@@ -12,6 +12,7 @@ public class DomainResultTests
         var r = DomainResult.Ok();
         r.IsSuccess.Should().BeTrue();
         r.IsFailed.Should().BeFalse();
+        r.Error.Should().BeEmpty();
     }
 
     [Fact]
@@ -29,6 +30,7 @@ public class DomainResultTests
         var r = DomainResult.Ok(42);
         r.IsSuccess.Should().BeTrue();
         r.Value.Should().Be(42);
+        r.Error.Should().BeEmpty();
     }
 
     [Fact]

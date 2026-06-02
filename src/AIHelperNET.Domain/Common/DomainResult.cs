@@ -66,15 +66,13 @@ public readonly struct DomainResult<T>
         Error = error;
     }
 
+#pragma warning disable CA1000 // Static factory on generic type — called only via non-generic DomainResult
     /// <summary>Creates a successful result carrying <paramref name="value"/>.</summary>
     /// <param name="value">The value to carry.</param>
-#pragma warning disable CA1000 // Static factory on generic type — called only via non-generic DomainResult
     public static DomainResult<T> Ok(T value) => new(true, value, "");
-#pragma warning restore CA1000
 
     /// <summary>Creates a failed result.</summary>
     /// <param name="error">The error description.</param>
-#pragma warning disable CA1000 // Static factory on generic type — called only via non-generic DomainResult
     public static DomainResult<T> Fail(string error) => new(false, default, error);
 #pragma warning restore CA1000
 }
