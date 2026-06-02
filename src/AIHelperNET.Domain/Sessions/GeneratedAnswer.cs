@@ -40,7 +40,14 @@ public sealed class GeneratedAnswer
     public void Complete(DateTimeOffset at) { Status = AnswerStatus.Completed; CompletedAt = at; }
 
     /// <summary>Cancels a streaming answer; no-op if already finalised.</summary>
-    public void Cancel(DateTimeOffset at) { if (Status == AnswerStatus.Streaming) Status = AnswerStatus.Cancelled; CompletedAt = at; }
+    public void Cancel(DateTimeOffset at)
+    {
+        if (Status == AnswerStatus.Streaming)
+        {
+            Status = AnswerStatus.Cancelled;
+            CompletedAt = at;
+        }
+    }
 
     /// <summary>Marks the answer as failed.</summary>
     public void Fail(DateTimeOffset at) { Status = AnswerStatus.Failed; CompletedAt = at; }
