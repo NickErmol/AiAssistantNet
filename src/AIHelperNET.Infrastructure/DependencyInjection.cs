@@ -1,4 +1,5 @@
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Infrastructure.Audio;
 using AIHelperNET.Infrastructure.Common;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Persistence;
@@ -25,6 +26,11 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<ISecretStore, WindowsCredentialSecretStore>();
         services.AddSingleton<IGlobalHotkeyService, GlobalHotkeyService>();
+
+        services.AddHttpClient(nameof(Transcription.WhisperModelProvider));
+        services.AddSingleton<IAudioCaptureService, NAudioCaptureService>();
+        services.AddSingleton<Transcription.WhisperModelProvider>();
+        services.AddSingleton<ITranscriptionService, Transcription.WhisperTranscriptionService>();
 
         return services;
     }
