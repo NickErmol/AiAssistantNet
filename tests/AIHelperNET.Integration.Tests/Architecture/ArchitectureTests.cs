@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using NetArchTest.Rules;
 using Xunit;
@@ -6,27 +7,37 @@ namespace AIHelperNET.Integration.Tests.Architecture;
 
 public class ArchitectureTests
 {
-    // These will be replaced with real NetArchTest assertions in Phase 2
-    // once Domain and Application assemblies have types to inspect.
+    private static readonly Assembly DomainAssembly      = typeof(AIHelperNET.Domain.Sessions.Session).Assembly;
+    private static readonly Assembly ApplicationAssembly = typeof(AIHelperNET.Application.DependencyInjection).Assembly;
 
     [Fact]
     public void Domain_ShouldNotDependOnApplication()
     {
-        // Placeholder — implement after Domain types exist (Phase 2)
-        Assert.True(true, "Placeholder: replace with NetArchTest assertion after Domain layer is built.");
+        Types.InAssembly(DomainAssembly)
+            .ShouldNot().HaveDependencyOn("AIHelperNET.Application")
+            .GetResult().IsSuccessful.Should().BeTrue();
     }
 
     [Fact]
     public void Domain_ShouldNotDependOnInfrastructure()
     {
-        // Placeholder — implement after Domain types exist (Phase 2)
-        Assert.True(true, "Placeholder: replace with NetArchTest assertion after Domain layer is built.");
+        Types.InAssembly(DomainAssembly)
+            .ShouldNot().HaveDependencyOn("AIHelperNET.Infrastructure")
+            .GetResult().IsSuccessful.Should().BeTrue();
     }
 
     [Fact]
     public void Application_ShouldNotDependOnInfrastructure()
     {
-        // Placeholder — implement after Application types exist (Phase 2)
-        Assert.True(true, "Placeholder: replace with NetArchTest assertion after Application layer is built.");
+        Types.InAssembly(ApplicationAssembly)
+            .ShouldNot().HaveDependencyOn("AIHelperNET.Infrastructure")
+            .GetResult().IsSuccessful.Should().BeTrue();
+    }
+
+    [Fact]
+    public void QuestionDetector_LivesInDomain()
+    {
+        typeof(AIHelperNET.Domain.Questions.QuestionDetector).Assembly
+            .Should().BeSameAs(DomainAssembly);
     }
 }
