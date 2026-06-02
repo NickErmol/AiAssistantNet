@@ -17,7 +17,8 @@ public sealed record GenerateAnswerCommand(
 /// <summary>Handles <see cref="GenerateAnswerCommand"/>.</summary>
 public sealed class GenerateAnswerHandler(
     ISessionRepository repository,
-    IAnswerProvider answerProvider,
+    IAnswerProviderResolver providerResolver,
+    ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : IRequestHandler<GenerateAnswerCommand, Result<AnswerId>>
@@ -25,6 +26,9 @@ public sealed class GenerateAnswerHandler(
     /// <inheritdoc/>
     public async ValueTask<Result<AnswerId>> Handle(GenerateAnswerCommand cmd, CancellationToken cancellationToken)
     {
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var provider = providerResolver.Resolve(settings.ActiveBackend);
+
         var get = await repository.GetAsync(cmd.SessionId, cancellationToken);
         if (get.IsFailed) return get.ToResult<AnswerId>();
         var session = get.Value;
@@ -40,7 +44,7 @@ public sealed class GenerateAnswerHandler(
 
         try
         {
-            await foreach (var chunk in answerProvider.StreamAnswerAsync(prompt, cancellationToken))
+            await foreach (var chunk in provider.StreamAnswerAsync(prompt, cancellationToken))
             {
                 answer.AppendChunk(chunk);
                 await streamSink.PushAsync(answer.Id, chunk, cancellationToken);
