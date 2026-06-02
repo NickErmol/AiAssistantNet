@@ -7,6 +7,7 @@ namespace AIHelperNET.Domain.Sessions;
 public sealed class GeneratedAnswer
 {
     private readonly StringBuilder _buffer = new();
+    private string _persistedContent = string.Empty;
 
     /// <summary>Unique identifier for this answer.</summary>
     public AnswerId Id { get; }
@@ -23,8 +24,8 @@ public sealed class GeneratedAnswer
     /// <summary>Current generation status.</summary>
     public AnswerStatus Status { get; private set; }
 
-    /// <summary>The accumulated answer content built from streamed chunks.</summary>
-    public string Content => _buffer.ToString();
+    /// <summary>Returns live buffer during streaming, persisted snapshot after completion.</summary>
+    public string Content => _buffer.Length > 0 ? _buffer.ToString() : _persistedContent;
 
     private GeneratedAnswer(AnswerId id, QuestionId questionId, DateTimeOffset at)
         => (Id, QuestionId, StartedAt, Status) = (id, questionId, at, AnswerStatus.Streaming);
@@ -37,20 +38,31 @@ public sealed class GeneratedAnswer
     public void AppendChunk(string chunk) => _buffer.Append(chunk);
 
     /// <summary>Marks the answer as successfully completed.</summary>
-    public void Complete(DateTimeOffset at) { Status = AnswerStatus.Completed; CompletedAt = at; }
+    public void Complete(DateTimeOffset at)
+    {
+        Status = AnswerStatus.Completed;
+        CompletedAt = at;
+        _persistedContent = _buffer.ToString();
+        _buffer.Clear();
+    }
 
     /// <summary>Cancels a streaming answer; no-op if already finalised.</summary>
     public void Cancel(DateTimeOffset at)
     {
-        if (Status == AnswerStatus.Streaming)
-        {
-            Status = AnswerStatus.Cancelled;
-            CompletedAt = at;
-        }
+        if (Status == AnswerStatus.Streaming) Status = AnswerStatus.Cancelled;
+        _persistedContent = _buffer.ToString();
+        _buffer.Clear();
+        CompletedAt = at;
     }
 
     /// <summary>Marks the answer as failed.</summary>
-    public void Fail(DateTimeOffset at) { Status = AnswerStatus.Failed; CompletedAt = at; }
+    public void Fail(DateTimeOffset at)
+    {
+        Status = AnswerStatus.Failed;
+        _persistedContent = _buffer.ToString();
+        _buffer.Clear();
+        CompletedAt = at;
+    }
 
 #pragma warning disable CS8618 // EF Core parameterless constructor — properties set by materialiser
     private GeneratedAnswer() { }

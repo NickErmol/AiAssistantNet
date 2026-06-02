@@ -2,8 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <IsPackable>false</IsPackable>
-    <!-- Test projects: suppress XML-doc requirement and underscore naming rule -->
-    <NoWarn>$(NoWarn);CS1591;CA1707</NoWarn>
+    <!-- Test projects: suppress XML-doc requirement, underscore naming, and disposable-field warning (IAsyncLifetime handles disposal) -->
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
