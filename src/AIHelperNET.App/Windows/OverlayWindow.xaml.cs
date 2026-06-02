@@ -8,8 +8,7 @@ namespace AIHelperNET.App.Windows;
 
 public partial class OverlayWindow : Window
 {
-    [DllImport("user32.dll")]
-    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
+    [DllImport("user32.dll")] private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
 
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
     private const uint WDA_MONITOR            = 0x00000001;

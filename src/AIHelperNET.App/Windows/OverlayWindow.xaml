@@ -5,7 +5,7 @@
         Width="500" Height="400"
         WindowStyle="None"
         Background="#1A1A2E"
-        Opacity="0.88"
+        Opacity="0.75"
         Topmost="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False">
