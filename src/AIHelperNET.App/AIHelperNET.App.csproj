@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>AIHelperNET.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AIHelperNET.Application\AIHelperNET.Application.csproj" />
+    <ProjectReference Include="..\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
+    <ProjectReference Include="..\AIHelperNET.Infrastructure\AIHelperNET.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AIHelperNET.App/AIHelperNET.App.csproj" />
+    <Project Path="src/AIHelperNET.Application/AIHelperNET.Application.csproj" />
+    <Project Path="src/AIHelperNET.Domain/AIHelperNET.Domain.csproj" />
+    <Project Path="src/AIHelperNET.Infrastructure/AIHelperNET.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AIHelperNET.Application.Tests/AIHelperNET.Application.Tests.csproj" />
+    <Project Path="tests/AIHelperNET.Domain.Tests/AIHelperNET.Domain.Tests.csproj" />
+    <Project Path="tests/AIHelperNET.Integration.Tests/AIHelperNET.Integration.Tests.csproj" />
+  </Folder>
+</Solution>
