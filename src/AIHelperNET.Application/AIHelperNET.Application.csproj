@@ -5,6 +5,10 @@
   <ItemGroup>
     <ProjectReference Include="..\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <!-- GetAudioDevicesQuery handler lives in Infrastructure (requires NAudio) -->
+    <NoWarn>$(NoWarn);MSG0005</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentResults" Version="4.0.0" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
