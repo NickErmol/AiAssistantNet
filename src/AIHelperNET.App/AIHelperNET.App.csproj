@@ -4,11 +4,18 @@
     <UseWPF>true</UseWPF>
     <OutputType>WinExe</OutputType>
     <RootNamespace>AIHelperNET.App</RootNamespace>
+    <!-- Presentation layer: suppress XML-doc, disposable-via-IAsyncLifetime, and locale-specific format -->
+    <NoWarn>$(NoWarn);CS1591;CA1001;CA1305</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AIHelperNET.Application\AIHelperNET.Application.csproj" />
     <ProjectReference Include="..\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
     <ProjectReference Include="..\AIHelperNET.Infrastructure\AIHelperNET.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
