@@ -4,8 +4,7 @@
         Title="AIHelper"
         Width="500" Height="400"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="#CC1A1A2E"
+        Background="#1A1A2E"
         Topmost="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False">
