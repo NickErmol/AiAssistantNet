@@ -5,4 +5,16 @@
   <ItemGroup>
     <ProjectReference Include="..\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentResults" Version="4.0.0" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
+    <PackageReference Include="Mediator.SourceGenerator" Version="3.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Riok.Mapperly" Version="4.3.1" />
+  </ItemGroup>
 </Project>
