@@ -23,7 +23,14 @@ public sealed record SessionDto(
     CodeProfile CodeProfile,
     IReadOnlyList<TranscriptItemDto> Transcript,
     IReadOnlyList<DetectedQuestionDto> Questions,
-    IReadOnlyList<GeneratedAnswerDto> Answers);
+    IReadOnlyList<GeneratedAnswerDto> Answers)
+{
+    /// <summary>Capture mode active for this session.</summary>
+    public SessionMode Mode { get; init; } = SessionMode.AudioAndScreen;
+
+    /// <summary>Audio source active for this session.</summary>
+    public AudioSourceMode AudioSource { get; init; } = AudioSourceMode.Both;
+}
 
 /// <summary>Projection of a single transcript item.</summary>
 /// <param name="Id">Item identifier.</param>

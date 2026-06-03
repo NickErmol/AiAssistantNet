@@ -10,9 +10,13 @@ namespace AIHelperNET.Application.Sessions.Commands;
 /// <summary>Command to start a new interview session.</summary>
 /// <param name="AnswerSettings">Initial answer settings for the session.</param>
 /// <param name="CodeProfile">Candidate's code profile.</param>
+/// <param name="Mode">Session capture mode.</param>
+/// <param name="AudioSource">Audio source selection.</param>
 public sealed record StartSessionCommand(
     AnswerSettings AnswerSettings,
-    CodeProfile CodeProfile) : IRequest<Result<SessionDto>>;
+    CodeProfile CodeProfile,
+    SessionMode Mode = SessionMode.AudioAndScreen,
+    AudioSourceMode AudioSource = AudioSourceMode.Both) : IRequest<Result<SessionDto>>;
 
 /// <summary>Handles <see cref="StartSessionCommand"/>.</summary>
 public sealed class StartSessionHandler(
@@ -25,10 +29,11 @@ public sealed class StartSessionHandler(
         StartSessionCommand command, CancellationToken cancellationToken)
     {
         var create = Session.Create(command.AnswerSettings, command.CodeProfile, clock.GetUtcNow());
-        if (create.IsFailed)
-            return Result.Fail(create.Error);
+        if (create.IsFailed) return Result.Fail(create.Error);
 
         var session = create.Value;
+        session.ChangeMode(command.Mode, command.AudioSource);
+
         await repository.AddAsync(session, cancellationToken);
         var save = await unitOfWork.SaveChangesAsync(cancellationToken);
         if (save.IsFailed) return save;

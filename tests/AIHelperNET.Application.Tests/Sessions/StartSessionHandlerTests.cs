@@ -27,8 +27,29 @@ public class StartSessionHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.State.Should().Be(SessionState.Active);
+        result.Value.Mode.Should().Be(SessionMode.AudioAndScreen);
+        result.Value.AudioSource.Should().Be(AudioSourceMode.Both);
         await repo.Received(1).AddAsync(Arg.Any<Session>(), Arg.Any<CancellationToken>());
         await uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WithCustomMode_MapsToDto()
+    {
+        var repo = Substitute.For<ISessionRepository>();
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Result.Ok());
+        var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+
+        var handler = new StartSessionHandler(repo, uow, clock);
+        var cmd = new StartSessionCommand(AnswerSettings.Default, CodeProfile.Empty,
+            SessionMode.AudioOnly, AudioSourceMode.MicrophoneOnly);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Mode.Should().Be(SessionMode.AudioOnly);
+        result.Value.AudioSource.Should().Be(AudioSourceMode.MicrophoneOnly);
     }
 
     [Fact]

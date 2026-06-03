@@ -1,0 +1,23 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Brush.Background.Window"          Color="#F1F5F9"/>
+    <SolidColorBrush x:Key="Brush.Background.Panel"           Color="#E8EDF3"/>
+    <SolidColorBrush x:Key="Brush.Background.Sidebar"         Color="#DDE3EC"/>
+    <SolidColorBrush x:Key="Brush.Background.Card"            Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Brush.Background.TitleBar"        Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="Brush.Background.Button"          Color="#CBD5E1"/>
+    <SolidColorBrush x:Key="Brush.Background.Button.Hover"    Color="#B8C5D6"/>
+    <SolidColorBrush x:Key="Brush.Background.Button.Pressed"  Color="#A0B0C4"/>
+    <SolidColorBrush x:Key="Brush.Background.IconBtn.Hover"    Color="#18000000"/>
+    <SolidColorBrush x:Key="Brush.Background.IconBtn.Pressed"  Color="#28000000"/>
+    <SolidColorBrush x:Key="Brush.Foreground.Primary"         Color="#1E293B"/>
+    <SolidColorBrush x:Key="Brush.Foreground.Secondary"       Color="#475569"/>
+    <SolidColorBrush x:Key="Brush.Foreground.Muted"           Color="#94A3B8"/>
+    <SolidColorBrush x:Key="Brush.Foreground.Button"          Color="#1E293B"/>
+    <SolidColorBrush x:Key="Brush.Accent"                     Color="#4F8EF7"/>
+    <SolidColorBrush x:Key="Brush.Semantic.Active"            Color="#16A34A"/>
+    <SolidColorBrush x:Key="Brush.Semantic.Question"          Color="#D97706"/>
+    <SolidColorBrush x:Key="Brush.Border"                     Color="#CBD5E1"/>
+    <SolidColorBrush x:Key="Brush.Splitter"                   Color="#94A3B8"/>
+    <SolidColorBrush x:Key="Brush.Splitter.Hover"             Color="#804F8EF7"/>
+</ResourceDictionary>

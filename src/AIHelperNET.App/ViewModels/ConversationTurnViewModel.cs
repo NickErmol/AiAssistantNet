@@ -1,0 +1,153 @@
+using System.Collections.ObjectModel;
+using AIHelperNET.Application.Answers.Commands;
+using AIHelperNET.Application.Sessions.Commands;
+using AIHelperNET.Domain.Ids;
+using AIHelperNET.Domain.Sessions;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Mediator;
+
+namespace AIHelperNET.App.ViewModels;
+
+/// <summary>Displays a single answer version within a conversation turn.</summary>
+public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, DateTimeOffset createdAt)
+{
+    /// <summary>Gets the answer version identifier.</summary>
+    public AnswerVersionId Id           => id;
+
+    /// <summary>Gets the human-readable label for this version type.</summary>
+    public string VersionLabel          => type switch
+    {
+        AnswerVersionType.Preliminary               => "Preliminary",
+        AnswerVersionType.RefinedAfterClarification => "Refined — after clarification",
+        AnswerVersionType.UpdatedWithScreen         => "Updated with screen",
+        AnswerVersionType.ManuallyRegenerated       => "Manually regenerated",
+        _                                           => type.ToString()
+    };
+
+    /// <summary>Gets the formatted creation time label.</summary>
+    public string TimeLabel             => createdAt.ToLocalTime().ToString("HH:mm:ss");
+
+    /// <summary>Gets or sets the accumulated answer text.</summary>
+    public string Text                  { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a value indicating whether this is the latest version.</summary>
+    public bool IsLatest                { get; set; }
+}
+
+/// <summary>Represents a single conversation turn (question + answers) in the UI.</summary>
+public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
+{
+    /// <summary>Gets the turn identifier.</summary>
+    public ConversationTurnId Id                              => id;
+
+    /// <summary>Gets the text of the initial question.</summary>
+    public string InitialQuestion                             => initialQuestion;
+
+    /// <summary>Gets or sets the current turn status.</summary>
+    public ConversationTurnStatus Status                      { get; set; } = ConversationTurnStatus.Detected;
+
+    /// <summary>Gets the human-readable status label.</summary>
+    public string StatusLabel                                 => Status.ToString();
+
+    /// <summary>Gets all answer versions for this turn.</summary>
+    public ObservableCollection<AnswerVersionVm> AnswerVersions { get; } = [];
+
+    /// <summary>Gets the latest answer version, or <see langword="null"/> if none.</summary>
+    public AnswerVersionVm? LatestVersion                     => AnswerVersions.FirstOrDefault(v => v.IsLatest);
+}
+
+/// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
+public sealed partial class ConversationTurnViewModel(IMediator mediator) : ObservableObject
+{
+    [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
+    [ObservableProperty] private SessionId? _activeSessionId;
+
+    /// <summary>Looks up a turn by its identifier.</summary>
+    public TurnVm? GetTurn(ConversationTurnId id)
+        => Turns.FirstOrDefault(t => t.Id == id);
+
+    /// <summary>Appends a streaming chunk to the active version of the given turn.</summary>
+    public void OnChunk(ConversationTurnId turnId, AnswerVersionType versionType, string chunk)
+    {
+        var turn = Turns.FirstOrDefault(t => t.Id == turnId);
+        if (turn is null) return;
+
+        var version = turn.AnswerVersions.FirstOrDefault(v => v.IsLatest);
+        if (version is null)
+        {
+            foreach (var v in turn.AnswerVersions) v.IsLatest = false;
+            version = new AnswerVersionVm(AnswerVersionId.New(), versionType, DateTimeOffset.UtcNow)
+                { IsLatest = true };
+            turn.AnswerVersions.Insert(0, version);
+        }
+        version.Text += chunk;
+    }
+
+    /// <summary>Called when streaming for the given turn and version type completes.</summary>
+    public static void OnComplete(ConversationTurnId turnId, AnswerVersionType versionType)
+    {
+        // Version already marked IsLatest during streaming — no further action needed.
+    }
+
+    /// <summary>Appends an error version to the given turn.</summary>
+    public void OnError(ConversationTurnId turnId, string errorMessage)
+    {
+        var turn = Turns.FirstOrDefault(t => t.Id == turnId);
+        if (turn is null) return;
+        var errVersion = new AnswerVersionVm(AnswerVersionId.New(), AnswerVersionType.Preliminary,
+            DateTimeOffset.UtcNow) { Text = $"[Error: {errorMessage}]", IsLatest = true };
+        turn.AnswerVersions.Insert(0, errVersion);
+    }
+
+    /// <summary>Adds a new turn to the top of the list.</summary>
+    public void AddTurn(ConversationTurnId id, string question)
+        => Turns.Insert(0, new TurnVm(id, question));
+
+    /// <summary>Regenerates the answer for the given turn, optionally with screen context.</summary>
+    [RelayCommand]
+    private async Task RegenerateAsync(TurnVm? turn)
+    {
+        if (turn is null || ActiveSessionId is not { } sid) return;
+        await mediator.Send(new RegenerateAnswerCommand(sid, turn.Id));
+    }
+
+    /// <summary>Dismisses the given turn and removes it from the list.</summary>
+    [RelayCommand]
+    private async Task DismissAsync(TurnVm? turn)
+    {
+        if (turn is null || ActiveSessionId is not { } sid) return;
+        await mediator.Send(new DismissTurnCommand(sid, turn.Id));
+        Turns.Remove(turn);
+    }
+
+    /// <summary>Resolves the given turn and removes it from the list.</summary>
+    [RelayCommand]
+    private async Task ResolveAsync(TurnVm? turn)
+    {
+        if (turn is null || ActiveSessionId is not { } sid) return;
+        await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
+        Turns.Remove(turn);
+    }
+
+    /// <summary>Copies the latest answer version text to the clipboard.</summary>
+    [RelayCommand]
+    private static void CopyLatest(TurnVm? turn)
+    {
+        var text = turn?.LatestVersion?.Text;
+        if (!string.IsNullOrEmpty(text))
+            System.Windows.Clipboard.SetText(text);
+    }
+
+    /// <summary>Captures the current screen and regenerates the answer for the most recent turn.</summary>
+    [RelayCommand]
+    private async Task CaptureScreenAsync()
+    {
+        if (ActiveSessionId is not { } sid) return;
+        var result = await mediator.Send(new CaptureScreenCommand());
+        if (result.IsSuccess && Turns.FirstOrDefault() is { } activeTurn)
+        {
+            await mediator.Send(new RegenerateAnswerCommand(sid, activeTurn.Id, result.Value));
+        }
+    }
+}

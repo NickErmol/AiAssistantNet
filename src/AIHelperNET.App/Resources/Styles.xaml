@@ -1,0 +1,219 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════
+         Button — default implicit style with
+         CornerRadius=3 and hover/pressed/disabled
+    ══════════════════════════════════════════════ -->
+    <Style TargetType="Button">
+        <Setter Property="Background"      Value="{DynamicResource Brush.Background.Button}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource Brush.Foreground.Button}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="6,3"/>
+        <Setter Property="FontSize"        Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource Brush.Background.Button.Hover}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource Brush.Background.Button.Pressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ActionBtn — small pill for Copy/Regen/Dismiss/Resolve -->
+    <Style x:Key="ActionBtn" TargetType="Button"
+           BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Padding" Value="5,2"/>
+        <Setter Property="Margin"  Value="0,0,4,0"/>
+    </Style>
+
+    <!-- IconBtn — transparent icon button (title bar, sidebar hide) -->
+    <Style x:Key="IconBtn" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="Foreground"      Value="{DynamicResource Brush.Foreground.Muted}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="4,2"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="Transparent"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource Brush.Background.IconBtn.Hover}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource Brush.Background.IconBtn.Pressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- SectionLabel — small-caps heading (TRANSCRIPT, MODE, STATUS …) -->
+    <Style x:Key="SectionLabel" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Muted}"/>
+        <Setter Property="FontSize"   Value="{DynamicResource Font.XS}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Margin"     Value="0,0,0,4"/>
+    </Style>
+
+    <!-- StatusDot — 7×7 indicator ellipse (Fill set per-element via binding) -->
+    <Style x:Key="StatusDot" TargetType="Ellipse">
+        <Setter Property="Width"  Value="7"/>
+        <Setter Property="Height" Value="7"/>
+        <Setter Property="Margin" Value="0,0,4,0"/>
+    </Style>
+
+    <!-- RadioBtn — custom circle indicator replacing WPF default -->
+    <Style x:Key="RadioBtn" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Secondary}"/>
+        <Setter Property="FontSize"   Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Margin"     Value="0,2"/>
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="12" Height="12" Margin="0,0,5,0"
+                              VerticalAlignment="Center">
+                            <Ellipse x:Name="outer"
+                                     Fill="Transparent"
+                                     Stroke="{DynamicResource Brush.Foreground.Muted}"
+                                     StrokeThickness="1.5"/>
+                            <Ellipse x:Name="inner"
+                                     Width="4" Height="4"
+                                     Fill="White"
+                                     Visibility="Collapsed"/>
+                        </Grid>
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="outer" Property="Fill"
+                                    Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="outer" Property="Stroke"
+                                    Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="inner" Property="Visibility"
+                                    Value="Visible"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- GridSplitter — hover changes to accent tint -->
+    <Style TargetType="GridSplitter">
+        <Setter Property="Background" Value="{DynamicResource Brush.Splitter}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border x:Name="border" Background="{TemplateBinding Background}"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource Brush.Splitter.Hover}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Thumb used by the slim ScrollBar below -->
+    <Style x:Key="SlimScrollBarThumb" TargetType="Thumb">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="thumb"
+                            CornerRadius="3"
+                            Background="{DynamicResource Brush.Foreground.Muted}"
+                            Opacity="0.5"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="thumb" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ScrollBar — 6px slim, no arrow buttons -->
+    <Style TargetType="ScrollBar">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Width"    Value="6"/>
+        <Setter Property="MinWidth" Value="6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid>
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource SlimScrollBarThumb}"
+                                       Margin="0,2"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width"     Value="Auto"/>
+                <Setter Property="MinWidth"  Value="0"/>
+                <Setter Property="Height"    Value="6"/>
+                <Setter Property="MinHeight" Value="6"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ScrollViewer — auto vertical, disabled horizontal (default for all) -->
+    <Style TargetType="ScrollViewer">
+        <Setter Property="VerticalScrollBarVisibility"   Value="Auto"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+    </Style>
+
+</ResourceDictionary>
