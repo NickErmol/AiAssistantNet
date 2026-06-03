@@ -6,9 +6,11 @@ using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Persistence;
+using AIHelperNET.Infrastructure.Transcription;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace AIHelperNET.App;
 
@@ -51,6 +53,27 @@ public partial class App : System.Windows.Application
 
         overlay.Show();
         WireHotkeys(overlay);
+        PreWarmWhisperModel();
+    }
+
+    private void PreWarmWhisperModel()
+    {
+        var modelProvider  = _host.Services.GetRequiredService<WhisperModelProvider>();
+        var settingsStore  = _host.Services.GetRequiredService<AIHelperNET.Application.Abstractions.ISettingsStore>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var settings = await settingsStore.LoadAsync(CancellationToken.None);
+                Log.Information("Whisper: pre-warming {Model} model in background…", settings.WhisperModel);
+                await modelProvider.GetFactoryAsync(settings.WhisperModel, CancellationToken.None);
+                Log.Information("Whisper: model ready");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Whisper: pre-warm failed");
+            }
+        });
     }
 
     private void WireHotkeys(MainOverlayWindow overlay)

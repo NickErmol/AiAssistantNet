@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions;
 using AIHelperNET.Domain.Ids;
@@ -63,10 +64,27 @@ public sealed class SessionRunner(
         CancellationToken ct)
     {
         Log.Information("SessionRunner: pipeline starting (mode={AudioSource})", audioSource);
+
+        // NAudio capture starts immediately on a background thread so audio is
+        // buffered while WhisperFactory.FromPath (synchronous, ~30s) loads the model.
+        var frameBuffer = Channel.CreateUnbounded<AudioFrame>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+        var captureTask = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var frame in FilterFrames(audioCapture.CaptureAsync(devices, ct), audioSource, ct))
+                    await frameBuffer.Writer.WriteAsync(frame, ct);
+            }
+            catch (OperationCanceledException) { }
+            finally { frameBuffer.Writer.TryComplete(); }
+        }, ct);
+
         try
         {
-            var frames = FilterFrames(audioCapture.CaptureAsync(devices, ct), audioSource, ct);
-            await foreach (var seg in transcription.TranscribeAsync(frames, model, ct).WithCancellation(ct))
+            var bufferedFrames = frameBuffer.Reader.ReadAllAsync(ct);
+            await foreach (var seg in transcription.TranscribeAsync(bufferedFrames, model, ct).WithCancellation(ct))
             {
                 Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}", seg.Speaker, seg.Confidence, seg.Text);
                 var item = TranscriptItem.Create(seg.Speaker, seg.Text, seg.CapturedAt, seg.Confidence);
@@ -78,6 +96,8 @@ public sealed class SessionRunner(
         {
             Log.Error(ex, "SessionRunner: unhandled error in pipeline");
         }
+
+        await captureTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         Log.Information("SessionRunner: pipeline stopped");
     }
 
