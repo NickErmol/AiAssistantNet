@@ -113,7 +113,8 @@ static class ThemeManager
     public static void Toggle()
     {
         var dicts   = System.Windows.Application.Current.Resources.MergedDictionaries;
-        var current = dicts.First(d => d.Source?.OriginalString.Contains("Theme") == true);
+        var current = dicts.FirstOrDefault(d => d.Source?.OriginalString.Contains("Theme") == true);
+        if (current is null) return;
         dicts.Remove(current);
         _isDark = !_isDark;
         dicts.Insert(0, new ResourceDictionary
