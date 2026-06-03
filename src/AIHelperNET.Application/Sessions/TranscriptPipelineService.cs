@@ -10,7 +10,8 @@ namespace AIHelperNET.Application.Sessions;
 /// <summary>Processes incoming transcript items and drives conversation turn lifecycle.</summary>
 public sealed class TranscriptPipelineService(
     IServiceScopeFactory scopeFactory,
-    ITranscriptSink transcriptSink)
+    ITranscriptSink transcriptSink,
+    IConversationTurnSink turnSink)
 {
     private readonly QuestionDetector _detector = new();
 
@@ -39,6 +40,7 @@ public sealed class TranscriptPipelineService(
                 if (turnResult.IsFailed) return Task.CompletedTask;
                 var turn = turnResult.Value;
 
+                turnSink.OnTurnCreated(turn.Id, item.Text);
                 FireAndForget(new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary), ct);
             }
             else if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
