@@ -17,7 +17,11 @@ public sealed class SessionMapper
         session.CodeProfile,
         session.Transcript.Select(t => new TranscriptItemDto(t.Id, t.Speaker, t.Text, t.Timestamp, t.Confidence)).ToList(),
         session.Questions.Select(q => new DetectedQuestionDto(q.Id, q.Text, q.Source, q.DetectedAt)).ToList(),
-        session.Answers.Select(a => new GeneratedAnswerDto(a.Id, a.QuestionId, a.StartedAt, a.CompletedAt, a.Status, a.Content)).ToList());
+        session.Answers.Select(a => new GeneratedAnswerDto(a.Id, a.QuestionId, a.StartedAt, a.CompletedAt, a.Status, a.Content)).ToList())
+    {
+        Mode        = session.Mode,
+        AudioSource = session.AudioSource
+    };
 
     /// <summary>Projects a <see cref="Session"/> to a lightweight <see cref="SessionSummaryDto"/>.</summary>
     /// <param name="session">The session to summarise.</param>
