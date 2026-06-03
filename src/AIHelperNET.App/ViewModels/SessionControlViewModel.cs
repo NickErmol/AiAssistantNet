@@ -1,3 +1,5 @@
+using AIHelperNET.App.Services;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Domain.Ids;
@@ -10,7 +12,7 @@ using Mediator;
 namespace AIHelperNET.App.ViewModels;
 
 /// <summary>Controls session lifecycle and capture mode selection.</summary>
-public sealed partial class SessionControlViewModel(IMediator mediator) : ObservableObject
+public sealed partial class SessionControlViewModel(IMediator mediator, SessionRunner runner) : ObservableObject
 {
     /// <summary>Gets or sets a value indicating whether a session is currently active.</summary>
     [ObservableProperty] private bool _isSessionActive;
@@ -59,10 +61,17 @@ public sealed partial class SessionControlViewModel(IMediator mediator) : Observ
                 IsSessionActive     = true;
                 IsMicActive         = AudioSource is AudioSourceMode.MicrophoneOnly or AudioSourceMode.Both;
                 IsSystemAudioActive = AudioSource is AudioSourceMode.SystemAudioOnly or AudioSourceMode.Both;
+
+                await runner.StartAsync(
+                    result.Value.Id,
+                    new AudioDeviceSelection(settings?.MicDeviceId, settings?.LoopbackDeviceId),
+                    settings?.WhisperModel ?? WhisperModelSize.Base,
+                    AudioSource);
             }
         }
         else if (ActiveSessionId is { } id)
         {
+            await runner.StopAsync();
             await mediator.Send(new StopSessionCommand(id));
             IsSessionActive     = false;
             IsMicActive         = false;

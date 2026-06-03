@@ -87,7 +87,14 @@ public partial class App : System.Windows.Application
                     turnVm2.CopyLatestCommand.Execute(turnVm2.Turns.FirstOrDefault());
                     break;
                 case HotkeyId.ToggleOverlay:
-                    sessionVm.ToggleSidebarCommand.Execute(null);
+                    if (overlay.IsVisible)
+                        overlay.Hide();
+                    else
+                    {
+                        overlay.Show();
+                        overlay.Activate();
+                        overlay.WindowState = WindowState.Normal;
+                    }
                     break;
             }
         };

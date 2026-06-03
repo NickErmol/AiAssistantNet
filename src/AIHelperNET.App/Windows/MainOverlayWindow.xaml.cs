@@ -66,6 +66,9 @@ public partial class MainOverlayWindow : Window
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         => DragMove();
 
+    private void Minimize_Click(object sender, RoutedEventArgs e)
+        => Hide();
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
         _settingsWindow.Show();

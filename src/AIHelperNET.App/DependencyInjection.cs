@@ -1,3 +1,4 @@
+using AIHelperNET.App.Services;
 using AIHelperNET.App.Streaming;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
@@ -17,6 +18,9 @@ public static class DependencyInjection
         services.AddSingleton<IAnswerStreamSink>(sp => sp.GetRequiredService<AnswerStreamSink>());
         services.AddSingleton<TranscriptSink>();
         services.AddSingleton<ITranscriptSink>(sp => sp.GetRequiredService<TranscriptSink>());
+
+        // Session pipeline runner
+        services.AddSingleton<SessionRunner>();
 
         // ViewModels
         services.AddSingleton<SessionControlViewModel>();

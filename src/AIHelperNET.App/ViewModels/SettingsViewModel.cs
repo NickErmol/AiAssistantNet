@@ -33,4 +33,11 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         StatusMessage = result.IsSuccess ? "API key saved." : $"Error: {string.Join(", ", result.Errors)}";
         ApiKeyInput = string.Empty;
     }
+
+    [RelayCommand]
+    private async Task DeleteApiKeyAsync()
+    {
+        var result = await mediator.Send(new DeleteApiKeyCommand());
+        StatusMessage = result.IsSuccess ? "API key deleted." : $"Error: {string.Join(", ", result.Errors)}";
+    }
 }
