@@ -62,6 +62,13 @@
                             Style="{StaticResource IconBtn}"
                             FontSize="11"
                             Click="OpenSettings_Click"/>
+                    <Button Content="✕"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="11"
+                            Foreground="#CC4444"
+                            Margin="4,0,0,0"
+                            Click="Close_Click"
+                            ToolTip="Close"/>
                 </StackPanel>
             </Grid>
         </Border>

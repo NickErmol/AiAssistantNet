@@ -74,4 +74,7 @@ public partial class MainOverlayWindow : Window
 
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
         => ThemeManager.Toggle();
+
+    private void Close_Click(object sender, RoutedEventArgs e)
+        => Close();
 }
