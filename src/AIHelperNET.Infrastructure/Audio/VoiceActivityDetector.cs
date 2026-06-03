@@ -6,8 +6,8 @@ namespace AIHelperNET.Infrastructure.Audio;
 
 public sealed class VoiceActivityDetector
 {
-    private const float EnergyThreshold  = 0.01f;
-    private const int   SilenceFramesToFlush = 20;
+    private const float EnergyThreshold     = 0.01f;
+    private const int   SilenceFramesToFlush = 8;    // ~800 ms pause triggers flush
     private const int   MinFramesForSpeech   = 5;
 
     public static async IAsyncEnumerable<SpeechWindow> AccumulateSpeechWindows(
