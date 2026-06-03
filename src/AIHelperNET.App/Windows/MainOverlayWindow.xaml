@@ -5,28 +5,17 @@
         Width="600" Height="500"
         MinWidth="320" MinHeight="260"
         WindowStyle="None"
-        Background="#1A1A2E"
+        Background="{DynamicResource Brush.Background.Window}"
         Opacity="0.75"
         Topmost="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False">
-    <Window.Resources>
-        <Style x:Key="RadioBtn" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="#AAD4D4D4"/>
-            <Setter Property="FontSize"   Value="10"/>
-            <Setter Property="Margin"     Value="0,2"/>
-        </Style>
-        <Style x:Key="StatusDot" TargetType="Ellipse">
-            <Setter Property="Width"  Value="7"/>
-            <Setter Property="Height" Value="7"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
-            <Setter Property="Fill"   Value="#FF444444"/>
-        </Style>
-    </Window.Resources>
 
     <DockPanel>
         <!-- Title bar -->
-        <Border DockPanel.Dock="Top" Background="#0D0D1A" Padding="8,4"
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource Brush.Background.TitleBar}"
+                Padding="8,4"
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -36,13 +25,17 @@
                 </Grid.ColumnDefinitions>
 
                 <Button Grid.Column="0" Content="▶"
+                        Style="{StaticResource IconBtn}"
+                        FontSize="9"
                         Visibility="{Binding SessionControl.IsSidebarVisible,
                             Converter={StaticResource InverseBoolToVisibilityConverter}}"
                         Command="{Binding SessionControl.ToggleSidebarCommand}"
-                        Background="Transparent" Foreground="#666" BorderThickness="0"
-                        FontSize="9" Margin="0,0,6,0"/>
+                        Margin="0,0,6,0"/>
 
-                <TextBlock Grid.Column="1" Foreground="#88D4D4D4" FontSize="10" VerticalAlignment="Center">
+                <TextBlock Grid.Column="1"
+                           Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                           FontSize="{DynamicResource Font.SM}"
+                           VerticalAlignment="Center">
                     <Run Text="AIHelper · "/>
                     <Run Text="●"
                          Foreground="{Binding SessionControl.IsSessionActive,
@@ -59,10 +52,15 @@
                                 Converter={StaticResource BoolToStringConverter},
                                 ConverterParameter='Stop|Start'}"
                             Command="{Binding SessionControl.ToggleSessionCommand}"
-                            Background="#2A2A4A" Foreground="#CCC" BorderThickness="0"
-                            FontSize="9" Padding="6,2" Margin="0,0,4,0"/>
-                    <Button Content="⚙" Background="Transparent" Foreground="#666"
-                            BorderThickness="0" FontSize="11"
+                            Style="{StaticResource ActionBtn}"/>
+                    <Button Content="◐"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="13"
+                            Click="ToggleTheme_Click"
+                            ToolTip="Toggle theme"/>
+                    <Button Content="⚙"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="11"
                             Click="OpenSettings_Click"/>
                 </StackPanel>
             </Grid>
@@ -73,10 +71,12 @@
                 Width="{Binding SessionControl.IsSidebarVisible,
                     Converter={StaticResource BoolToWidthConverter},
                     ConverterParameter='120'}"
-                Background="#0A0A1A" BorderBrush="#333" BorderThickness="0,0,1,0"
+                Background="{DynamicResource Brush.Background.Sidebar}"
+                BorderBrush="{DynamicResource Brush.Border}"
+                BorderThickness="0,0,1,0"
                 Padding="8">
             <StackPanel>
-                <TextBlock Text="MODE" Foreground="#555" FontSize="8" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource SectionLabel}" Text="MODE" Margin="0,0,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Audio Only"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
@@ -90,7 +90,8 @@
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=AudioAndScreen}"/>
 
-                <TextBlock Text="AUDIO SOURCE" Foreground="#555" FontSize="8" Margin="0,10,0,4"/>
+                <TextBlock Style="{StaticResource SectionLabel}" Text="AUDIO SOURCE"
+                           Margin="0,10,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Mic Only"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
@@ -104,40 +105,50 @@
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=Both}"/>
 
-                <TextBlock Text="STATUS" Foreground="#555" FontSize="8" Margin="0,10,0,4"/>
+                <TextBlock Style="{StaticResource SectionLabel}" Text="STATUS"
+                           Margin="0,10,0,4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
                              Fill="{Binding SessionControl.IsMicActive,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
-                    <TextBlock Text="Mic" Foreground="#888" FontSize="9"/>
+                    <TextBlock Text="Mic"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                               FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
                              Fill="{Binding SessionControl.IsSystemAudioActive,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
-                    <TextBlock Text="System" Foreground="#888" FontSize="9"/>
+                    <TextBlock Text="System"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                               FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
                              Fill="{Binding SessionControl.IsOcrReady,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
-                    <TextBlock Text="OCR" Foreground="#888" FontSize="9"/>
+                    <TextBlock Text="OCR"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                               FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
                              Fill="{Binding SessionControl.IsAiConnected,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
-                    <TextBlock Text="AI" Foreground="#888" FontSize="9"/>
+                    <TextBlock Text="AI"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                               FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
 
-                <Button Content="◀ Hide" HorizontalAlignment="Left"
+                <Button Content="◀ Hide"
+                        HorizontalAlignment="Left"
                         Command="{Binding SessionControl.ToggleSidebarCommand}"
-                        Background="Transparent" Foreground="#444"
-                        BorderThickness="0" FontSize="9" Margin="0,12,0,0"/>
+                        Style="{StaticResource IconBtn}"
+                        Margin="0,12,0,0"/>
             </StackPanel>
         </Border>
 
@@ -150,10 +161,12 @@
             </Grid.RowDefinitions>
 
             <!-- Transcript panel -->
-            <Border Grid.Row="0" Background="#0D0D1A">
+            <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="TRANSCRIPT"
-                               Foreground="#555" FontSize="8" Margin="8,6,8,3"/>
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource SectionLabel}"
+                               Text="TRANSCRIPT"
+                               Margin="8,6,8,3"/>
                     <ScrollViewer x:Name="TranscriptScroll"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
@@ -163,12 +176,18 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="0,2">
                                         <TextBlock Text="{Binding TimestampLabel}"
-                                                   Foreground="#444" FontSize="9" Margin="0,0,6,0"/>
+                                                   Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                                   FontSize="{DynamicResource Font.XS}"
+                                                   Margin="0,0,6,0"/>
                                         <TextBlock Text="{Binding SpeakerLabel}"
                                                    Foreground="{Binding SpeakerColor}"
-                                                   FontSize="9" FontWeight="SemiBold" Margin="0,0,4,0"/>
-                                        <TextBlock Text="{Binding Text}" Foreground="#CCC"
-                                                   FontSize="9" TextWrapping="Wrap"/>
+                                                   FontSize="{DynamicResource Font.SM}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding Text}"
+                                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                                   FontSize="{DynamicResource Font.SM}"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -178,54 +197,69 @@
             </Border>
 
             <!-- Splitter -->
-            <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
-                          Background="#2A2A4A" Height="4"/>
+            <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" Height="4"/>
 
             <!-- Answer/turn panel -->
-            <Border Grid.Row="2" Background="#0D0D1A">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="8">
+            <Border Grid.Row="2" Background="{DynamicResource Brush.Background.Panel}">
+                <ScrollViewer Margin="8">
                     <ItemsControl ItemsSource="{Binding ConversationTurn.Turns}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,0,8" Padding="6"
-                                        Background="#111827" CornerRadius="4">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                            <TextBlock Text="❓ " Foreground="#FFCC44" FontSize="9"/>
-                                            <TextBlock Text="{Binding InitialQuestion}"
-                                                       Foreground="#FFCC44" FontSize="9"
-                                                       FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <Border Margin="0,0,0,8"
+                                        Background="{DynamicResource Brush.Background.Card}"
+                                        BorderBrush="{DynamicResource Brush.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        ClipToBounds="True">
+                                    <DockPanel>
+                                        <Rectangle DockPanel.Dock="Left"
+                                                   Width="3"
+                                                   Fill="{DynamicResource Brush.Accent}"/>
+                                        <StackPanel Margin="6">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                <TextBlock Text="❓ "
+                                                           Foreground="{DynamicResource Brush.Semantic.Question}"
+                                                           FontSize="{DynamicResource Font.XS}"/>
+                                                <TextBlock Text="{Binding InitialQuestion}"
+                                                           Foreground="{DynamicResource Brush.Semantic.Question}"
+                                                           FontSize="{DynamicResource Font.SM}"
+                                                           FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding StatusLabel}"
+                                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                                       FontSize="{DynamicResource Font.XS}"
+                                                       Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding LatestVersion.Text}"
+                                                       Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                                       FontSize="{DynamicResource Font.MD}"
+                                                       TextWrapping="Wrap"
+                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="Copy"
+                                                        Command="{Binding DataContext.ConversationTurn.CopyLatestCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource ActionBtn}"/>
+                                                <Button Content="Regen"
+                                                        Command="{Binding DataContext.ConversationTurn.RegenerateCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource ActionBtn}"/>
+                                                <Button Content="Dismiss"
+                                                        Command="{Binding DataContext.ConversationTurn.DismissCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource ActionBtn}"/>
+                                                <Button Content="Resolve"
+                                                        Command="{Binding DataContext.ConversationTurn.ResolveCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource ActionBtn}"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding StatusLabel}"
-                                                   Foreground="#555" FontSize="8" Margin="0,0,0,4"/>
-                                        <TextBlock Text="{Binding LatestVersion.Text}"
-                                                   Foreground="#EEE" FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   FontFamily="Cascadia Mono, Consolas"
-                                                   Margin="0,0,0,4"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Copy"
-                                                    Command="{Binding DataContext.ConversationTurn.CopyLatestCommand,
-                                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource ActionBtn}"/>
-                                            <Button Content="Regen"
-                                                    Command="{Binding DataContext.ConversationTurn.RegenerateCommand,
-                                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource ActionBtn}"/>
-                                            <Button Content="Dismiss"
-                                                    Command="{Binding DataContext.ConversationTurn.DismissCommand,
-                                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource ActionBtn}"/>
-                                            <Button Content="Resolve"
-                                                    Command="{Binding DataContext.ConversationTurn.ResolveCommand,
-                                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource ActionBtn}"/>
-                                        </StackPanel>
-                                    </StackPanel>
+                                    </DockPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
