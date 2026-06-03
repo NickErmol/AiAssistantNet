@@ -79,5 +79,57 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasColumnName("Content")
                 .HasMaxLength(32000);
         });
+
+        // Session mode columns
+        s.Property(x => x.Mode).HasConversion<int>();
+        s.Property(x => x.AudioSource).HasConversion<int>();
+
+        s.Navigation(x => x.ConversationTurns).HasField("_turns").UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        s.OwnsMany(x => x.ConversationTurns, ct =>
+        {
+            ct.HasKey(x => x.Id);
+            ct.Property(x => x.Id)
+                .HasConversion(id => id.Value, v => new ConversationTurnId(v));
+            ct.Property(x => x.SessionId)
+                .HasConversion(id => id.Value, v => new SessionId(v));
+            ct.Property(x => x.InitialQuestionId)
+                .HasConversion(id => id.Value, v => new QuestionId(v));
+            ct.Property(x => x.InitialQuestionText).HasMaxLength(2000);
+            ct.Property(x => x.Status).HasConversion<int>();
+            ct.Property(x => x.CreatedAt)
+                .HasConversion(dto => dto.ToUnixTimeMilliseconds(),
+                               ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
+            ct.Property(x => x.UpdatedAt)
+                .HasConversion(dto => dto.ToUnixTimeMilliseconds(),
+                               ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
+
+            // JSON bridge for private List<TranscriptItemId> fields
+            ct.Property("ClarificationQuestionIdsJson")
+                .HasColumnName("ClarificationQuestionIds")
+                .HasColumnType("TEXT")
+                .HasDefaultValue("[]");
+            ct.Property("ClarificationResponseIdsJson")
+                .HasColumnName("ClarificationResponseIds")
+                .HasColumnType("TEXT")
+                .HasDefaultValue("[]");
+
+            ct.OwnsMany(x => x.AnswerVersions, av =>
+            {
+                av.HasKey(x => x.Id);
+                av.Property(x => x.Id)
+                    .HasConversion(id => id.Value, v => new AnswerVersionId(v));
+                av.Property(x => x.VersionType).HasConversion<int>();
+                av.Property(x => x.Text).HasMaxLength(32000);
+                av.Property(x => x.SupersedesId)
+                    .HasConversion(
+                        id => id.HasValue ? (Guid?)id.Value.Value : null,
+                        v  => v.HasValue ? new AnswerVersionId(v.Value) : (AnswerVersionId?)null);
+                av.Property(x => x.CreatedAt)
+                    .HasConversion(dto => dto.ToUnixTimeMilliseconds(),
+                                   ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
+            });
+            ct.Navigation(x => x.AnswerVersions).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
     }
 }
