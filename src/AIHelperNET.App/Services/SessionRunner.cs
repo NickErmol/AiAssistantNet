@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions;
@@ -100,7 +99,7 @@ public sealed class SessionRunner(
             }
         }, ct);
 
-        // Mic transcription task (Speaker.Me — interviewer follow-ups).
+        // Mic transcription task (Speaker.Me — candidate follow-ups).
         var micTask = runMic
             ? Task.Run(async () =>
             {
@@ -134,29 +133,33 @@ public sealed class SessionRunner(
             }, ct)
             : Task.CompletedTask;
 
-        // Complete the merge channel once both transcription tasks finish.
-        _ = Task.WhenAll(micTask, loopbackTask)
-            .ContinueWith(_ => mergeChannel.Writer.TryComplete(), TaskScheduler.Default);
-
         // Sequential consumer: pipeline.ProcessAsync must not be called concurrently.
-        try
+        // CancellationToken.None: the consumer must drain remaining items after cancellation.
+        var consumerTask = Task.Run(async () =>
         {
-            await foreach (var seg in mergeChannel.Reader.ReadAllAsync(ct))
+            try
             {
-                Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}",
-                    seg.Speaker, seg.Confidence, seg.Text);
-                var item = TranscriptItem.Create(seg.Speaker, seg.Text, seg.CapturedAt, seg.Confidence);
-                await pipeline.ProcessAsync(session, item, ct);
+                await foreach (var seg in mergeChannel.Reader.ReadAllAsync(ct))
+                {
+                    Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}",
+                        seg.Speaker, seg.Confidence, seg.Text);
+                    var item = TranscriptItem.Create(seg.Speaker, seg.Text, seg.CapturedAt, seg.Confidence);
+                    await pipeline.ProcessAsync(session, item, ct);
+                }
             }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "SessionRunner: unhandled error in pipeline");
-        }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "SessionRunner: unhandled error in pipeline");
+            }
+        }, CancellationToken.None);
+
+        // Explicit sequencing: wait for transcription to finish, close merge channel, drain consumer.
+        await Task.WhenAll(micTask, loopbackTask).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        mergeChannel.Writer.TryComplete();
+        await consumerTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
         await captureTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        await Task.WhenAll(micTask, loopbackTask).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         Log.Information("SessionRunner: pipeline stopped");
     }
 }
