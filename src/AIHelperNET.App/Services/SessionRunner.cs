@@ -68,6 +68,7 @@ public sealed class SessionRunner(
             var frames = FilterFrames(audioCapture.CaptureAsync(devices, ct), audioSource, ct);
             await foreach (var seg in transcription.TranscribeAsync(frames, model, ct).WithCancellation(ct))
             {
+                Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}", seg.Speaker, seg.Confidence, seg.Text);
                 var item = TranscriptItem.Create(seg.Speaker, seg.Text, seg.CapturedAt, seg.Confidence);
                 await pipeline.ProcessAsync(session, item, ct);
             }
