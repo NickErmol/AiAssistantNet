@@ -5,3 +5,4 @@ obj/
 *.suo
 .idea/
 *.DS_Store
+.superpowers/
