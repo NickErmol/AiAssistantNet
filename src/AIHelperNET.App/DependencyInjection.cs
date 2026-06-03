@@ -18,6 +18,8 @@ public static class DependencyInjection
         services.AddSingleton<IAnswerStreamSink>(sp => sp.GetRequiredService<AnswerStreamSink>());
         services.AddSingleton<TranscriptSink>();
         services.AddSingleton<ITranscriptSink>(sp => sp.GetRequiredService<TranscriptSink>());
+        services.AddSingleton<ConversationTurnSinkAdapter>();
+        services.AddSingleton<IConversationTurnSink>(sp => sp.GetRequiredService<ConversationTurnSinkAdapter>());
 
         // Session pipeline runner
         services.AddSingleton<SessionRunner>();

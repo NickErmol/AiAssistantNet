@@ -51,6 +51,10 @@ public partial class App : System.Windows.Application
             onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
             onError:    (id, err)         => turnVm.OnError(id, err));
 
+        // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel
+        var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
+        turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
+
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
@@ -72,7 +76,24 @@ public partial class App : System.Windows.Application
             catch (Exception ex)
             {
                 Log.Warning(ex, "Whisper: pre-warm failed");
+                return;
             }
+
+            // Download Medium only after the active model is loaded so the semaphore
+            // is free for session start while the large download runs.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    Log.Information("Whisper: downloading Medium model in background…");
+                    await modelProvider.GetFactoryAsync(WhisperModelSize.Medium, CancellationToken.None);
+                    Log.Information("Whisper: Medium model ready");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Whisper: Medium model download failed");
+                }
+            });
         });
     }
 
