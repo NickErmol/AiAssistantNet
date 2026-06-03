@@ -4,19 +4,16 @@
              xmlns:local="clr-namespace:AIHelperNET.App">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/DarkTheme.xaml"/>
+                <ResourceDictionary Source="Resources/Sizes.xaml"/>
+                <ResourceDictionary Source="Resources/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
             <local:BoolToVisibilityInverseConverter x:Key="InverseBoolToVisibilityConverter"/>
             <local:BoolToColorConverter             x:Key="BoolToColorConverter"/>
             <local:BoolToStringConverter            x:Key="BoolToStringConverter"/>
             <local:BoolToWidthConverter             x:Key="BoolToWidthConverter"/>
             <local:EnumToBoolConverter              x:Key="EnumToBoolConverter"/>
-            <Style x:Key="ActionBtn" TargetType="Button">
-                <Setter Property="Background"       Value="#2A2A4A"/>
-                <Setter Property="Foreground"       Value="#AAA"/>
-                <Setter Property="BorderThickness"  Value="0"/>
-                <Setter Property="FontSize"         Value="9"/>
-                <Setter Property="Padding"          Value="6,2"/>
-                <Setter Property="Margin"           Value="0,0,4,0"/>
-            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
