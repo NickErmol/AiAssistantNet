@@ -10,6 +10,7 @@ public sealed class Session
     private readonly List<TranscriptItem> _transcript = [];
     private readonly List<DetectedQuestion> _questions = [];
     private readonly List<GeneratedAnswer> _answers = [];
+    private readonly List<ConversationTurn> _turns = [];
 
     /// <summary>Unique identifier for this session.</summary>
     public SessionId Id { get; }
@@ -37,6 +38,21 @@ public sealed class Session
 
     /// <summary>All generated answers produced during this session.</summary>
     public IReadOnlyList<GeneratedAnswer> Answers => _answers;
+
+    /// <summary>The session capture mode.</summary>
+    public SessionMode Mode { get; private set; } = SessionMode.AudioAndScreen;
+
+    /// <summary>Which audio sources are active.</summary>
+    public AudioSourceMode AudioSource { get; private set; } = AudioSourceMode.Both;
+
+    /// <summary>All conversation turns in this session.</summary>
+    public IReadOnlyList<ConversationTurn> ConversationTurns => _turns;
+
+    /// <summary>The most recent non-terminal conversation turn, or <see langword="null"/> if none.</summary>
+    public ConversationTurn? ActiveTurn =>
+        _turns.LastOrDefault(t =>
+            t.Status is not ConversationTurnStatus.Dismissed
+                     and not ConversationTurnStatus.Resolved);
 
     private Session(SessionId id, DateTimeOffset startedAt,
         AnswerSettings answerSettings, CodeProfile codeProfile)
@@ -120,6 +136,34 @@ public sealed class Session
         State = SessionState.Stopped;
         EndedAt = now;
         return DomainResult.Ok();
+    }
+
+    /// <summary>Changes the capture mode. Fails if the session is not active.</summary>
+    /// <param name="mode">The new session capture mode.</param>
+    /// <param name="audioSource">The new audio source selection.</param>
+    public DomainResult ChangeMode(SessionMode mode, AudioSourceMode audioSource)
+    {
+        if (State != SessionState.Active)
+            return DomainResult.Fail("Cannot change mode on a stopped session.");
+        Mode = mode;
+        AudioSource = audioSource;
+        return DomainResult.Ok();
+    }
+
+    /// <summary>Creates a new conversation turn for the given question. Fails if session is not active or question is unknown.</summary>
+    /// <param name="questionId">The identifier of the question that opens this turn.</param>
+    /// <param name="questionText">The text of the question.</param>
+    /// <param name="now">The current timestamp.</param>
+    public DomainResult<ConversationTurn> AddConversationTurn(
+        QuestionId questionId, string questionText, DateTimeOffset now)
+    {
+        if (State != SessionState.Active)
+            return DomainResult.Fail<ConversationTurn>("Cannot add turn to a stopped session.");
+        if (_questions.All(q => q.Id != questionId))
+            return DomainResult.Fail<ConversationTurn>("Unknown question.");
+        var turn = ConversationTurn.Create(Id, questionId, questionText, now);
+        _turns.Add(turn);
+        return DomainResult.Ok(turn);
     }
 
 #pragma warning disable CS8618 // EF Core parameterless constructor — properties set by materialiser

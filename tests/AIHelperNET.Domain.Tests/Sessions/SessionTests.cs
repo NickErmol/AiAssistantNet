@@ -104,4 +104,59 @@ public class SessionTests
         session.UpdateAnswerSettings(newSettings).IsSuccess.Should().BeTrue();
         session.AnswerSettings.OutputLanguage.Should().Be("Polish");
     }
+
+    [Fact]
+    public void Create_DefaultMode_IsAudioAndScreen()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        session.Mode.Should().Be(SessionMode.AudioAndScreen);
+        session.AudioSource.Should().Be(AudioSourceMode.Both);
+    }
+
+    [Fact]
+    public void ChangeMode_ActiveSession_Succeeds()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        var result = session.ChangeMode(SessionMode.AudioOnly, AudioSourceMode.MicrophoneOnly);
+        result.IsSuccess.Should().BeTrue();
+        session.Mode.Should().Be(SessionMode.AudioOnly);
+        session.AudioSource.Should().Be(AudioSourceMode.MicrophoneOnly);
+    }
+
+    [Fact]
+    public void ChangeMode_StoppedSession_Fails()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        session.Stop(Now);
+        session.ChangeMode(SessionMode.ScreenOnly, AudioSourceMode.Both).IsFailed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AddConversationTurn_ActiveSession_Succeeds()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        var q = DetectedQuestion.Create("Q?", QuestionSource.Audio, Now);
+        session.AddDetectedQuestion(q);
+        var result = session.AddConversationTurn(q.Id, "Q?", Now);
+        result.IsSuccess.Should().BeTrue();
+        session.ConversationTurns.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void ActiveTurn_NoTurns_ReturnsNull()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        session.ActiveTurn.Should().BeNull();
+    }
+
+    [Fact]
+    public void ActiveTurn_DismissedTurn_ReturnsNull()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        var q = DetectedQuestion.Create("Q?", QuestionSource.Audio, Now);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Q?", Now).Value;
+        turn.Dismiss();
+        session.ActiveTurn.Should().BeNull();
+    }
 }
