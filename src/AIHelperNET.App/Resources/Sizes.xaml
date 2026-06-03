@@ -1,0 +1,10 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <!-- Font scale -->
+    <sys:Double x:Key="Font.XS">9</sys:Double>
+    <sys:Double x:Key="Font.SM">11</sys:Double>
+    <sys:Double x:Key="Font.MD">12</sys:Double>
+    <!-- Spacing reference values: XS=2, SM=4, MD=8, LG=12, XL=16
+         Use these values for Margin/Padding inline in XAML for consistency. -->
+</ResourceDictionary>
