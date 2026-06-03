@@ -102,3 +102,23 @@ public partial class App : System.Windows.Application
         base.OnExit(e);
     }
 }
+
+static class ThemeManager
+{
+    const string DarkUri  = "Resources/DarkTheme.xaml";
+    const string LightUri = "Resources/LightTheme.xaml";
+
+    static bool _isDark = true;
+
+    public static void Toggle()
+    {
+        var dicts   = System.Windows.Application.Current.Resources.MergedDictionaries;
+        var current = dicts.First(d => d.Source?.OriginalString.Contains("Theme") == true);
+        dicts.Remove(current);
+        _isDark = !_isDark;
+        dicts.Insert(0, new ResourceDictionary
+        {
+            Source = new Uri(_isDark ? DarkUri : LightUri, UriKind.Relative)
+        });
+    }
+}

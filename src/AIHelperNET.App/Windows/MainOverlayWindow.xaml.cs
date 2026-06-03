@@ -71,4 +71,7 @@ public partial class MainOverlayWindow : Window
         _settingsWindow.Show();
         _settingsWindow.Activate();
     }
+
+    private void ToggleTheme_Click(object sender, RoutedEventArgs e)
+        => ThemeManager.Toggle();
 }
