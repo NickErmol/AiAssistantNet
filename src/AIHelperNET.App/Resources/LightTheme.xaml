@@ -8,6 +8,8 @@
     <SolidColorBrush x:Key="Brush.Background.Button"          Color="#CBD5E1"/>
     <SolidColorBrush x:Key="Brush.Background.Button.Hover"    Color="#B8C5D6"/>
     <SolidColorBrush x:Key="Brush.Background.Button.Pressed"  Color="#A0B0C4"/>
+    <SolidColorBrush x:Key="Brush.Background.IconBtn.Hover"    Color="#18000000"/>
+    <SolidColorBrush x:Key="Brush.Background.IconBtn.Pressed"  Color="#28000000"/>
     <SolidColorBrush x:Key="Brush.Foreground.Primary"         Color="#1E293B"/>
     <SolidColorBrush x:Key="Brush.Foreground.Secondary"       Color="#475569"/>
     <SolidColorBrush x:Key="Brush.Foreground.Muted"           Color="#94A3B8"/>
