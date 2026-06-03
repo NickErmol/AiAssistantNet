@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git tag *)",
+      "Bash(git merge *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Edit(C:\\Windows\\*)",
+      "Write(C:\\Windows\\*)",
+      "Edit(C:\\Program Files\\*)",
+      "Write(C:\\Program Files\\*)",
+      "Edit(C:\\Program Files (x86)\\*)",
+      "Write(C:\\Program Files (x86)\\*)",
+      "Edit(C:\\System32\\*)",
+      "Write(C:\\System32\\*)",
+      "Bash(reg *)",
+      "Bash(sc *)",
+      "Bash(net user *)",
+      "Bash(net localgroup *)"
+    ]
+  }
+}

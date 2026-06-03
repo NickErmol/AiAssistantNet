@@ -12,7 +12,7 @@ public static class HostConfiguration
     public static HostApplicationBuilder ConfigureAIHelper(this HostApplicationBuilder b)
     {
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Information()
             .WriteTo.File(
                 AppPaths.LogFile,
                 rollingInterval: RollingInterval.Day,

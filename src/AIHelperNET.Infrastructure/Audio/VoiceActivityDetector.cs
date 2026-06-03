@@ -6,9 +6,9 @@ namespace AIHelperNET.Infrastructure.Audio;
 
 public sealed class VoiceActivityDetector
 {
-    private const float EnergyThreshold     = 0.01f;
-    private const int   SilenceFramesToFlush = 8;    // ~800 ms pause triggers flush
-    private const int   MinFramesForSpeech   = 5;
+    private const float EnergyThreshold     = 0.005f; // sensitive enough for loopback/quiet mic
+    private const int   SilenceFramesToFlush = 10;    // ~1 s pause triggers flush
+    private const int   MinFramesForSpeech   = 20;   // ~1.2 s minimum speech — prevents tiny chunks
 
     public static async IAsyncEnumerable<SpeechWindow> AccumulateSpeechWindows(
         IAsyncEnumerable<AudioFrame> frames,
@@ -27,7 +27,7 @@ public sealed class VoiceActivityDetector
             var energy  = frame.Samples.Select(s => s * s).DefaultIfEmpty().Average();
             bool isSpeech = energy > EnergyThreshold;
 
-            if (totalFrames % 100 == 1)
+            if (totalFrames % 200 == 1)
                 Log.Debug("VAD: frame={F} energy={E:F5} speech={S} bufLen={B}", totalFrames, energy, isSpeech, buffer.Count);
 
             if (isSpeech)
