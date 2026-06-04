@@ -22,7 +22,7 @@ public sealed class WindowsOcrService : IScreenOcrService
             using var bmp = ScreenGrabber.CaptureForeground();
             using var processed = ImagePreprocessor.Enhance(bmp);
 
-            var softwareBitmap = await BitmapToSoftwareBitmapAsync(processed, ct);
+            using var softwareBitmap = await BitmapToSoftwareBitmapAsync(processed, ct);
             var result = await engine.RecognizeAsync(softwareBitmap);
             return Result.Ok(result.Text);
         }
