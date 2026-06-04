@@ -26,4 +26,9 @@ public interface ISessionRepository
     /// <summary>Marks a session as modified so its changes are tracked.</summary>
     /// <param name="session">The modified session.</param>
     void Update(Session session);
+
+    /// <summary>Returns full transcript and answers for a single session.</summary>
+    /// <param name="id">Session identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<SessionDetailDto?> GetDetailAsync(SessionId id, CancellationToken ct);
 }
