@@ -4,13 +4,6 @@ using AIHelperNET.Domain.ValueObjects;
 namespace AIHelperNET.Application.Sessions.Dtos;
 
 /// <summary>Serialisable application settings shared between the UI and the settings store.</summary>
-/// <param name="ActiveBackend">Which AI backend to use.</param>
-/// <param name="WhisperModel">Whisper model size for transcription.</param>
-/// <param name="AnswerSettings">Answer generation settings.</param>
-/// <param name="CodeProfile">Developer code profile.</param>
-/// <param name="MicDeviceId">Microphone device ID, or null for system default.</param>
-/// <param name="LoopbackDeviceId">Loopback device ID, or null for system default.</param>
-/// <param name="AnswerFontSize">Font size for answer display, in points.</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
     WhisperModelSize WhisperModel,
@@ -18,4 +11,10 @@ public sealed record AppSettingsDto(
     CodeProfile CodeProfile,
     string? MicDeviceId,
     string? LoopbackDeviceId,
-    int AnswerFontSize = 12);
+    int AnswerFontSize = 12,
+    string WhisperLanguage = "auto",
+    double OverlayOpacity = 0.75)
+{
+    /// <summary>Named setting presets for quick profile switching.</summary>
+    public IReadOnlyList<ProfilePreset> Presets { get; init; } = [];
+}
