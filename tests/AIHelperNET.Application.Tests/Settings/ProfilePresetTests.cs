@@ -22,6 +22,7 @@ public sealed class ProfilePresetTests
         Assert.NotNull(restored);
         Assert.Equal("C# Azure", restored.Name);
         Assert.Equal("C#", restored.CodeProfile.ProgrammingLanguage);
+        Assert.Equal(AnswerSettings.Default, restored.AnswerSettings);
     }
 
     [Fact]
