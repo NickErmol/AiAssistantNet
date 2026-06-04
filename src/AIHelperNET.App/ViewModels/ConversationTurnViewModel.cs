@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AIHelperNET.Application.Answers;
 using AIHelperNET.Application.Answers.Commands;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Queries;
@@ -221,15 +222,32 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             System.Windows.Clipboard.SetText(text);
     }
 
-    /// <summary>Captures the current screen and regenerates the answer for the most recent turn.</summary>
+    /// <summary>Captures the current screen and regenerates the answer for the most recent turn using the selected analysis mode.</summary>
     [RelayCommand]
-    private async Task CaptureScreenAsync()
+    private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
         if (ActiveSessionId is not { } sid) return;
-        var result = await mediator.Send(new CaptureScreenCommand());
-        if (result.IsSuccess && Turns.FirstOrDefault() is { } activeTurn)
-        {
-            await mediator.Send(new RegenerateAnswerCommand(sid, activeTurn.Id, result.Value));
-        }
+        if (sessionControl is null) return;
+
+        var ocrResult = await mediator.Send(new CaptureScreenCommand());
+        if (ocrResult.IsFailed) return;
+
+        string[] interviewerLines = sessionControl.IncludeInterviewerContext
+            ? _lastInterviewerLines
+            : [];
+
+        var activeTurn = Turns.FirstOrDefault();
+        if (activeTurn is null) return;
+
+        await mediator.Send(new RegenerateAnswerWithScreenCommand(
+            sid, activeTurn.Id, ocrResult.Value,
+            sessionControl.ScreenAnalysisMode, interviewerLines));
     }
+
+    private string[] _lastInterviewerLines = [];
+
+    /// <summary>Updates the cached interviewer lines used as context for screen-based answer generation.</summary>
+    /// <param name="lines">The most recent interviewer transcript lines.</param>
+    public void UpdateInterviewerLines(IEnumerable<string> lines)
+        => _lastInterviewerLines = lines.ToArray();
 }

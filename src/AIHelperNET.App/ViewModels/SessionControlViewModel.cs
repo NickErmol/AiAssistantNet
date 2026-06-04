@@ -1,5 +1,6 @@
 using AIHelperNET.App.Services;
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Application.Answers;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Domain.Ids;
@@ -41,6 +42,12 @@ public sealed partial class SessionControlViewModel(
 
     /// <summary>Gets or sets a value indicating whether the AI backend is connected.</summary>
     [ObservableProperty] private bool _isAiConnected;
+
+    /// <summary>Gets or sets the screen analysis mode for capture-based answer generation.</summary>
+    [ObservableProperty] private ScreenAnalysisMode _screenAnalysisMode = ScreenAnalysisMode.General;
+
+    /// <summary>Gets or sets a value indicating whether to include recent interviewer lines in screen prompts.</summary>
+    [ObservableProperty] private bool _includeInterviewerContext = true;
 
     /// <summary>Gets the active session identifier, or <see langword="null"/> when stopped.</summary>
     public SessionId? ActiveSessionId { get; private set; }

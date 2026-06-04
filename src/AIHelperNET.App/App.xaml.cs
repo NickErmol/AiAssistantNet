@@ -38,14 +38,29 @@ public partial class App : System.Windows.Application
 
         var overlay = _host.Services.GetRequiredService<MainOverlayWindow>();
 
+        // Resolve ConversationTurnViewModel early — referenced in both transcript and answer sink handlers.
+        var turnVm = _host.Services.GetRequiredService<ConversationTurnViewModel>();
+
         // Wire TranscriptSink → TranscriptViewModel
         var transcriptSink = _host.Services.GetRequiredService<TranscriptSink>();
         var transcriptVm   = _host.Services.GetRequiredService<TranscriptViewModel>();
-        transcriptSink.SetHandler(item => transcriptVm.AddItem(item));
+        transcriptSink.SetHandler(item =>
+        {
+            transcriptVm.AddItem(item);
+
+            // Keep the last 5 interviewer lines available for screen-analysis prompts.
+            if (item.Speaker == AIHelperNET.Domain.Sessions.Speaker.Other)
+            {
+                var last5 = transcriptVm.Items
+                    .Where(i => i.SpeakerLabel == "Other")
+                    .TakeLast(5)
+                    .Select(i => i.Text);
+                turnVm.UpdateInterviewerLines(last5);
+            }
+        });
 
         // Wire AnswerStreamSink → ConversationTurnViewModel
         var answerSink = _host.Services.GetRequiredService<AnswerStreamSink>();
-        var turnVm     = _host.Services.GetRequiredService<ConversationTurnViewModel>();
         answerSink.SetHandlers(
             onChunk:    (id, type, chunk) => turnVm.OnChunk(id, type, chunk),
             onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
@@ -125,7 +140,7 @@ public partial class App : System.Windows.Application
                     _ = sessionVm.ToggleSessionCommand.ExecuteAsync(null);
                     break;
                 case HotkeyId.CaptureScreen:
-                    _ = turnVm2.CaptureScreenCommand.ExecuteAsync(null);
+                    _ = turnVm2.CaptureScreenCommand.ExecuteAsync(sessionVm);
                     break;
                 case HotkeyId.GenerateAnswer:
                     _ = turnVm2.RegenerateCommand.ExecuteAsync(turnVm2.Turns.FirstOrDefault());
