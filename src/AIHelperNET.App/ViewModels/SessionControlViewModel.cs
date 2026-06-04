@@ -74,6 +74,7 @@ public sealed partial class SessionControlViewModel(
                     result.Value.Id,
                     new AudioDeviceSelection(settings?.MicDeviceId, settings?.LoopbackDeviceId),
                     settings?.WhisperModel ?? WhisperModelSize.Base,
+                    settings?.WhisperLanguage ?? "auto",
                     AudioSource);
             }
         }

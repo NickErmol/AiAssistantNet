@@ -24,6 +24,7 @@ public sealed class SessionRunner(
         SessionId sessionId,
         AudioDeviceSelection devices,
         WhisperModelSize model,
+        string language,
         AudioSourceMode audioSource)
     {
         _sessionScope = scopeFactory.CreateScope();
@@ -39,7 +40,7 @@ public sealed class SessionRunner(
         }
 
         _cts          = new CancellationTokenSource();
-        _pipelineTask = RunAsync(result.Value, devices, model, audioSource, _cts.Token);
+        _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, _cts.Token);
     }
 
     /// <summary>Stops audio capture and waits for the pipeline to drain.</summary>
@@ -59,6 +60,7 @@ public sealed class SessionRunner(
         Session session,
         AudioDeviceSelection devices,
         WhisperModelSize model,
+        string language,
         AudioSourceMode audioSource,
         CancellationToken ct)
     {
@@ -108,7 +110,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, ct)
+                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, language, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);
@@ -125,7 +127,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, ct)
+                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, language, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);

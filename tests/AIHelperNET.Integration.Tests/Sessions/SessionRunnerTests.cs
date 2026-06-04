@@ -69,7 +69,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.Both);
+            WhisperModelSize.Base, "auto", AudioSourceMode.Both);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -89,7 +89,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.MicrophoneOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.MicrophoneOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -109,7 +109,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.SystemAudioOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.SystemAudioOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -144,6 +144,7 @@ public class SessionRunnerTests
         public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
             IAsyncEnumerable<AudioFrame> frames,
             WhisperModelSize model,
+            string language,
             [EnumeratorCancellation] CancellationToken ct)
         {
             await foreach (var frame in frames.WithCancellation(ct))

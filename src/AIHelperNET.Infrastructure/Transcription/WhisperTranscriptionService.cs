@@ -21,11 +21,13 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
         WhisperModelSize model,
+        string language,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         var factory = await models.GetFactoryAsync(model, ct);
+        var lang = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
         await using var processor = factory.CreateBuilder()
-            .WithLanguage("en")
+            .WithLanguage(lang ?? "en")
             .WithTemperature(0)            // greedy decoding — eliminates random word substitutions
             .WithPrompt(InitialPrompt)     // primes vocabulary, reduces nonsense outputs
             .WithNoSpeechThreshold(0.6f)   // drop segments Whisper itself flags as silent
