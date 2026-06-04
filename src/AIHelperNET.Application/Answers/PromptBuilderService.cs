@@ -54,6 +54,33 @@ public sealed class PromptBuilderService
             MaxTokens: MapLengthToTokens(settings.Length));
     }
 
+    /// <summary>Builds a follow-up prompt with the original Q+A injected as context.</summary>
+    public static AnswerPrompt BuildFollowUp(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string originalQuestion,
+        string previousAnswer,
+        string followUpText)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(
+            "You are a senior software engineer coaching a candidate through a technical job interview. " +
+            "You previously answered a question. Now the candidate asks a follow-up. " +
+            "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
+        AppendCodeProfile(system, profile);
+
+        var user = new StringBuilder();
+        user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Your previous answer: {previousAnswer}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Follow-up: {followUpText}");
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: MapLengthToTokens(settings.Length));
+    }
+
     private static void AppendCodeProfile(StringBuilder sb, CodeProfile p)
     {
         var fields = new[]

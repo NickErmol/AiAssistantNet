@@ -24,6 +24,7 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
         AnswerVersionType.RefinedAfterClarification => "Refined — after clarification",
         AnswerVersionType.UpdatedWithScreen         => "Updated with screen",
         AnswerVersionType.ManuallyRegenerated       => "Manually regenerated",
+        AnswerVersionType.FollowUp                  => "Follow-up",
         _                                           => type.ToString()
     };
 
