@@ -257,7 +257,8 @@
                                                        Margin="0,0,0,4"/>
                                             <TextBlock Text="{Binding LatestVersion.Text}"
                                                        Foreground="{DynamicResource Brush.Foreground.Primary}"
-                                                       FontSize="{DynamicResource Font.MD}"
+                                                       FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                                          RelativeSource={RelativeSource AncestorType=Window}}"
                                                        TextWrapping="Wrap"
                                                        FontFamily="Cascadia Mono, Consolas"
                                                        Margin="0,0,0,4"/>
@@ -282,6 +283,16 @@
                                                             RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource ActionBtn}"/>
+                                                <Button Content="−"
+                                                        Command="{Binding DataContext.ConversationTurn.DecreaseFontSizeCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        Style="{StaticResource ActionBtn}"
+                                                        ToolTip="Decrease font size"/>
+                                                <Button Content="+"
+                                                        Command="{Binding DataContext.ConversationTurn.IncreaseFontSizeCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        Style="{StaticResource ActionBtn}"
+                                                        ToolTip="Increase font size"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </DockPanel>

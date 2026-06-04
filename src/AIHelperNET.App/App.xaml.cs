@@ -55,6 +55,8 @@ public partial class App : System.Windows.Application
         var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
         turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
 
+        await turnVm.LoadFontSizeAsync();
+
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
