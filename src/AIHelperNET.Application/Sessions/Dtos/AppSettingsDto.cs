@@ -10,10 +10,12 @@ namespace AIHelperNET.Application.Sessions.Dtos;
 /// <param name="CodeProfile">Developer code profile.</param>
 /// <param name="MicDeviceId">Microphone device ID, or null for system default.</param>
 /// <param name="LoopbackDeviceId">Loopback device ID, or null for system default.</param>
+/// <param name="AnswerFontSize">Font size for answer display, in points.</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
     WhisperModelSize WhisperModel,
     AnswerSettings AnswerSettings,
     CodeProfile CodeProfile,
     string? MicDeviceId,
-    string? LoopbackDeviceId);
+    string? LoopbackDeviceId,
+    int AnswerFontSize = 12);
