@@ -35,7 +35,11 @@ public sealed class TranscriptPipelineService(
             var detection = _detector.Evaluate(item.Text, recentTexts);
             if (detection.IsQuestion)
             {
-                if (activeTurn is null)
+                bool answerReady = activeTurn?.Status is
+                    ConversationTurnStatus.PreliminaryReady or
+                    ConversationTurnStatus.RefinedReady;
+
+                if (activeTurn is null || answerReady)
                 {
                     var q          = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
                     session.AddDetectedQuestion(q);
