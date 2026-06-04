@@ -6,6 +6,18 @@ namespace AIHelperNET.Infrastructure.Transcription;
 
 public sealed class WhisperTranscriptionService(WhisperModelProvider models) : ITranscriptionService
 {
+    private const int MinWords = 3;
+
+    private const string InitialPrompt =
+        "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
+
+    private static readonly HashSet<string> HallucinationPhrases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "thank you", "thanks for watching", "thanks for listening",
+        "please subscribe", "like and subscribe", "see you next time",
+        "subtitles by", "transcribed by",
+    };
+
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
         WhisperModelSize model,
@@ -14,6 +26,10 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
         var factory = await models.GetFactoryAsync(model, ct);
         await using var processor = factory.CreateBuilder()
             .WithLanguage("en")
+            .WithTemperature(0)            // greedy decoding — eliminates random word substitutions
+            .WithPrompt(InitialPrompt)     // primes vocabulary, reduces nonsense outputs
+            .WithNoSpeechThreshold(0.6f)   // drop segments Whisper itself flags as silent
+            .WithSingleSegment()           // one result per VAD window — prevents within-window splits
             .Build();
 
         string? lastEmitted = null;
@@ -24,6 +40,8 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
                 if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
+                if (WordCount(seg.Text) < MinWords) continue;
+                if (IsKnownHallucination(seg.Text)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
                 lastEmitted = seg.Text;
@@ -34,6 +52,15 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
                     seg.Probability);
             }
         }
+    }
+
+    private static int WordCount(string text) =>
+        text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+
+    private static bool IsKnownHallucination(string text)
+    {
+        var trimmed = text.Trim('.', '!', '?', ' ');
+        return HallucinationPhrases.Contains(trimmed);
     }
 
     private static bool IsNearDuplicate(string current, string? previous)
