@@ -35,11 +35,10 @@ public sealed class TranscriptPipelineService(
             var detection = _detector.Evaluate(item.Text, recentTexts);
             if (detection.IsQuestion)
             {
-                bool answerReady = activeTurn?.Status is
-                    ConversationTurnStatus.PreliminaryReady or
-                    ConversationTurnStatus.RefinedReady;
-
-                if (activeTurn is null || answerReady)
+                // Allow a new turn for any new question unless we're specifically waiting for a
+                // clarification response. Status checks against the in-memory Session are unreliable
+                // because GenerateAnswerHandler mutates its own DB-loaded copy.
+                if (activeTurn is null || activeTurn.Status != ConversationTurnStatus.AwaitingClarification)
                 {
                     var q          = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
                     session.AddDetectedQuestion(q);
