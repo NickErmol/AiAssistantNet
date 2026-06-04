@@ -194,7 +194,8 @@
                            Margin="0,10,0,4"/>
                 <ToggleButton Content="Toggle Follow-ups"
                               IsChecked="{Binding ConversationTurn.IsFollowUpEnabled}"
-                              Style="{StaticResource ActionBtn}"/>
+                              Padding="5,2"
+                              Margin="0,0,4,0"/>
 
                 <TextBlock Style="{StaticResource SectionLabel}" Text="SCREEN" Margin="0,10,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="General"

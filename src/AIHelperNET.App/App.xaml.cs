@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += (_, ex) => Log.Fatal(ex.Exception, "Unhandled dispatcher exception");
 
         var builder = Host.CreateApplicationBuilder();
         builder.ConfigureAIHelper();
