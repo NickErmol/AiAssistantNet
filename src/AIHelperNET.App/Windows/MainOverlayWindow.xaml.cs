@@ -12,7 +12,8 @@ namespace AIHelperNET.App.Windows;
 public sealed class MainOverlayWindowContext(
     SessionControlViewModel sessionControl,
     TranscriptViewModel transcript,
-    ConversationTurnViewModel conversationTurn)
+    ConversationTurnViewModel conversationTurn,
+    AudioLevelViewModel audioLevel)
 {
     /// <summary>Gets the session control view model.</summary>
     public SessionControlViewModel SessionControl    => sessionControl;
@@ -22,6 +23,9 @@ public sealed class MainOverlayWindowContext(
 
     /// <summary>Gets the conversation turn view model.</summary>
     public ConversationTurnViewModel ConversationTurn => conversationTurn;
+
+    /// <summary>Gets the audio level view model.</summary>
+    public AudioLevelViewModel AudioLevel             => audioLevel;
 }
 
 /// <summary>The stealth overlay window excluded from screen capture.</summary>

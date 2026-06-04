@@ -44,6 +44,7 @@ public static class DependencyInjection
         // Audio & transcription
         services.AddHttpClient(nameof(WhisperModelProvider));
         services.AddSingleton<IAudioCaptureService, NAudioCaptureService>();
+        services.AddSingleton<IAudioLevelMonitor, AudioLevelMonitor>();
         services.AddSingleton<WhisperModelProvider>();
         services.AddSingleton<ITranscriptionService, WhisperTranscriptionService>();
 

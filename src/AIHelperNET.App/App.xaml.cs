@@ -73,6 +73,19 @@ public partial class App : System.Windows.Application
         try { await turnVm.LoadFontSizeAsync(); }
         catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
 
+        // Start always-on audio level monitoring
+        var levelMonitor = _host.Services.GetRequiredService<IAudioLevelMonitor>();
+        try
+        {
+            var settingsStore  = _host.Services.GetRequiredService<ISettingsStore>();
+            var appSettings    = await settingsStore.LoadAsync(CancellationToken.None);
+            await levelMonitor.StartAsync(appSettings.MicDeviceId, appSettings.LoopbackDeviceId, CancellationToken.None);
+        }
+        catch (Exception ex) { Log.Warning(ex, "Failed to start audio level monitor"); }
+
+        var levelVm = _host.Services.GetRequiredService<AudioLevelViewModel>();
+        levelVm.Subscribe();
+
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
@@ -166,6 +179,8 @@ public partial class App : System.Windows.Application
     protected override async void OnExit(ExitEventArgs e)
     {
         _host.Services.GetService<IGlobalHotkeyService>()?.UnregisterAll();
+        var monitor = _host.Services.GetService<IAudioLevelMonitor>();
+        if (monitor is not null) await monitor.StopAsync();
         using (_host) await _host.StopAsync();
         Serilog.Log.CloseAndFlush();
         base.OnExit(e);
