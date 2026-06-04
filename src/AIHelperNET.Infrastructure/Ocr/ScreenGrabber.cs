@@ -52,8 +52,10 @@ public static class ScreenGrabber
         if (clientSize.Width <= 0 || clientSize.Height <= 0)
             return CapturePrimary();
 
+        // logical coords — may drift on non-100% DPI monitors
         var pt = new POINT { X = 0, Y = 0 };
-        ClientToScreen(hwnd, ref pt);
+        if (!ClientToScreen(hwnd, ref pt))
+            return CapturePrimary();
         var origin = new Point(pt.X, pt.Y);
 
         var bmp = new Bitmap(clientSize.Width, clientSize.Height, PixelFormat.Format32bppArgb);
