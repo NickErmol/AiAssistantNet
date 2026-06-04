@@ -55,7 +55,8 @@ public partial class App : System.Windows.Application
         var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
         turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
 
-        await turnVm.LoadFontSizeAsync();
+        try { await turnVm.LoadFontSizeAsync(); }
+        catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
 
         overlay.Show();
         WireHotkeys(overlay);
