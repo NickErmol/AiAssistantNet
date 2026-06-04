@@ -17,12 +17,19 @@ public sealed class WindowsOcrService : IScreenOcrService
         if (engine is null)
             return Result.Fail("No OCR engine available for the system's user profile languages.");
 
-        using var bmp = ScreenGrabber.CapturePrimary();
-        using var processed = ImagePreprocessor.Enhance(bmp);
+        try
+        {
+            using var bmp = ScreenGrabber.CaptureForeground();
+            using var processed = ImagePreprocessor.Enhance(bmp);
 
-        var softwareBitmap = await BitmapToSoftwareBitmapAsync(processed, ct);
-        var result = await engine.RecognizeAsync(softwareBitmap);
-        return Result.Ok(result.Text);
+            var softwareBitmap = await BitmapToSoftwareBitmapAsync(processed, ct);
+            var result = await engine.RecognizeAsync(softwareBitmap);
+            return Result.Ok(result.Text);
+        }
+        catch (Exception ex)
+        {
+            return Result.Fail($"Screen capture failed: {ex.Message}");
+        }
     }
 
     private static async Task<SoftwareBitmap> BitmapToSoftwareBitmapAsync(Bitmap bmp, CancellationToken ct)
