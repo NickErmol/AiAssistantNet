@@ -53,6 +53,12 @@
                                 ConverterParameter='Stop|Start'}"
                             Command="{Binding SessionControl.ToggleSessionCommand}"
                             Style="{StaticResource ActionBtn}"/>
+                    <Button x:Name="StealthBtn"
+                            Content="🎥"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="13"
+                            Click="ToggleStealth_Click"
+                            ToolTip="Toggle screen capture visibility"/>
                     <Button Content="◐"
                             Style="{StaticResource IconBtn}"
                             FontSize="13"
@@ -179,7 +185,8 @@
             </Grid.RowDefinitions>
 
             <!-- Transcript panel -->
-            <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}">
+            <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}"
+                    DataContext="{Binding Transcript}">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top"
                                Style="{StaticResource SectionLabel}"
@@ -189,7 +196,7 @@
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Margin="8,0,8,6">
-                        <ItemsControl ItemsSource="{Binding Transcript.Items}">
+                        <ItemsControl ItemsSource="{Binding Items}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="0,2">

@@ -13,7 +13,7 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
     {
         var factory = await models.GetFactoryAsync(model, ct);
         await using var processor = factory.CreateBuilder()
-            .WithLanguage("auto")
+            .WithLanguage("en")
             .Build();
 
         string? lastEmitted = null;
@@ -23,6 +23,7 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
             await foreach (var seg in processor.ProcessAsync(window.Samples, ct))
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
+                if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
                 lastEmitted = seg.Text;

@@ -6,9 +6,10 @@ namespace AIHelperNET.Infrastructure.Audio;
 
 public sealed class VoiceActivityDetector
 {
-    private const float EnergyThreshold     = 0.005f; // sensitive enough for loopback/quiet mic
-    private const int   SilenceFramesToFlush = 10;    // ~1 s pause triggers flush
-    private const int   MinFramesForSpeech   = 20;   // ~1.2 s minimum speech — prevents tiny chunks
+    private const float EnergyThreshold     = 0.00005f; // tuned for Arctis Nova Pro mic (quiet mic, low gain)
+    private const int   SilenceFramesToFlush = 6;       // ~600 ms pause triggers flush (100 ms/frame × 6)
+    private const int   MinFramesForSpeech   = 8;       // ~800 ms minimum — blocks noise bursts, allows normal speech
+    private const int   MaxWindowFrames      = 40;      // ~4 s max — prevents huge windows stalling Whisper
 
     public static async IAsyncEnumerable<SpeechWindow> AccumulateSpeechWindows(
         IAsyncEnumerable<AudioFrame> frames,
@@ -37,6 +38,15 @@ public sealed class VoiceActivityDetector
                 speechCount++;
                 speechFrames++;
                 silenceCount = 0;
+
+                if (speechCount >= MaxWindowFrames)
+                {
+                    Log.Information("VAD: max-window flush speaker={S} samples={N}", lastSpeaker, buffer.Count);
+                    yield return new SpeechWindow([.. buffer], lastSpeaker);
+                    buffer.Clear();
+                    speechCount  = 0;
+                    silenceCount = 0;
+                }
             }
             else if (buffer.Count > 0)
             {

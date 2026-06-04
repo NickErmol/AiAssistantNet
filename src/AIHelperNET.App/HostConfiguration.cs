@@ -13,6 +13,7 @@ public static class HostConfiguration
     {
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
+            .MinimumLevel.Override("AIHelperNET", Serilog.Events.LogEventLevel.Debug)
             .WriteTo.File(
                 AppPaths.LogFile,
                 rollingInterval: RollingInterval.Day,
