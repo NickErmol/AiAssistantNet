@@ -34,21 +34,26 @@ public partial class MainOverlayWindow : Window
     private const uint WDA_NONE             = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
-    private readonly SettingsWindow  _settingsWindow;
+    private readonly SettingsWindow    _settingsWindow;
     private readonly SettingsViewModel _settingsVm;
+    private readonly HistoryViewModel  _historyVm;
     private bool _stealthActive;
+    private bool _showingHistory;
 
     /// <summary>Initialises a new instance of <see cref="MainOverlayWindow"/>.</summary>
     public MainOverlayWindow(
         MainOverlayWindowContext context,
         SettingsWindow settingsWindow,
-        SettingsViewModel settingsVm)
+        SettingsViewModel settingsVm,
+        HistoryViewModel historyVm)
     {
         InitializeComponent();
         DataContext     = context;
         _settingsWindow = settingsWindow;
         _settingsVm     = settingsVm;
+        _historyVm      = historyVm;
         _settingsVm.OpacityChanged += opacity => Opacity = opacity;
+        HistoryPanelControl.DataContext = _historyVm;
     }
 
     /// <inheritdoc/>
@@ -98,6 +103,15 @@ public partial class MainOverlayWindow : Window
 
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
         => ThemeManager.Toggle();
+
+    private async void ToggleHistory_Click(object sender, RoutedEventArgs e)
+    {
+        _showingHistory = !_showingHistory;
+        LiveView.Visibility            = _showingHistory ? Visibility.Collapsed : Visibility.Visible;
+        HistoryPanelControl.Visibility = _showingHistory ? Visibility.Visible   : Visibility.Collapsed;
+        if (_showingHistory)
+            await _historyVm.LoadAsync();
+    }
 
     private void Close_Click(object sender, RoutedEventArgs e)
         => Close();

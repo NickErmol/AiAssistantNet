@@ -61,6 +61,18 @@ public sealed class BoolToWidthConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Converts a boolean to Visibility (true → Visible, false → Collapsed).</summary>
+public sealed class BoolToVisibilityConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is true ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Converts an enum value to bool by comparing with the parameter string.</summary>
 public sealed class EnumToBoolConverter : IValueConverter
 {
