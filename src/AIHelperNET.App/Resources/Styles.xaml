@@ -84,6 +84,13 @@
         </Setter>
     </Style>
 
+    <!-- FieldLabel — small label above a form field -->
+    <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+        <Setter Property="FontSize"   Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Secondary}"/>
+        <Setter Property="Margin"     Value="0,4,0,2"/>
+    </Style>
+
     <!-- SectionLabel — small-caps heading (TRANSCRIPT, MODE, STATUS …) -->
     <Style x:Key="SectionLabel" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Muted}"/>

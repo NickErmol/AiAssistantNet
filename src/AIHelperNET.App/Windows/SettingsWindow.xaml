@@ -1,36 +1,176 @@
 <Window x:Class="AIHelperNET.App.Windows.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AIHelper — Settings" Width="480" Height="320"
+        xmlns:local="clr-namespace:AIHelperNET.App.Windows"
+        Title="AIHelper — Settings" Width="560" Height="600"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
-        Background="{DynamicResource Brush.Background.Window}">
-    <StackPanel Margin="20">
-        <TextBlock Text="Claude API Key"
-                   FontWeight="SemiBold"
-                   FontSize="{DynamicResource Font.SM}"
-                   Foreground="{DynamicResource Brush.Foreground.Primary}"
-                   Margin="0,0,0,6"/>
-        <DockPanel>
-            <Button Content="Delete" DockPanel.Dock="Right" Width="60"
-                    Foreground="#CC4444"
-                    Command="{Binding DeleteApiKeyCommand}"/>
-            <Button Content="Save" DockPanel.Dock="Right" Width="60" Margin="0,0,6,0"
-                    Command="{Binding SaveApiKeyCommand}"/>
-            <Border Background="{DynamicResource Brush.Background.Panel}"
-                    BorderBrush="{DynamicResource Brush.Border}"
-                    BorderThickness="1" CornerRadius="3" Padding="1">
-                <PasswordBox x:Name="ApiKeyBox"
-                             Background="Transparent"
-                             Foreground="{DynamicResource Brush.Foreground.Primary}"
-                             CaretBrush="{DynamicResource Brush.Foreground.Primary}"
-                             BorderThickness="0"
-                             Padding="5,3"
-                             PasswordChanged="ApiKeyBox_PasswordChanged"/>
-            </Border>
-        </DockPanel>
-        <TextBlock Text="{Binding StatusMessage}"
-                   Foreground="{DynamicResource Brush.Semantic.Active}"
-                   Margin="0,8,0,0"
-                   FontSize="{DynamicResource Font.SM}"/>
-    </StackPanel>
+        Background="{DynamicResource Brush.Background.Window}"
+        Loaded="Window_Loaded">
+
+    <DockPanel Margin="12">
+        <Button DockPanel.Dock="Bottom"
+                Content="Save"
+                HorizontalAlignment="Right"
+                Width="80" Margin="0,8,0,0"
+                Command="{Binding SaveSettingsCommand}"/>
+
+        <TabControl>
+            <!-- ═══ API Key ═══ -->
+            <TabItem Header="API Key">
+                <StackPanel Margin="8">
+                    <TextBlock Text="Claude API Key" FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                               Margin="0,0,0,6"/>
+                    <DockPanel>
+                        <Button Content="Delete" DockPanel.Dock="Right" Width="60"
+                                Foreground="#CC4444"
+                                Command="{Binding DeleteApiKeyCommand}"/>
+                        <Button Content="Save" DockPanel.Dock="Right" Width="60" Margin="0,0,6,0"
+                                Command="{Binding SaveApiKeyCommand}"/>
+                        <Border Background="{DynamicResource Brush.Background.Panel}"
+                                BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="1" CornerRadius="3" Padding="1">
+                            <PasswordBox x:Name="ApiKeyBox"
+                                         Background="Transparent"
+                                         Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                         CaretBrush="{DynamicResource Brush.Foreground.Primary}"
+                                         BorderThickness="0" Padding="5,3"
+                                         PasswordChanged="ApiKeyBox_PasswordChanged"/>
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="{DynamicResource Brush.Semantic.Active}"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource Font.SM}"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- ═══ Audio ═══ -->
+            <TabItem Header="Audio">
+                <StackPanel Margin="8">
+                    <TextBlock Text="AUDIO DEVICES" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Microphone" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="MicCombo"
+                              DisplayMemberPath="FriendlyName"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding SelectedMicDeviceId}"
+                              Margin="0,0,0,8"/>
+                    <TextBlock Text="System Audio (Loopback)" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="LoopbackCombo"
+                              DisplayMemberPath="FriendlyName"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding SelectedLoopbackDeviceId}"
+                              Margin="0,0,0,16"/>
+                    <TextBlock Text="TRANSCRIPTION" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Language" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox SelectedValue="{Binding WhisperLanguage}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Auto-detect" Tag="auto"/>
+                        <ComboBoxItem Content="English"     Tag="en"/>
+                        <ComboBoxItem Content="Russian"     Tag="ru"/>
+                        <ComboBoxItem Content="Polish"      Tag="pl"/>
+                    </ComboBox>
+                </StackPanel>
+            </TabItem>
+
+            <!-- ═══ Code Profiles ═══ -->
+            <TabItem Header="Code Profiles">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <DockPanel Margin="0,0,0,8">
+                            <Button Content="Delete" DockPanel.Dock="Right" Width="55" Margin="4,0,0,0"
+                                    Command="{Binding DeletePresetCommand}"
+                                    CommandParameter="{Binding SelectedPreset}"/>
+                            <Button Content="Load"   DockPanel.Dock="Right" Width="55" Margin="4,0,0,0"
+                                    Command="{Binding LoadPresetCommand}"
+                                    CommandParameter="{Binding SelectedPreset}"/>
+                            <ComboBox ItemsSource="{Binding Presets}"
+                                      SelectedItem="{Binding SelectedPreset}"
+                                      DisplayMemberPath="Name"/>
+                        </DockPanel>
+                        <Separator Margin="0,0,0,8"/>
+                        <TextBlock Text="TECH STACK" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Language"       Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding ProgrammingLanguage}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Backend"        Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding BackendFramework}"    Margin="0,0,0,4"/>
+                        <TextBlock Text="Frontend"       Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding FrontendFramework}"   Margin="0,0,0,4"/>
+                        <TextBlock Text="Database"       Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding Database}"            Margin="0,0,0,4"/>
+                        <TextBlock Text="Cloud / DevOps" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding CloudDevOps}"         Margin="0,0,0,4"/>
+                        <TextBlock Text="Messaging"      Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding Messaging}"           Margin="0,0,0,4"/>
+                        <TextBlock Text="Architecture"   Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding ArchitectureStyle}"   Margin="0,0,0,4"/>
+                        <TextBlock Text="Testing"        Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding TestingFramework}"    Margin="0,0,0,4"/>
+                        <TextBlock Text="Notes"          Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding CustomNotes}"         Margin="0,0,0,12" Height="48"
+                                 AcceptsReturn="True" TextWrapping="Wrap"/>
+                        <TextBlock Text="ANSWER STYLE" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Length"         Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerLengths}}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding AnswerLength}"
+                                  Margin="0,0,0,4"/>
+                        <TextBlock Text="Complexity"     Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerComplexities}}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding AnswerComplexity}"
+                                  Margin="0,0,0,4"/>
+                        <TextBlock Text="Style"          Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerStyles}}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding AnswerStyle}"
+                                  Margin="0,0,0,4"/>
+                        <TextBlock Text="Output Language" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding OutputLanguage}" Margin="0,0,0,12"/>
+                        <Separator Margin="0,0,0,8"/>
+                        <DockPanel>
+                            <Button Content="Update current" DockPanel.Dock="Right" Margin="4,0,0,0"
+                                    Command="{Binding UpdateCurrentPresetCommand}"/>
+                            <TextBox Text="{Binding PresetName}" Margin="0,0,4,0"/>
+                        </DockPanel>
+                        <Button Content="Save as new preset" HorizontalAlignment="Left"
+                                Margin="0,4,0,0"
+                                Command="{Binding SaveAsNewPresetCommand}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══ Appearance ═══ -->
+            <TabItem Header="Appearance">
+                <StackPanel Margin="8">
+                    <TextBlock Text="OVERLAY" Style="{StaticResource SectionLabel}" Margin="0,0,0,8"/>
+                    <TextBlock Text="Opacity" Style="{StaticResource FieldLabel}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="20%"
+                                   Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                   FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                        <Slider Grid.Column="1"
+                                Minimum="0.2" Maximum="1.0" SmallChange="0.05"
+                                Value="{Binding OverlayOpacity}"/>
+                        <TextBlock Grid.Column="2" Text="100%"
+                                   Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                   FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
+                    </Grid>
+                    <TextBlock Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                               FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
 </Window>
