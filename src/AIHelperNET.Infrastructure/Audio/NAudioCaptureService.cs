@@ -35,7 +35,7 @@ public sealed class NAudioCaptureService : IAudioCaptureService
 
         mic.DataAvailable += (_, e) =>
         {
-            if (++micFrames % 50 == 1)
+            if (++micFrames % 200 == 1)
                 Log.Debug("NAudio: mic frame #{N} bytes={B}", micFrames, e.BytesRecorded);
             channel.Writer.TryWrite(
                 new AudioFrame(

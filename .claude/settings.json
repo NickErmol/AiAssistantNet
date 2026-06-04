@@ -5,7 +5,16 @@
       "Bash(git merge *)",
       "Bash(git checkout *)",
       "Bash(git branch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet run *)",
+      "PowerShell(dotnet build *)",
+      "PowerShell(dotnet test *)",
+      "PowerShell(dotnet run *)",
+      "PowerShell(Start-Process *AIHelperNET*)",
+      "PowerShell(Get-Process *AIHelperNET*)",
+      "PowerShell(Stop-Process *)"
     ],
     "deny": [
       "Edit(C:\\Windows\\*)",

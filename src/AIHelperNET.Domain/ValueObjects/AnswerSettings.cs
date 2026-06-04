@@ -123,10 +123,10 @@ public sealed record AnswerSettings(
     /// Gets the default answer settings (medium length, balanced complexity, interview style, confident tone, explanation with code, English).
     /// </summary>
     public static AnswerSettings Default => new(
-        AnswerLength.Medium,
+        AnswerLength.ShortLength,
         AnswerComplexity.Balanced,
         AnswerStyle.Interview,
         AnswerTone.Confident,
-        AnswerFormat.ExplanationPlusCode,
+        AnswerFormat.VerbalOnly,
         "English");
 }

@@ -18,59 +18,71 @@ public sealed class TranscriptPipelineService(
     /// <summary>Processes a single transcript item against the active session.</summary>
     /// <param name="session">The active session to update.</param>
     /// <param name="item">The transcript item to process.</param>
+    /// <param name="unitOfWork">Unit of work that owns the session — saved before any command is fired.</param>
     /// <param name="ct">Cancellation token.</param>
-    public Task ProcessAsync(Session session, TranscriptItem item, CancellationToken ct)
+    public async Task ProcessAsync(Session session, TranscriptItem item, IUnitOfWork unitOfWork, CancellationToken ct)
     {
         session.AddTranscriptItem(item);
         transcriptSink.OnTranscriptItem(item);
 
-        var activeTurn = session.ActiveTurn;
+        var activeTurn  = session.ActiveTurn;
         var recentTexts = session.Questions.Select(q => q.Text).ToList();
+
+        GenerateAnswerCommand? pendingCommand = null;
 
         if (item.Speaker == Speaker.Other)
         {
             var detection = _detector.Evaluate(item.Text, recentTexts);
-            if (!detection.IsQuestion) return Task.CompletedTask;
-
-            if (activeTurn is null)
+            if (detection.IsQuestion)
             {
-                var q = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
-                session.AddDetectedQuestion(q);
-                var turnResult = session.AddConversationTurn(q.Id, item.Text, item.Timestamp);
-                if (turnResult.IsFailed) return Task.CompletedTask;
-                var turn = turnResult.Value;
-
-                turnSink.OnTurnCreated(turn.Id, item.Text);
-                FireAndForget(new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary), ct);
-            }
-            else if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
-            {
-                activeTurn.AttachClarificationResponse(item.Id);
-                activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
-
-                FireAndForget(new GenerateAnswerCommand(
-                    session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification), ct);
+                // Allow a new turn for any new question unless we're specifically waiting for a
+                // clarification response. Status checks against the in-memory Session are unreliable
+                // because GenerateAnswerHandler mutates its own DB-loaded copy.
+                if (activeTurn is null || activeTurn.Status != ConversationTurnStatus.AwaitingClarification)
+                {
+                    var q          = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
+                    session.AddDetectedQuestion(q);
+                    var turnResult = session.AddConversationTurn(q.Id, item.Text, item.Timestamp);
+                    if (turnResult.IsSuccess)
+                    {
+                        var turn = turnResult.Value;
+                        turnSink.OnTurnCreated(turn.Id, item.Text);
+                        pendingCommand = new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary);
+                    }
+                }
+                else if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
+                {
+                    activeTurn.AttachClarificationResponse(item.Id);
+                    activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
+                    pendingCommand = new GenerateAnswerCommand(
+                        session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
+                }
             }
         }
         else if (item.Speaker == Speaker.Me &&
                  activeTurn?.Status == ConversationTurnStatus.PreliminaryReady)
         {
             var detection = _detector.Evaluate(item.Text, recentTexts);
-            if (!detection.IsQuestion) return Task.CompletedTask;
-
-            activeTurn.AttachClarificationQuestion(item.Id);
-            activeTurn.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+            if (detection.IsQuestion)
+            {
+                activeTurn.AttachClarificationQuestion(item.Id);
+                activeTurn.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+            }
         }
 
-        return Task.CompletedTask;
+        // Persist all mutations (transcript item, detected question, turn) before firing any command.
+        await unitOfWork.SaveChangesAsync(ct);
+
+        if (pendingCommand is not null)
+            FireAndForget(pendingCommand, ct);
     }
 
     private void FireAndForget(GenerateAnswerCommand command, CancellationToken ct)
     {
         _ = Task.Run(async () =>
         {
-            using var scope = scopeFactory.CreateScope();
-            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            using var scope  = scopeFactory.CreateScope();
+            var mediator     = scope.ServiceProvider.GetRequiredService<IMediator>();
             await mediator.Send(command, ct);
         }, ct);
     }

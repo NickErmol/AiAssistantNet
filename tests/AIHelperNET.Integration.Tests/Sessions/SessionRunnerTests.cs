@@ -29,9 +29,13 @@ public class SessionRunnerTests
         repo.GetAsync(Arg.Any<SessionId>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok(session)));
 
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+
         var provider = Substitute.For<IServiceProvider>();
         provider.GetService(typeof(IMediator)).Returns(mediator);
         provider.GetService(typeof(ISessionRepository)).Returns(repo);
+        provider.GetService(typeof(IUnitOfWork)).Returns(uow);
 
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);
