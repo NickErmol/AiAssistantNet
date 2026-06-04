@@ -64,6 +64,8 @@ public sealed class SessionRunner(
     {
         Log.Information("SessionRunner: pipeline starting (mode={AudioSource})", audioSource);
 
+        var uow = _sessionScope!.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
         bool runMic      = audioSource != AudioSourceMode.SystemAudioOnly;
         bool runLoopback = audioSource != AudioSourceMode.MicrophoneOnly;
 
@@ -134,23 +136,78 @@ public sealed class SessionRunner(
             : Task.CompletedTask;
 
         // Sequential consumer: pipeline.ProcessAsync must not be called concurrently.
-        // CancellationToken.None: the consumer must drain remaining items after cancellation.
+        // Segments from a single Whisper window arrive back-to-back within milliseconds; segments
+        // from different windows are separated by at least the VAD silence gap (~600 ms). Waiting
+        // SegmentMergeWindowMs after the first segment lets us greedily merge consecutive
+        // same-speaker fragments into one transcript item before question detection fires.
+        const int SegmentMergeWindowMs = 300;
+
         var consumerTask = Task.Run(async () =>
         {
+            TranscriptSegment? pending = null;
+
+            async Task FlushAsync()
+            {
+                if (pending is null) return;
+                Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}",
+                    pending.Speaker, pending.Confidence, pending.Text);
+                var item = TranscriptItem.Create(pending.Speaker, pending.Text, pending.CapturedAt, pending.Confidence);
+                await pipeline.ProcessAsync(session, item, uow, CancellationToken.None);
+                pending = null;
+            }
+
             try
             {
-                await foreach (var seg in mergeChannel.Reader.ReadAllAsync(ct))
+                while (true)
                 {
-                    Log.Information("SessionRunner: segment [{Speaker}] conf={Conf:F2} — {Text}",
-                        seg.Speaker, seg.Confidence, seg.Text);
-                    var item = TranscriptItem.Create(seg.Speaker, seg.Text, seg.CapturedAt, seg.Confidence);
-                    await pipeline.ProcessAsync(session, item, ct);
+                    TranscriptSegment next;
+
+                    if (pending is null)
+                    {
+                        // No buffered segment — block until one arrives or channel closes.
+                        if (!await mergeChannel.Reader.WaitToReadAsync(CancellationToken.None)) break;
+                        if (!mergeChannel.Reader.TryRead(out next!)) continue;
+                    }
+                    else
+                    {
+                        // Have a buffered segment — wait briefly for a follow-on from the same speaker.
+                        using var window = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
+                        window.CancelAfter(SegmentMergeWindowMs);
+                        try
+                        {
+                            next = await mergeChannel.Reader.ReadAsync(window.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            await FlushAsync(); // timeout — no follow-on arrived
+                            continue;
+                        }
+                    }
+
+                    if (pending is null)
+                    {
+                        pending = next;
+                    }
+                    else if (next.Speaker == pending.Speaker)
+                    {
+                        // Same speaker: merge into one utterance.
+                        pending = pending with { Text = pending.Text + " " + next.Text };
+                    }
+                    else
+                    {
+                        // Speaker changed: flush current, start new.
+                        await FlushAsync();
+                        pending = next;
+                    }
                 }
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log.Error(ex, "SessionRunner: unhandled error in pipeline");
+            }
+            finally
+            {
+                await FlushAsync(); // drain whatever remains
             }
         }, CancellationToken.None);
 
