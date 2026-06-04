@@ -83,6 +83,14 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
         get => _latestVersion;
         set => SetProperty(ref _latestVersion, value);
     }
+
+    private string _followUpText = string.Empty;
+    /// <summary>Gets or sets the follow-up question text typed by the user for this turn.</summary>
+    public string FollowUpText
+    {
+        get => _followUpText;
+        set => SetProperty(ref _followUpText, value);
+    }
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
@@ -91,6 +99,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
     [ObservableProperty] private int _answerFontSize = 12;
+    [ObservableProperty] private bool _isFollowUpEnabled;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
@@ -190,6 +199,17 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
         if (turn is null || ActiveSessionId is not { } sid) return;
         await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
         Turns.Remove(turn);
+    }
+
+    /// <summary>Submits the follow-up question typed in a turn card and triggers answer generation.</summary>
+    [RelayCommand]
+    private async Task SubmitFollowUpAsync(TurnVm? turn)
+    {
+        if (turn is null || ActiveSessionId is not { } sid) return;
+        if (string.IsNullOrWhiteSpace(turn.FollowUpText)) return;
+        var text = turn.FollowUpText;
+        turn.FollowUpText = string.Empty;
+        await mediator.Send(new GenerateFollowUpCommand(sid, turn.Id, text));
     }
 
     /// <summary>Copies the latest answer version text to the clipboard.</summary>
