@@ -23,7 +23,7 @@ public class TranscriptPipelineServiceTests
     private static TranscriptItem MakeItem(Speaker speaker, string text)
         => TranscriptItem.Create(speaker, text, Now, 0.9f);
 
-    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink)
+    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow)
         MakeSvc(ITranscriptSink sink)
     {
         var mediator = Substitute.For<IMediator>();
@@ -43,7 +43,10 @@ public class TranscriptPipelineServiceTests
 
         var turnSink = Substitute.For<IConversationTurnSink>();
 
-        return (new TranscriptPipelineService(factory, sink, turnSink), mediator, turnSink);
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+
+        return (new TranscriptPipelineService(factory, sink, turnSink), mediator, turnSink, uow);
     }
 
     [Fact]
@@ -51,10 +54,10 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, mediator, _) = MakeSvc(transcriptSink);
+        var (svc, mediator, _, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
-        await svc.ProcessAsync(session, item, CancellationToken.None);
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         session.ConversationTurns.Should().HaveCount(1);
         session.ConversationTurns[0].Status.Should().Be(ConversationTurnStatus.Detected);
@@ -70,10 +73,10 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
-        await svc.ProcessAsync(session, item, CancellationToken.None);
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         session.ConversationTurns.Should().BeEmpty();
     }
@@ -83,7 +86,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
         var q = DetectedQuestion.Create("Original Q?", QuestionSource.Audio, Now);
         session.AddDetectedQuestion(q);
@@ -91,7 +94,7 @@ public class TranscriptPipelineServiceTests
         turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
 
         var clarification = MakeItem(Speaker.Me, "Should it cover all error types?");
-        await svc.ProcessAsync(session, clarification, CancellationToken.None);
+        await svc.ProcessAsync(session, clarification, uow, CancellationToken.None);
 
         turn.Status.Should().Be(ConversationTurnStatus.AwaitingClarification);
         turn.ClarificationQuestionIds.Should().HaveCount(1);
@@ -102,10 +105,10 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Me, "Hello");
-        await svc.ProcessAsync(session, item, CancellationToken.None);
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         transcriptSink.Received(1).OnTranscriptItem(item);
     }
@@ -115,10 +118,10 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, turnSink) = MakeSvc(transcriptSink);
+        var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
-        await svc.ProcessAsync(session, item, CancellationToken.None);
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         var expectedId = session.ConversationTurns[0].Id;
         turnSink.Received(1).OnTurnCreated(expectedId, item.Text);
@@ -129,10 +132,10 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, turnSink) = MakeSvc(transcriptSink);
+        var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
-        await svc.ProcessAsync(session, item, CancellationToken.None);
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         turnSink.DidNotReceive().OnTurnCreated(Arg.Any<ConversationTurnId>(), Arg.Any<string>());
     }

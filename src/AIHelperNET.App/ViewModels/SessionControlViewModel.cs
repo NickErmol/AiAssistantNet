@@ -12,7 +12,11 @@ using Mediator;
 namespace AIHelperNET.App.ViewModels;
 
 /// <summary>Controls session lifecycle and capture mode selection.</summary>
-public sealed partial class SessionControlViewModel(IMediator mediator, SessionRunner runner) : ObservableObject
+public sealed partial class SessionControlViewModel(
+    IMediator mediator,
+    SessionRunner runner,
+    TranscriptViewModel transcript,
+    ConversationTurnViewModel conversationTurn) : ObservableObject
 {
     /// <summary>Gets or sets a value indicating whether a session is currently active.</summary>
     [ObservableProperty] private bool _isSessionActive;
@@ -57,10 +61,14 @@ public sealed partial class SessionControlViewModel(IMediator mediator, SessionR
 
             if (result.IsSuccess)
             {
-                ActiveSessionId     = result.Value.Id;
-                IsSessionActive     = true;
-                IsMicActive         = AudioSource is AudioSourceMode.MicrophoneOnly or AudioSourceMode.Both;
-                IsSystemAudioActive = AudioSource is AudioSourceMode.SystemAudioOnly or AudioSourceMode.Both;
+                transcript.Clear();
+                conversationTurn.Clear();
+
+                ActiveSessionId                  = result.Value.Id;
+                conversationTurn.ActiveSessionId = result.Value.Id;
+                IsSessionActive                  = true;
+                IsMicActive                      = AudioSource is AudioSourceMode.MicrophoneOnly or AudioSourceMode.Both;
+                IsSystemAudioActive              = AudioSource is AudioSourceMode.SystemAudioOnly or AudioSourceMode.Both;
 
                 await runner.StartAsync(
                     result.Value.Id,
@@ -73,10 +81,11 @@ public sealed partial class SessionControlViewModel(IMediator mediator, SessionR
         {
             await runner.StopAsync();
             await mediator.Send(new StopSessionCommand(id));
-            IsSessionActive     = false;
-            IsMicActive         = false;
-            IsSystemAudioActive = false;
-            ActiveSessionId     = null;
+            IsSessionActive                  = false;
+            IsMicActive                      = false;
+            IsSystemAudioActive              = false;
+            ActiveSessionId                  = null;
+            conversationTurn.ActiveSessionId = null;
         }
     }
 

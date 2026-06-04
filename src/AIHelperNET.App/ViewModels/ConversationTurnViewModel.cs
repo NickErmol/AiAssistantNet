@@ -11,6 +11,7 @@ namespace AIHelperNET.App.ViewModels;
 
 /// <summary>Displays a single answer version within a conversation turn.</summary>
 public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, DateTimeOffset createdAt)
+    : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     /// <summary>Gets the answer version identifier.</summary>
     public AnswerVersionId Id           => id;
@@ -28,15 +29,26 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
     /// <summary>Gets the formatted creation time label.</summary>
     public string TimeLabel             => createdAt.ToLocalTime().ToString("HH:mm:ss");
 
+    private string _text = string.Empty;
     /// <summary>Gets or sets the accumulated answer text.</summary>
-    public string Text                  { get; set; } = string.Empty;
+    public string Text
+    {
+        get => _text;
+        set => SetProperty(ref _text, value);
+    }
 
+    private bool _isLatest;
     /// <summary>Gets or sets a value indicating whether this is the latest version.</summary>
-    public bool IsLatest                { get; set; }
+    public bool IsLatest
+    {
+        get => _isLatest;
+        set => SetProperty(ref _isLatest, value);
+    }
 }
 
 /// <summary>Represents a single conversation turn (question + answers) in the UI.</summary>
 public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
+    : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     /// <summary>Gets the turn identifier.</summary>
     public ConversationTurnId Id                              => id;
@@ -44,8 +56,17 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
     /// <summary>Gets the text of the initial question.</summary>
     public string InitialQuestion                             => initialQuestion;
 
+    private ConversationTurnStatus _status = ConversationTurnStatus.Detected;
     /// <summary>Gets or sets the current turn status.</summary>
-    public ConversationTurnStatus Status                      { get; set; } = ConversationTurnStatus.Detected;
+    public ConversationTurnStatus Status
+    {
+        get => _status;
+        set
+        {
+            if (SetProperty(ref _status, value))
+                OnPropertyChanged(nameof(StatusLabel));
+        }
+    }
 
     /// <summary>Gets the human-readable status label.</summary>
     public string StatusLabel                                 => Status.ToString();
@@ -53,8 +74,13 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
     /// <summary>Gets all answer versions for this turn.</summary>
     public ObservableCollection<AnswerVersionVm> AnswerVersions { get; } = [];
 
-    /// <summary>Gets the latest answer version, or <see langword="null"/> if none.</summary>
-    public AnswerVersionVm? LatestVersion                     => AnswerVersions.FirstOrDefault(v => v.IsLatest);
+    private AnswerVersionVm? _latestVersion;
+    /// <summary>Gets or sets the latest answer version (observable — drives the answer text binding).</summary>
+    public AnswerVersionVm? LatestVersion
+    {
+        get => _latestVersion;
+        set => SetProperty(ref _latestVersion, value);
+    }
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
@@ -80,6 +106,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             version = new AnswerVersionVm(AnswerVersionId.New(), versionType, DateTimeOffset.UtcNow)
                 { IsLatest = true };
             turn.AnswerVersions.Insert(0, version);
+            turn.LatestVersion = version;
         }
         version.Text += chunk;
     }
@@ -103,6 +130,9 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     /// <summary>Adds a new turn to the top of the list.</summary>
     public void AddTurn(ConversationTurnId id, string question)
         => Turns.Insert(0, new TurnVm(id, question));
+
+    /// <summary>Clears all turns and resets the active session.</summary>
+    public void Clear() { Turns.Clear(); ActiveSessionId = null; }
 
     /// <summary>Regenerates the answer for the given turn, optionally with screen context.</summary>
     [RelayCommand]
