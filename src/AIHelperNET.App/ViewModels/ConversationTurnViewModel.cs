@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using AIHelperNET.Application.Answers.Commands;
 using AIHelperNET.Application.Sessions.Commands;
+using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -88,6 +89,36 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
 {
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
+    [ObservableProperty] private int _answerFontSize = 12;
+
+    private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
+    private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
+
+    [RelayCommand(CanExecute = nameof(CanIncrease))]
+    private async Task IncreaseFontSizeAsync()
+    {
+        AnswerFontSize++;
+        IncreaseFontSizeCommand.NotifyCanExecuteChanged();
+        DecreaseFontSizeCommand.NotifyCanExecuteChanged();
+        await mediator.Send(new SaveAnswerFontSizeCommand(AnswerFontSize));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDecrease))]
+    private async Task DecreaseFontSizeAsync()
+    {
+        AnswerFontSize--;
+        IncreaseFontSizeCommand.NotifyCanExecuteChanged();
+        DecreaseFontSizeCommand.NotifyCanExecuteChanged();
+        await mediator.Send(new SaveAnswerFontSizeCommand(AnswerFontSize));
+    }
+
+    /// <summary>Restores the persisted answer font size from settings. Call once at startup.</summary>
+    public async Task LoadFontSizeAsync()
+    {
+        var result = await mediator.Send(new GetSettingsQuery());
+        if (result.IsSuccess)
+            AnswerFontSize = result.Value.AnswerFontSize;
+    }
 
     /// <summary>Looks up a turn by its identifier.</summary>
     public TurnVm? GetTurn(ConversationTurnId id)
