@@ -34,22 +34,39 @@ public partial class MainOverlayWindow : Window
     private const uint WDA_NONE             = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
-    private readonly SettingsWindow _settingsWindow;
+    private readonly SettingsWindow  _settingsWindow;
+    private readonly SettingsViewModel _settingsVm;
     private bool _stealthActive;
 
     /// <summary>Initialises a new instance of <see cref="MainOverlayWindow"/>.</summary>
-    public MainOverlayWindow(MainOverlayWindowContext context, SettingsWindow settingsWindow)
+    public MainOverlayWindow(
+        MainOverlayWindowContext context,
+        SettingsWindow settingsWindow,
+        SettingsViewModel settingsVm)
     {
         InitializeComponent();
         DataContext     = context;
         _settingsWindow = settingsWindow;
+        _settingsVm     = settingsVm;
+        _settingsVm.OpacityChanged += opacity => Opacity = opacity;
     }
 
     /// <inheritdoc/>
-    protected override void OnSourceInitialized(EventArgs e)
+    protected override async void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
         ApplyStealth(enable: true); // stealth on by default; toggle with 🎥 button
+
+        // Load persisted opacity before the window becomes visible
+        try
+        {
+            await _settingsVm.LoadAsync();
+            Opacity = _settingsVm.OverlayOpacity;
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to restore overlay opacity; using default");
+        }
     }
 
     private void ApplyStealth(bool enable)
