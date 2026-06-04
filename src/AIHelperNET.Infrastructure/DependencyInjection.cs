@@ -3,6 +3,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Audio;
 using AIHelperNET.Infrastructure.Common;
+using AIHelperNET.Infrastructure.Export;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
@@ -33,6 +34,9 @@ public static class DependencyInjection
         // Settings & secrets
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<ISecretStore, WindowsCredentialSecretStore>();
+
+        // Export
+        services.AddSingleton<IExportService, ExportService>();
 
         // Hotkeys
         services.AddSingleton<IGlobalHotkeyService, GlobalHotkeyService>();
