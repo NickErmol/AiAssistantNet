@@ -26,18 +26,19 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
     {
         var factory = await models.GetFactoryAsync(model, ct);
         var lang = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
-        await using var processor = factory.CreateBuilder()
-            .WithLanguage(lang ?? "en")
-            .WithTemperature(0)            // greedy decoding — eliminates random word substitutions
-            .WithPrompt(InitialPrompt)     // primes vocabulary, reduces nonsense outputs
-            .WithNoSpeechThreshold(0.6f)   // drop segments Whisper itself flags as silent
-            .WithSingleSegment()           // one result per VAD window — prevents within-window splits
-            .Build();
 
         string? lastEmitted = null;
 
         await foreach (var window in VoiceActivityDetector.AccumulateSpeechWindows(frames, ct))
         {
+            await using var processor = factory.CreateBuilder()
+                .WithLanguage(lang ?? "en")
+                .WithTemperature(0)
+                .WithPrompt(lastEmitted ?? InitialPrompt)
+                .WithNoSpeechThreshold(0.6f)
+                .WithSingleSegment()
+                .Build();
+
             await foreach (var seg in processor.ProcessAsync(window.Samples, ct))
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
