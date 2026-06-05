@@ -63,6 +63,12 @@
                               SelectedValue="{Binding SelectedLoopbackDeviceId}"
                               Margin="0,0,0,16"/>
                     <TextBlock Text="TRANSCRIPTION" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Model" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.WhisperModelSizes}}"
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding WhisperModel}"
+                              Margin="0,0,0,8"/>
                     <TextBlock Text="Language" Style="{StaticResource FieldLabel}"/>
                     <ComboBox SelectedValue="{Binding WhisperLanguage}"
                               SelectedValuePath="Tag">

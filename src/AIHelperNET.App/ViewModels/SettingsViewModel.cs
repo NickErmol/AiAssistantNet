@@ -22,6 +22,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
     [ObservableProperty] private string? _selectedMicDeviceId;
     [ObservableProperty] private string? _selectedLoopbackDeviceId;
     [ObservableProperty] private string _whisperLanguage = "auto";
+    [ObservableProperty] private WhisperModelSize _whisperModel = WhisperModelSize.Medium;
 
     // ── Code Profiles tab ─────────────────────────────────────────
     [ObservableProperty] private ProfilePreset? _selectedPreset;
@@ -68,6 +69,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         SelectedMicDeviceId      = s.MicDeviceId;
         SelectedLoopbackDeviceId = s.LoopbackDeviceId;
         WhisperLanguage          = s.WhisperLanguage;
+        WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
@@ -122,7 +124,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
 
         var dto = new AppSettingsDto(
             current?.ActiveBackend  ?? AiBackend.Claude,
-            current?.WhisperModel   ?? WhisperModelSize.Medium,
+            WhisperModel,
             new AnswerSettings(AnswerLength, AnswerComplexity, AnswerStyle, AnswerTone, AnswerFormat, OutputLanguage),
             new CodeProfile(NullIfEmpty(ProgrammingLanguage), NullIfEmpty(BackendFramework),
                 NullIfEmpty(FrontendFramework), NullIfEmpty(Database), NullIfEmpty(CloudDevOps),

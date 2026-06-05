@@ -1,4 +1,5 @@
 // src/AIHelperNET.App/Windows/EnumValues.cs
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.ValueObjects;
 
 namespace AIHelperNET.App.Windows;
@@ -35,5 +36,15 @@ public static class EnumValues
         new("Code First",   AnswerStyle.CodeFirst),
         new("Architecture", AnswerStyle.Architecture),
         new("Debugging",    AnswerStyle.Debugging),
+    ];
+
+    public static IReadOnlyList<EnumOption<WhisperModelSize>> WhisperModelSizes { get; } =
+    [
+        new("Tiny",        WhisperModelSize.Tiny),
+        new("Base",        WhisperModelSize.Base),
+        new("Small",       WhisperModelSize.Small),
+        new("Medium",      WhisperModelSize.Medium),
+        new("Large Turbo", WhisperModelSize.LargeTurbo),
+        new("Large",       WhisperModelSize.Large),
     ];
 }
