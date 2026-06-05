@@ -15,6 +15,8 @@ public sealed class SessionRepository(AppDbContext db) : ISessionRepository
             .Include(s => s.Transcript)
             .Include(s => s.Questions)
             .Include(s => s.Answers)
+            .Include(s => s.ConversationTurns)
+                .ThenInclude(t => t.AnswerVersions)
             .FirstOrDefaultAsync(s => s.Id == id, ct);
 
         return session is null

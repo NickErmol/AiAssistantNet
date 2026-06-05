@@ -23,7 +23,7 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
     {
         AnswerVersionType.Preliminary               => "Preliminary",
         AnswerVersionType.RefinedAfterClarification => "Refined — after clarification",
-        AnswerVersionType.UpdatedWithScreen         => "Updated with screen",
+        AnswerVersionType.UpdatedWithScreen         => "Screen analysis",
         AnswerVersionType.ManuallyRegenerated       => "Manually regenerated",
         AnswerVersionType.FollowUp                  => "Follow-up",
         _                                           => type.ToString()
@@ -164,9 +164,11 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     {
         var turn = Turns.FirstOrDefault(t => t.Id == turnId);
         if (turn is null) return;
+        foreach (var v in turn.AnswerVersions) v.IsLatest = false;
         var errVersion = new AnswerVersionVm(AnswerVersionId.New(), AnswerVersionType.Preliminary,
             DateTimeOffset.UtcNow) { Text = $"[Error: {errorMessage}]", IsLatest = true };
         turn.AnswerVersions.Insert(0, errVersion);
+        turn.LatestVersion = errVersion;
     }
 
     /// <summary>Adds a new turn to the top of the list.</summary>
@@ -222,7 +224,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             System.Windows.Clipboard.SetText(text);
     }
 
-    /// <summary>Captures the current screen and regenerates the answer for the most recent turn using the selected analysis mode.</summary>
+    /// <summary>Captures the current screen and either creates a new turn (if none exist) or updates the most recent one.</summary>
     [RelayCommand]
     private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
@@ -237,7 +239,12 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             : [];
 
         var activeTurn = Turns.FirstOrDefault();
-        if (activeTurn is null) return;
+        if (activeTurn is null)
+        {
+            await mediator.Send(new StartScreenTurnCommand(
+                sid, ocrResult.Value, sessionControl.ScreenAnalysisMode, interviewerLines));
+            return;
+        }
 
         await mediator.Send(new RegenerateAnswerWithScreenCommand(
             sid, activeTurn.Id, ocrResult.Value,

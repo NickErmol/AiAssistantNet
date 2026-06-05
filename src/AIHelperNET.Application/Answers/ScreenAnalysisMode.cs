@@ -16,5 +16,8 @@ public enum ScreenAnalysisMode
     ExplainCode,
 
     /// <summary>Provide a high-level system design for requirements on screen.</summary>
-    SystemDesign
+    SystemDesign,
+
+    /// <summary>Pick the correct answer from a multiple-choice question on screen.</summary>
+    MultipleChoice
 }

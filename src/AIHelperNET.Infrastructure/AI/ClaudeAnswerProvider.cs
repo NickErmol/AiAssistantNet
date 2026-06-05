@@ -41,7 +41,13 @@ public sealed class ClaudeAnswerProvider(
 
             using var response = await http.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                throw new HttpRequestException(
+                    $"{(int)response.StatusCode} {response.ReasonPhrase}: {errorBody}",
+                    null, response.StatusCode);
+            }
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
