@@ -31,10 +31,11 @@ public partial class MainOverlayWindow : Window
     [DllImport("user32.dll")]
     private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
 
+    private const uint WDA_NONE             = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
-    private const uint WDA_MONITOR            = 0x00000001;
 
     private readonly SettingsWindow _settingsWindow;
+    private bool _stealthActive;
 
     /// <summary>Initialises a new instance of <see cref="MainOverlayWindow"/>.</summary>
     public MainOverlayWindow(MainOverlayWindowContext context, SettingsWindow settingsWindow)
@@ -48,23 +49,29 @@ public partial class MainOverlayWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var hwnd = new WindowInteropHelper(this).Handle;
+        ApplyStealth(enable: true); // stealth on by default; toggle with 🎥 button
+    }
 
-        if (!SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE))
-        {
-            if (!SetWindowDisplayAffinity(hwnd, WDA_MONITOR))
-                Log.Warning("SetWindowDisplayAffinity failed — overlay may be visible to screen capture");
-            else
-                Log.Information("Overlay: WDA_MONITOR applied");
-        }
-        else
-        {
-            Log.Information("Overlay: WDA_EXCLUDEFROMCAPTURE applied");
-        }
+    private void ApplyStealth(bool enable)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        _stealthActive = enable && SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+        if (!_stealthActive) SetWindowDisplayAffinity(hwnd, WDA_NONE);
+
+        if (StealthBtn is not null)
+            StealthBtn.Content = _stealthActive ? "👁" : "🎥";
+
+        Log.Information("Overlay: stealth={S}", _stealthActive);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         => DragMove();
+
+    private void ToggleStealth_Click(object sender, RoutedEventArgs e)
+        => ApplyStealth(!_stealthActive);
+
+    private void Minimize_Click(object sender, RoutedEventArgs e)
+        => Hide();
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {

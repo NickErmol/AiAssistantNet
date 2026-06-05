@@ -9,10 +9,6 @@ namespace AIHelperNET.Application.Answers;
 public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
-    /// <param name="profile">Candidate's code profile.</param>
-    /// <param name="settings">Answer generation settings.</param>
-    /// <param name="question">The detected question to answer.</param>
-    /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
@@ -20,11 +16,31 @@ public sealed class PromptBuilderService
         string? screenContext = null)
     {
         var system = new StringBuilder();
-        system.AppendLine("You are an expert technical interview assistant. " +
-            "Answer the candidate's interview question concisely and correctly.");
+
+        system.AppendLine(
+            "You are a senior software engineer coaching a candidate through a technical job interview. " +
+            "Your job is to give short, spoken-style answers the candidate can say out loud right now.");
+
+        system.AppendLine();
+        system.AppendLine("STRICT RULES:");
+        system.AppendLine("1. Be concise. 3–5 sentences or 3–4 bullets max. No padding.");
+        system.AppendLine("2. Answer like an experienced engineer speaking — clear, direct, no filler.");
+        system.AppendLine("3. NO markdown headers (no #, ##). Use plain prose or short bullets.");
+        system.AppendLine("4. CODE: include code ONLY when the question explicitly asks to write, " +
+            "implement, fix, debug, show syntax, or provide a query/example. " +
+            "For conceptual, design, 'what is', 'why', 'how does it work' questions — verbal answer only.");
+        system.AppendLine("5. Start directly with the answer. Never say 'Great question' or restate the question.");
 
         AppendCodeProfile(system, profile);
-        AppendAnswerSettings(system, settings);
+
+        if (settings.Complexity != AnswerComplexity.Balanced)
+            system.AppendLine(CultureInfo.InvariantCulture,
+                $"\nTarget level: {settings.Complexity}.");
+
+        if (!string.IsNullOrWhiteSpace(settings.OutputLanguage) &&
+            !settings.OutputLanguage.Equals("English", StringComparison.OrdinalIgnoreCase))
+            system.AppendLine(CultureInfo.InvariantCulture,
+                $"Answer in: {settings.OutputLanguage}.");
 
         var user = new StringBuilder();
         user.AppendLine(CultureInfo.InvariantCulture, $"Question: {question.Text}");
@@ -40,42 +56,36 @@ public sealed class PromptBuilderService
 
     private static void AppendCodeProfile(StringBuilder sb, CodeProfile p)
     {
-        sb.AppendLine("\n# Candidate technical profile (use this stack in code/examples):");
-        AppendIf(sb, "Programming language", p.ProgrammingLanguage);
-        AppendIf(sb, "Backend framework",    p.BackendFramework);
-        AppendIf(sb, "Frontend framework",   p.FrontendFramework);
-        AppendIf(sb, "Database",             p.Database);
-        AppendIf(sb, "Cloud/DevOps",         p.CloudDevOps);
-        AppendIf(sb, "Messaging",            p.Messaging);
-        AppendIf(sb, "Architecture style",   p.ArchitectureStyle);
-        AppendIf(sb, "Testing framework",    p.TestingFramework);
-        AppendIf(sb, "Notes",                p.CustomNotes);
-    }
+        var fields = new[]
+        {
+            ("language", p.ProgrammingLanguage),
+            ("backend",  p.BackendFramework),
+            ("frontend", p.FrontendFramework),
+            ("database", p.Database),
+            ("cloud",    p.CloudDevOps),
+            ("messaging",p.Messaging),
+            ("architecture", p.ArchitectureStyle),
+            ("testing",  p.TestingFramework),
+        }.Where(f => !string.IsNullOrWhiteSpace(f.Item2)).ToList();
 
-    private static void AppendAnswerSettings(StringBuilder sb, AnswerSettings s)
-    {
-        sb.AppendLine("\n# Answer requirements:");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Length: {s.Length}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Complexity: {s.Complexity}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Style: {s.Style}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Tone: {s.Tone}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Format: {s.Format}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"- Output language: {s.OutputLanguage}");
-    }
+        if (fields.Count == 0) return;
 
-    private static void AppendIf(StringBuilder sb, string label, string? value)
-    {
-        if (!string.IsNullOrWhiteSpace(value))
+        sb.AppendLine();
+        sb.AppendLine("Candidate stack (use this in code examples only):");
+        foreach (var (label, value) in fields)
             sb.AppendLine(CultureInfo.InvariantCulture, $"- {label}: {value}");
+
+        if (!string.IsNullOrWhiteSpace(p.CustomNotes))
+            sb.AppendLine(CultureInfo.InvariantCulture, $"- notes: {p.CustomNotes}");
     }
 
     private static int MapLengthToTokens(AnswerLength length) => length switch
     {
-        AnswerLength.VeryShort    => 200,
-        AnswerLength.ShortLength  => 400,
-        AnswerLength.Medium       => 800,
-        AnswerLength.Detailed     => 1500,
-        AnswerLength.DeepDive     => 3000,
-        _                         => 800
+        AnswerLength.VeryShort    => 150,
+        AnswerLength.ShortLength  => 300,
+        AnswerLength.Medium       => 550,
+        AnswerLength.Detailed     => 1000,
+        AnswerLength.DeepDive     => 2000,
+        _                         => 300
     };
 }

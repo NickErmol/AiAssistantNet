@@ -24,6 +24,7 @@ public static class DependencyInjection
 
         services.AddSingleton<SessionMapper>();
         services.AddSingleton<PromptBuilderService>();
+        services.AddSingleton<TranscriptPipelineService>();
 
         return services;
     }

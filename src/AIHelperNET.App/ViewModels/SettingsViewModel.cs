@@ -18,6 +18,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
     {
         var result = await mediator.Send(new GetSettingsQuery());
         if (result.IsSuccess) Settings = result.Value;
+
+        await RefreshKeyStatusAsync();
     }
 
     [RelayCommand]
@@ -30,7 +32,21 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         secure.MakeReadOnly();
 
         var result = await mediator.Send(new SaveApiKeyCommand(secure));
-        StatusMessage = result.IsSuccess ? "API key saved." : $"Error: {string.Join(", ", result.Errors)}";
+        StatusMessage = result.IsSuccess ? "API key saved ✓" : $"Error: {string.Join(", ", result.Errors)}";
         ApiKeyInput = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task DeleteApiKeyAsync()
+    {
+        var result = await mediator.Send(new DeleteApiKeyCommand());
+        StatusMessage = result.IsSuccess ? "API key deleted." : $"Error: {string.Join(", ", result.Errors)}";
+    }
+
+    private async Task RefreshKeyStatusAsync()
+    {
+        var hasKey = await mediator.Send(new HasApiKeyQuery());
+        if (StatusMessage == string.Empty || StatusMessage.StartsWith("API key is", StringComparison.Ordinal))
+            StatusMessage = (hasKey.IsSuccess && hasKey.Value) ? "API key is stored ✓" : "No API key stored — enter one above.";
     }
 }

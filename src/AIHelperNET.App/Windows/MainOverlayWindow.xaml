@@ -53,6 +53,12 @@
                                 ConverterParameter='Stop|Start'}"
                             Command="{Binding SessionControl.ToggleSessionCommand}"
                             Style="{StaticResource ActionBtn}"/>
+                    <Button x:Name="StealthBtn"
+                            Content="🎥"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="13"
+                            Click="ToggleStealth_Click"
+                            ToolTip="Toggle screen capture visibility"/>
                     <Button Content="◐"
                             Style="{StaticResource IconBtn}"
                             FontSize="13"
@@ -62,6 +68,11 @@
                             Style="{StaticResource IconBtn}"
                             FontSize="11"
                             Click="OpenSettings_Click"/>
+                    <Button Content="−"
+                            Style="{StaticResource IconBtn}"
+                            FontSize="16"
+                            Click="Minimize_Click"
+                            ToolTip="Minimize (Ctrl+Shift+H to restore)"/>
                     <Button Content="✕"
                             Style="{StaticResource IconBtn}"
                             FontSize="11"
@@ -85,14 +96,17 @@
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionLabel}" Text="MODE" Margin="0,0,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Audio Only"
+                             GroupName="Mode"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=AudioOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Screen Only"
+                             GroupName="Mode"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=ScreenOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Audio + Screen"
+                             GroupName="Mode"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=AudioAndScreen}"/>
@@ -100,14 +114,17 @@
                 <TextBlock Style="{StaticResource SectionLabel}" Text="AUDIO SOURCE"
                            Margin="0,10,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Mic Only"
+                             GroupName="AudioSource"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=MicrophoneOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="System Only"
+                             GroupName="AudioSource"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=SystemAudioOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Both"
+                             GroupName="AudioSource"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=Both}"/>
@@ -168,7 +185,8 @@
             </Grid.RowDefinitions>
 
             <!-- Transcript panel -->
-            <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}">
+            <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}"
+                    DataContext="{Binding Transcript}">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top"
                                Style="{StaticResource SectionLabel}"
@@ -178,7 +196,7 @@
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Margin="8,0,8,6">
-                        <ItemsControl ItemsSource="{Binding Transcript.Items}">
+                        <ItemsControl ItemsSource="{Binding Items}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="0,2">
@@ -239,7 +257,8 @@
                                                        Margin="0,0,0,4"/>
                                             <TextBlock Text="{Binding LatestVersion.Text}"
                                                        Foreground="{DynamicResource Brush.Foreground.Primary}"
-                                                       FontSize="{DynamicResource Font.MD}"
+                                                       FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                                          RelativeSource={RelativeSource AncestorType=Window}}"
                                                        TextWrapping="Wrap"
                                                        FontFamily="Cascadia Mono, Consolas"
                                                        Margin="0,0,0,4"/>
@@ -264,6 +283,16 @@
                                                             RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource ActionBtn}"/>
+                                                <Button Content="−"
+                                                        Command="{Binding DataContext.ConversationTurn.DecreaseFontSizeCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        Style="{StaticResource ActionBtn}"
+                                                        ToolTip="Decrease font size"/>
+                                                <Button Content="+"
+                                                        Command="{Binding DataContext.ConversationTurn.IncreaseFontSizeCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        Style="{StaticResource ActionBtn}"
+                                                        ToolTip="Increase font size"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </DockPanel>

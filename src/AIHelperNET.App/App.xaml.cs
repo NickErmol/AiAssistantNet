@@ -6,9 +6,11 @@ using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Persistence;
+using AIHelperNET.Infrastructure.Transcription;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace AIHelperNET.App;
 
@@ -49,8 +51,53 @@ public partial class App : System.Windows.Application
             onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
             onError:    (id, err)         => turnVm.OnError(id, err));
 
+        // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel
+        var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
+        turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
+
+        try { await turnVm.LoadFontSizeAsync(); }
+        catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
+
         overlay.Show();
         WireHotkeys(overlay);
+        PreWarmWhisperModel();
+    }
+
+    private void PreWarmWhisperModel()
+    {
+        var modelProvider  = _host.Services.GetRequiredService<WhisperModelProvider>();
+        var settingsStore  = _host.Services.GetRequiredService<AIHelperNET.Application.Abstractions.ISettingsStore>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var settings = await settingsStore.LoadAsync(CancellationToken.None);
+                Log.Information("Whisper: pre-warming {Model} model in background…", settings.WhisperModel);
+                await modelProvider.GetFactoryAsync(settings.WhisperModel, CancellationToken.None);
+                Log.Information("Whisper: model ready");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Whisper: pre-warm failed");
+                return;
+            }
+
+            // Download Medium only after the active model is loaded so the semaphore
+            // is free for session start while the large download runs.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    Log.Information("Whisper: downloading Medium model in background…");
+                    await modelProvider.GetFactoryAsync(WhisperModelSize.Medium, CancellationToken.None);
+                    Log.Information("Whisper: Medium model ready");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Whisper: Medium model download failed");
+                }
+            });
+        });
     }
 
     private void WireHotkeys(MainOverlayWindow overlay)
@@ -87,7 +134,14 @@ public partial class App : System.Windows.Application
                     turnVm2.CopyLatestCommand.Execute(turnVm2.Turns.FirstOrDefault());
                     break;
                 case HotkeyId.ToggleOverlay:
-                    sessionVm.ToggleSidebarCommand.Execute(null);
+                    if (overlay.IsVisible)
+                        overlay.Hide();
+                    else
+                    {
+                        overlay.Show();
+                        overlay.Activate();
+                        overlay.WindowState = WindowState.Normal;
+                    }
                     break;
             }
         };

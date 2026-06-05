@@ -3,80 +3,87 @@ using AIHelperNET.Application.Answers.Commands;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Domain.Sessions;
 using Mediator;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AIHelperNET.Application.Sessions;
 
 /// <summary>Processes incoming transcript items and drives conversation turn lifecycle.</summary>
 public sealed class TranscriptPipelineService(
-    IMediator mediator,
-    ITranscriptSink transcriptSink)
+    IServiceScopeFactory scopeFactory,
+    ITranscriptSink transcriptSink,
+    IConversationTurnSink turnSink)
 {
     private readonly QuestionDetector _detector = new();
 
     /// <summary>Processes a single transcript item against the active session.</summary>
     /// <param name="session">The active session to update.</param>
     /// <param name="item">The transcript item to process.</param>
+    /// <param name="unitOfWork">Unit of work that owns the session — saved before any command is fired.</param>
     /// <param name="ct">Cancellation token.</param>
-    public Task ProcessAsync(Session session, TranscriptItem item, CancellationToken ct)
+    public async Task ProcessAsync(Session session, TranscriptItem item, IUnitOfWork unitOfWork, CancellationToken ct)
     {
         session.AddTranscriptItem(item);
         transcriptSink.OnTranscriptItem(item);
 
-        var activeTurn = session.ActiveTurn;
+        var activeTurn  = session.ActiveTurn;
         var recentTexts = session.Questions.Select(q => q.Text).ToList();
+
+        GenerateAnswerCommand? pendingCommand = null;
 
         if (item.Speaker == Speaker.Other)
         {
             var detection = _detector.Evaluate(item.Text, recentTexts);
-            if (!detection.IsQuestion) return Task.CompletedTask;
-
-            if (activeTurn is null)
+            if (detection.IsQuestion)
             {
-                var q = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
-                session.AddDetectedQuestion(q);
-                var turnResult = session.AddConversationTurn(q.Id, item.Text, item.Timestamp);
-                if (turnResult.IsFailed) return Task.CompletedTask;
-                var turn = turnResult.Value;
-
-                FireAndForget(mediator.Send(
-                    new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary), ct));
-            }
-            else if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
-            {
-                activeTurn.AttachClarificationResponse(item.Id);
-                activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
-
-                FireAndForget(mediator.Send(
-                    new GenerateAnswerCommand(
-                        session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification), ct));
+                // Allow a new turn for any new question unless we're specifically waiting for a
+                // clarification response. Status checks against the in-memory Session are unreliable
+                // because GenerateAnswerHandler mutates its own DB-loaded copy.
+                if (activeTurn is null || activeTurn.Status != ConversationTurnStatus.AwaitingClarification)
+                {
+                    var q          = DetectedQuestion.Create(item.Text, QuestionSource.Audio, item.Timestamp);
+                    session.AddDetectedQuestion(q);
+                    var turnResult = session.AddConversationTurn(q.Id, item.Text, item.Timestamp);
+                    if (turnResult.IsSuccess)
+                    {
+                        var turn = turnResult.Value;
+                        turnSink.OnTurnCreated(turn.Id, item.Text);
+                        pendingCommand = new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary);
+                    }
+                }
+                else if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
+                {
+                    activeTurn.AttachClarificationResponse(item.Id);
+                    activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
+                    pendingCommand = new GenerateAnswerCommand(
+                        session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
+                }
             }
         }
         else if (item.Speaker == Speaker.Me &&
                  activeTurn?.Status == ConversationTurnStatus.PreliminaryReady)
         {
             var detection = _detector.Evaluate(item.Text, recentTexts);
-            if (!detection.IsQuestion) return Task.CompletedTask;
-
-            activeTurn.AttachClarificationQuestion(item.Id);
-            activeTurn.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+            if (detection.IsQuestion)
+            {
+                activeTurn.AttachClarificationQuestion(item.Id);
+                activeTurn.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+            }
         }
 
-        return Task.CompletedTask;
+        // Persist all mutations (transcript item, detected question, turn) before firing any command.
+        await unitOfWork.SaveChangesAsync(ct);
+
+        if (pendingCommand is not null)
+            FireAndForget(pendingCommand, ct);
     }
 
-    /// <summary>
-    /// Consumes a <see cref="ValueTask{TResult}"/> without awaiting it,
-    /// suppressing CA2012 by converting to a <see cref="Task"/> and discarding via a no-op continuation.
-    /// </summary>
-    /// <typeparam name="T">The result type of the value task.</typeparam>
-    /// <param name="valueTask">The value task to fire and forget.</param>
-#pragma warning disable CA1822 // intentionally an instance method for consistency
-    private static void FireAndForget<T>(ValueTask<T> valueTask)
-#pragma warning restore CA1822
+    private void FireAndForget(GenerateAnswerCommand command, CancellationToken ct)
     {
-        if (valueTask.IsCompleted) return;
-        valueTask.AsTask().ContinueWith(
-            static _ => { },
-            TaskContinuationOptions.ExecuteSynchronously);
+        _ = Task.Run(async () =>
+        {
+            using var scope  = scopeFactory.CreateScope();
+            var mediator     = scope.ServiceProvider.GetRequiredService<IMediator>();
+            await mediator.Send(command, ct);
+        }, ct);
     }
 }

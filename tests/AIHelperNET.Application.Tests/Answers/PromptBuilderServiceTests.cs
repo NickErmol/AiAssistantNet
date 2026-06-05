@@ -23,14 +23,14 @@ public class PromptBuilderServiceTests
     }
 
     [Fact]
-    public void Build_IncludesAnswerSettingsInSystem()
+    public void Build_NonDefaultComplexity_IncludedInSystem()
     {
-        var settings = AnswerSettings.Default with { Style = AnswerStyle.CodeFirst };
-        var question = DetectedQuestion.Create("Write a LINQ query", QuestionSource.Audio, Now);
+        var settings = AnswerSettings.Default with { Complexity = AnswerComplexity.Senior };
+        var question = DetectedQuestion.Create("Explain event sourcing", QuestionSource.Audio, Now);
 
         var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, question);
 
-        prompt.System.Should().Contain("CodeFirst");
+        prompt.System.Should().Contain("Senior");
     }
 
     [Fact]
@@ -68,11 +68,11 @@ public class PromptBuilderServiceTests
     }
 
     [Theory]
-    [InlineData(AnswerLength.VeryShort, 200)]
-    [InlineData(AnswerLength.ShortLength, 400)]
-    [InlineData(AnswerLength.Medium, 800)]
-    [InlineData(AnswerLength.Detailed, 1500)]
-    [InlineData(AnswerLength.DeepDive, 3000)]
+    [InlineData(AnswerLength.VeryShort, 150)]
+    [InlineData(AnswerLength.ShortLength, 300)]
+    [InlineData(AnswerLength.Medium, 550)]
+    [InlineData(AnswerLength.Detailed, 1000)]
+    [InlineData(AnswerLength.DeepDive, 2000)]
     public void Build_MapsLengthToTokens(AnswerLength length, int expected)
     {
         var settings = AnswerSettings.Default with { Length = length };
