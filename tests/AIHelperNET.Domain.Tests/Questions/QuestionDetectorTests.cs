@@ -88,4 +88,23 @@ public class QuestionDetectorTests
             new HashSet<string> { "a", "b" },
             new HashSet<string> { "b", "c" }).Should().BeApproximately(1.0 / 3.0, 0.001);
     }
+
+    [Theory]
+    [InlineData("Software engineering, system design, coding.")]
+    [InlineData("Software engineering, system design, data structure, coding.")]
+    [InlineData("Software engineering, system design, software engineering, software engineering.")]
+    public void Evaluate_HallucinationPhrase_NotAQuestion(string text)
+    {
+        _sut.Evaluate(text, []).IsQuestion.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("So.")]
+    [InlineData("What?")]
+    [InlineData("Go on.")]
+    [InlineData("Can you")]
+    public void Evaluate_FewerThan4Words_NotAQuestion(string text)
+    {
+        _sut.Evaluate(text, []).IsQuestion.Should().BeFalse();
+    }
 }
