@@ -35,6 +35,14 @@ public sealed partial class SettingsWindow : Window
 
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
         => _vm.ApiKeyInput = ApiKeyBox.Password;
+
+    // Closing a singleton DI window destroys it — subsequent Show() calls would throw.
+    // Hide instead so the instance stays reusable.
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        e.Cancel = true;
+        Hide();
+    }
 }
 
 public sealed record AudioDeviceItem(string Id, string FriendlyName);

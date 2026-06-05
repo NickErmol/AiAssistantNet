@@ -223,6 +223,11 @@
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=SystemDesign}"/>
+                <RadioButton Style="{StaticResource RadioBtn}" Content="Multiple choice"
+                             GroupName="ScreenMode"
+                             IsChecked="{Binding SessionControl.ScreenAnalysisMode,
+                                 Converter={StaticResource EnumToBoolConverter},
+                                 ConverterParameter=MultipleChoice}"/>
                 <CheckBox Content="+ interviewer (5 lines)"
                           IsChecked="{Binding SessionControl.IncludeInterviewerContext}"
                           Foreground="{DynamicResource Brush.Foreground.Secondary}"
