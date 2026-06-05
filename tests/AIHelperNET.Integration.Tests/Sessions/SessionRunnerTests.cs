@@ -51,7 +51,8 @@ public class SessionRunnerTests
         var scopeFactory   = MakeScopeFactory(session);
         var transcriptSink = Substitute.For<ITranscriptSink>();
         var turnSink       = Substitute.For<IConversationTurnSink>();
-        var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink);
+        var classifier     = Substitute.For<IQuestionClassifier>();
+        var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink, classifier);
         var capture        = new FakeAudioCaptureService(captureFrames);
         var transcription  = new FakeTranscriptionService();
         return new SessionRunner(scopeFactory, capture, transcription, pipeline);
