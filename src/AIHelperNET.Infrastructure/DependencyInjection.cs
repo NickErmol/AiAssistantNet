@@ -55,6 +55,9 @@ public static class DependencyInjection
         services.Configure<ClaudeOptions>(config.GetSection("Claude"));
         services.Configure<OllamaOptions>(config.GetSection("Ollama"));
 
+        services.AddHttpClient<HaikuQuestionClassifier>();
+        services.AddSingleton<IQuestionClassifier, HaikuQuestionClassifier>();
+
         services.AddHttpClient<ClaudeAnswerProvider>();
         services.AddSingleton<ClaudeAnswerProvider>();
         services.AddSingleton<IOllamaApiClient>(sp =>

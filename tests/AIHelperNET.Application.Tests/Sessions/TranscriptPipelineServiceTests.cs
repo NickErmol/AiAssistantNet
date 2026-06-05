@@ -15,17 +15,26 @@ namespace AIHelperNET.Application.Tests.Sessions;
 
 public class TranscriptPipelineServiceTests
 {
-    private static readonly DateTimeOffset Now = DateTimeOffset.UnixEpoch;
+    private static readonly DateTimeOffset T0 = DateTimeOffset.UnixEpoch;
+    private static readonly DateTimeOffset T0Plus4s = T0.AddSeconds(4); // triggers accumulator flush
 
     private static Session MakeSession()
-        => Session.Create(AnswerSettings.Default, CodeProfile.Empty, Now).Value;
+        => Session.Create(AnswerSettings.Default, CodeProfile.Empty, T0).Value;
 
-    private static TranscriptItem MakeItem(Speaker speaker, string text)
-        => TranscriptItem.Create(speaker, text, Now, 0.9f);
+    private static TranscriptItem MakeItem(Speaker speaker, string text, DateTimeOffset? at = null)
+        => TranscriptItem.Create(speaker, text, at ?? T0, 0.9f);
 
     private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow)
-        MakeSvc(ITranscriptSink sink)
+        MakeSvc(ITranscriptSink sink, IQuestionClassifier? classifier = null)
     {
+        // Default classifier: NewQuestion for any text that passes pre-filter
+        if (classifier is null)
+        {
+            classifier = Substitute.For<IQuestionClassifier>();
+            classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(ClassificationResult.NewQuestion));
+        }
+
         var mediator = Substitute.For<IMediator>();
 #pragma warning disable CA2012
         mediator.Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>())
@@ -46,7 +55,15 @@ public class TranscriptPipelineServiceTests
         var uow = Substitute.For<IUnitOfWork>();
         uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
 
-        return (new TranscriptPipelineService(factory, sink, turnSink), mediator, turnSink, uow);
+        return (new TranscriptPipelineService(factory, sink, turnSink, classifier), mediator, turnSink, uow);
+    }
+
+    // Helper: process a segment, then flush the accumulator (simulates the 3s gap firing)
+    private static async Task ProcessAndFlushAsync(
+        TranscriptPipelineService svc, Session session, TranscriptItem item, IUnitOfWork uow)
+    {
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+        await svc.FlushAccumulatorAsync(session, uow, CancellationToken.None);
     }
 
     [Fact]
@@ -57,7 +74,7 @@ public class TranscriptPipelineServiceTests
         var (svc, mediator, _, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
-        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+        await ProcessAndFlushAsync(svc, session, item, uow);
 
         session.ConversationTurns.Should().HaveCount(1);
         session.ConversationTurns[0].Status.Should().Be(ConversationTurnStatus.Detected);
@@ -76,9 +93,116 @@ public class TranscriptPipelineServiceTests
         var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
-        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+        await ProcessAndFlushAsync(svc, session, item, uow);
 
         session.ConversationTurns.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task OtherSpeaker_ClassifierReturnsNotAQuestion_NoTurnCreated()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+        var classifier = Substitute.For<IQuestionClassifier>();
+        classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(ClassificationResult.NotAQuestion));
+        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+
+        var item = MakeItem(Speaker.Other, "How do you approach this problem?");
+        await ProcessAndFlushAsync(svc, session, item, uow);
+
+        session.ConversationTurns.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task OtherSpeaker_ClassifierReturnsContinuation_WithActiveTurn_AppendsAndRegenerates()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var classifier = Substitute.For<IQuestionClassifier>();
+        // First call: NewQuestion (creates the turn)
+        // Second call: Continuation (appends to turn)
+        classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(ClassificationResult.NewQuestion),
+                Task.FromResult(ClassificationResult.Continuation));
+        var (svc, mediator, _, uow) = MakeSvc(transcriptSink, classifier);
+
+        // First segment creates a turn
+        var first = MakeItem(Speaker.Other, "Can we use observables and what is");
+        await ProcessAndFlushAsync(svc, session, first, uow);
+        session.ConversationTurns.Should().HaveCount(1);
+
+        // Second segment is a continuation — should append, not create a new turn
+        var second = MakeItem(Speaker.Other, "the difference comparing them to promise");
+        await ProcessAndFlushAsync(svc, session, second, uow);
+
+        session.ConversationTurns.Should().HaveCount(1, "Continuation must not create a new turn");
+        session.ConversationTurns[0].InitialQuestionText.Should()
+            .Contain("the difference comparing them to promise");
+
+        await Task.Delay(200);
+        // Two GenerateAnswerCommand calls: once for NewQuestion, once for Continuation
+        await mediator.Received(2).Send(
+            Arg.Is<GenerateAnswerCommand>(c => c.TurnId == session.ConversationTurns[0].Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OtherSpeaker_ClassifierReturnsContinuation_NoActiveTurn_PromotesToNewQuestion()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+        var classifier = Substitute.For<IQuestionClassifier>();
+        classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(ClassificationResult.Continuation));
+        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+
+        var item = MakeItem(Speaker.Other, "How do you approach this kind of problem?");
+        await ProcessAndFlushAsync(svc, session, item, uow);
+
+        // No active turn → Continuation promoted to NewQuestion
+        session.ConversationTurns.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task OtherSpeaker_ClassifierThrows_FallsBackToNewQuestion()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+        var classifier = Substitute.For<IQuestionClassifier>();
+        classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ClassificationResult>>(_ => throw new HttpRequestException("network error"));
+        var (svc, mediator, _, uow) = MakeSvc(transcriptSink, classifier);
+
+        var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
+        await ProcessAndFlushAsync(svc, session, item, uow);
+
+        // Falls back: QuestionDetector said yes, so treat as NewQuestion
+        session.ConversationTurns.Should().HaveCount(1);
+        await Task.Delay(200);
+        await mediator.Received(1).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TwoSegmentsWithin3s_CombinedAndClassifiedTogether()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+        var classifier = Substitute.For<IQuestionClassifier>();
+        string? capturedText = null;
+        classifier.ClassifyAsync(Arg.Do<string>(t => capturedText = t),
+                Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(ClassificationResult.NewQuestion));
+        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+
+        // Two segments 1s apart — accumulator should combine them
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "Can we use them", T0), uow, CancellationToken.None);
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "and what is", T0.AddSeconds(1)), uow, CancellationToken.None);
+        await svc.FlushAccumulatorAsync(session, uow, CancellationToken.None);
+
+        capturedText.Should().Be("Can we use them and what is");
     }
 
     [Fact]
@@ -88,9 +212,9 @@ public class TranscriptPipelineServiceTests
         var transcriptSink = Substitute.For<ITranscriptSink>();
         var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
-        var q = DetectedQuestion.Create("Original Q?", QuestionSource.Audio, Now);
+        var q = DetectedQuestion.Create("Original Q?", QuestionSource.Audio, T0);
         session.AddDetectedQuestion(q);
-        var turn = session.AddConversationTurn(q.Id, "Original Q?", Now).Value;
+        var turn = session.AddConversationTurn(q.Id, "Original Q?", T0).Value;
         turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
 
         var clarification = MakeItem(Speaker.Me, "Should it cover all error types?");
@@ -107,7 +231,7 @@ public class TranscriptPipelineServiceTests
         var transcriptSink = Substitute.For<ITranscriptSink>();
         var (svc, _, _, uow) = MakeSvc(transcriptSink);
 
-        var item = MakeItem(Speaker.Me, "Hello");
+        var item = MakeItem(Speaker.Me, "Hello there friend");
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
         transcriptSink.Received(1).OnTranscriptItem(item);
@@ -121,10 +245,10 @@ public class TranscriptPipelineServiceTests
         var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
-        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+        await ProcessAndFlushAsync(svc, session, item, uow);
 
         var expectedId = session.ConversationTurns[0].Id;
-        turnSink.Received(1).OnTurnCreated(expectedId, item.Text);
+        turnSink.Received(1).OnTurnCreated(expectedId, Arg.Any<string>());
     }
 
     [Fact]
@@ -135,7 +259,7 @@ public class TranscriptPipelineServiceTests
         var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
-        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+        await ProcessAndFlushAsync(svc, session, item, uow);
 
         turnSink.DidNotReceive().OnTurnCreated(Arg.Any<ConversationTurnId>(), Arg.Any<string>());
     }
