@@ -210,6 +210,7 @@ public sealed class SessionRunner(
             finally
             {
                 await FlushAsync(); // drain whatever remains
+                await pipeline.FlushAccumulatorAsync(session, uow, CancellationToken.None);
             }
         }, CancellationToken.None);
 
