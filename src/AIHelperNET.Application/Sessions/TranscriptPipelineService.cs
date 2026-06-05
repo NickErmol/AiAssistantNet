@@ -118,10 +118,13 @@ public sealed partial class TranscriptPipelineService(
 
         if (activeTurn is null
             || activeTurn.Status == ConversationTurnStatus.AwaitingClarification
+            || activeTurn.Status == ConversationTurnStatus.ClarificationReceived
+            || activeTurn.Status == ConversationTurnStatus.GeneratingRefined
+            || activeTurn.Status == ConversationTurnStatus.RefinedReady
             || activeTurn.Status == ConversationTurnStatus.Dismissed
             || activeTurn.Status == ConversationTurnStatus.Resolved)
         {
-            // No open turn — promote to NewQuestion.
+            // No open turn or post-clarification turn — promote to NewQuestion.
             return HandleNewQuestion(session, combined, DateTimeOffset.UtcNow);
         }
 
@@ -135,8 +138,8 @@ public sealed partial class TranscriptPipelineService(
         {
             using var scope  = scopeFactory.CreateScope();
             var mediator     = scope.ServiceProvider.GetRequiredService<IMediator>();
-            await mediator.Send(command, ct);
-        }, ct);
+            await mediator.Send(command, CancellationToken.None);
+        }, CancellationToken.None);
     }
 
     private static partial class Log
