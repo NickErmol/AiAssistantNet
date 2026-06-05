@@ -41,10 +41,12 @@ public sealed class WhisperModelProvider : IAsyncDisposable
     {
         var name = size switch
         {
-            WhisperModelSize.Tiny   => "ggml-tiny.bin",
-            WhisperModelSize.Base   => "ggml-base.bin",
-            WhisperModelSize.Small  => "ggml-small.bin",
-            WhisperModelSize.Medium => "ggml-medium.bin",
+            WhisperModelSize.Tiny       => "ggml-tiny.bin",
+            WhisperModelSize.Base       => "ggml-base.bin",
+            WhisperModelSize.Small      => "ggml-small.bin",
+            WhisperModelSize.Medium     => "ggml-medium.bin",
+            WhisperModelSize.LargeTurbo => "ggml-large-v3-turbo.bin",
+            WhisperModelSize.Large      => "ggml-large-v3.bin",
             _ => throw new ArgumentOutOfRangeException(nameof(size))
         };
         return Path.Combine(AppPaths.ModelsDir, name);
@@ -54,10 +56,12 @@ public sealed class WhisperModelProvider : IAsyncDisposable
     {
         var ggmlType = size switch
         {
-            WhisperModelSize.Tiny   => GgmlType.Tiny,
-            WhisperModelSize.Base   => GgmlType.Base,
-            WhisperModelSize.Small  => GgmlType.Small,
-            WhisperModelSize.Medium => GgmlType.Medium,
+            WhisperModelSize.Tiny       => GgmlType.Tiny,
+            WhisperModelSize.Base       => GgmlType.Base,
+            WhisperModelSize.Small      => GgmlType.Small,
+            WhisperModelSize.Medium     => GgmlType.Medium,
+            WhisperModelSize.LargeTurbo => GgmlType.LargeV3Turbo,
+            WhisperModelSize.Large      => GgmlType.LargeV3,
             _ => throw new ArgumentOutOfRangeException(nameof(size))
         };
 

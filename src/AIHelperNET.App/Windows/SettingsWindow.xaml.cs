@@ -1,25 +1,40 @@
+// src/AIHelperNET.App/Windows/SettingsWindow.xaml.cs
 using System.Windows;
 using AIHelperNET.App.ViewModels;
+using NAudio.CoreAudioApi;
 
 namespace AIHelperNET.App.Windows;
 
-public partial class SettingsWindow : Window
+public sealed partial class SettingsWindow : Window
 {
     private readonly SettingsViewModel _vm;
 
     public SettingsWindow(SettingsViewModel vm)
     {
         InitializeComponent();
-        _vm = vm;
+        _vm         = vm;
         DataContext = vm;
     }
 
-    protected override async void OnContentRendered(EventArgs e)
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        base.OnContentRendered(e);
-        await _vm.LoadCommand.ExecuteAsync(null);
+        PopulateAudioDevices();
+        await _vm.LoadAsync();
+    }
+
+    private void PopulateAudioDevices()
+    {
+        using var enumerator = new MMDeviceEnumerator();
+
+        var mics = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+        MicCombo.ItemsSource = mics.Select(d => new AudioDeviceItem(d.ID, d.FriendlyName)).ToList();
+
+        var loopbacks = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+        LoopbackCombo.ItemsSource = loopbacks.Select(d => new AudioDeviceItem(d.ID, d.FriendlyName)).ToList();
     }
 
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
         => _vm.ApiKeyInput = ApiKeyBox.Password;
 }
+
+public sealed record AudioDeviceItem(string Id, string FriendlyName);

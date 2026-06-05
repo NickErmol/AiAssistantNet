@@ -29,6 +29,8 @@ public static class DependencyInjection
         services.AddSingleton<TranscriptViewModel>();
         services.AddSingleton<ConversationTurnViewModel>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<HistoryViewModel>();
+        services.AddSingleton<AudioLevelViewModel>();
 
         // Window context + windows
         services.AddSingleton<MainOverlayWindowContext>();

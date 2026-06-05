@@ -30,7 +30,11 @@ public enum WhisperModelSize
     /// <summary>Small model.</summary>
     Small,
     /// <summary>Medium model — balanced speed and accuracy.</summary>
-    Medium
+    Medium,
+    /// <summary>Large-v3 Turbo — distilled Large-v3, ~800 MB, 8× faster than Large.</summary>
+    LargeTurbo,
+    /// <summary>Large-v3 — maximum accuracy, ~3 GB.</summary>
+    Large
 }
 
 /// <summary>Selects which AI backend to use for answer generation.</summary>

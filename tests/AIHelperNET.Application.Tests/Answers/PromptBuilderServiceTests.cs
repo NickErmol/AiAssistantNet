@@ -80,4 +80,19 @@ public class PromptBuilderServiceTests
         var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, question);
         prompt.MaxTokens.Should().Be(expected);
     }
+
+    [Fact]
+    public void BuildFollowUp_InjectsOriginalQAndA_InUserPrompt()
+    {
+        var prompt = PromptBuilderService.BuildFollowUp(
+            CodeProfile.Empty,
+            AnswerSettings.Default,
+            "What is CQRS?",
+            "CQRS separates reads and writes.",
+            "Can you give an example?");
+
+        prompt.User.Should().Contain("What is CQRS?");
+        prompt.User.Should().Contain("CQRS separates reads and writes.");
+        prompt.User.Should().Contain("Can you give an example?");
+    }
 }

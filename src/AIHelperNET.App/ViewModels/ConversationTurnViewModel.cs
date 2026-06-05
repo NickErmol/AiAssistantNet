@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AIHelperNET.Application.Answers;
 using AIHelperNET.Application.Answers.Commands;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Queries;
@@ -24,6 +25,7 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
         AnswerVersionType.RefinedAfterClarification => "Refined — after clarification",
         AnswerVersionType.UpdatedWithScreen         => "Updated with screen",
         AnswerVersionType.ManuallyRegenerated       => "Manually regenerated",
+        AnswerVersionType.FollowUp                  => "Follow-up",
         _                                           => type.ToString()
     };
 
@@ -82,6 +84,14 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
         get => _latestVersion;
         set => SetProperty(ref _latestVersion, value);
     }
+
+    private string _followUpText = string.Empty;
+    /// <summary>Gets or sets the follow-up question text typed by the user for this turn.</summary>
+    public string FollowUpText
+    {
+        get => _followUpText;
+        set => SetProperty(ref _followUpText, value);
+    }
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
@@ -90,6 +100,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
     [ObservableProperty] private int _answerFontSize = 12;
+    [ObservableProperty] private bool _isFollowUpEnabled;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
@@ -191,6 +202,17 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
         Turns.Remove(turn);
     }
 
+    /// <summary>Submits the follow-up question typed in a turn card and triggers answer generation.</summary>
+    [RelayCommand]
+    private async Task SubmitFollowUpAsync(TurnVm? turn)
+    {
+        if (turn is null || ActiveSessionId is not { } sid) return;
+        if (string.IsNullOrWhiteSpace(turn.FollowUpText)) return;
+        var text = turn.FollowUpText;
+        turn.FollowUpText = string.Empty;
+        await mediator.Send(new GenerateFollowUpCommand(sid, turn.Id, text));
+    }
+
     /// <summary>Copies the latest answer version text to the clipboard.</summary>
     [RelayCommand]
     private static void CopyLatest(TurnVm? turn)
@@ -200,15 +222,32 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             System.Windows.Clipboard.SetText(text);
     }
 
-    /// <summary>Captures the current screen and regenerates the answer for the most recent turn.</summary>
+    /// <summary>Captures the current screen and regenerates the answer for the most recent turn using the selected analysis mode.</summary>
     [RelayCommand]
-    private async Task CaptureScreenAsync()
+    private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
         if (ActiveSessionId is not { } sid) return;
-        var result = await mediator.Send(new CaptureScreenCommand());
-        if (result.IsSuccess && Turns.FirstOrDefault() is { } activeTurn)
-        {
-            await mediator.Send(new RegenerateAnswerCommand(sid, activeTurn.Id, result.Value));
-        }
+        if (sessionControl is null) return;
+
+        var ocrResult = await mediator.Send(new CaptureScreenCommand());
+        if (ocrResult.IsFailed) return;
+
+        string[] interviewerLines = sessionControl.IncludeInterviewerContext
+            ? _lastInterviewerLines
+            : [];
+
+        var activeTurn = Turns.FirstOrDefault();
+        if (activeTurn is null) return;
+
+        await mediator.Send(new RegenerateAnswerWithScreenCommand(
+            sid, activeTurn.Id, ocrResult.Value,
+            sessionControl.ScreenAnalysisMode, interviewerLines));
     }
+
+    private string[] _lastInterviewerLines = [];
+
+    /// <summary>Updates the cached interviewer lines used as context for screen-based answer generation.</summary>
+    /// <param name="lines">The most recent interviewer transcript lines.</param>
+    public void UpdateInterviewerLines(IEnumerable<string> lines)
+        => _lastInterviewerLines = lines.ToArray();
 }

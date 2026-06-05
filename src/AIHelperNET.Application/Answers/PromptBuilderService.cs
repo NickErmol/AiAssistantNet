@@ -54,6 +54,82 @@ public sealed class PromptBuilderService
             MaxTokens: MapLengthToTokens(settings.Length));
     }
 
+    /// <summary>Builds a follow-up prompt with the original Q+A injected as context.</summary>
+    public static AnswerPrompt BuildFollowUp(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string originalQuestion,
+        string previousAnswer,
+        string followUpText)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(
+            "You are a senior software engineer coaching a candidate through a technical job interview. " +
+            "You previously answered a question. Now the candidate asks a follow-up. " +
+            "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
+        AppendCodeProfile(system, profile);
+
+        var user = new StringBuilder();
+        user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Your previous answer: {previousAnswer}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Follow-up: {followUpText}");
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: MapLengthToTokens(settings.Length));
+    }
+
+    /// <summary>Builds a prompt for screen-based analysis with mode-specific instructions.</summary>
+    public static AnswerPrompt BuildWithScreenMode(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string screenContext,
+        IEnumerable<string> interviewerLines,
+        ScreenAnalysisMode mode)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(ModeSystemPrompt(mode));
+        AppendCodeProfile(system, profile);
+
+        var user = new StringBuilder();
+        var lines = interviewerLines.ToList();
+        if (lines.Count > 0)
+        {
+            user.AppendLine("Interviewer context (recent speech):");
+            foreach (var line in lines) user.AppendLine(CultureInfo.InvariantCulture, $"- {line}");
+            user.AppendLine();
+        }
+        user.AppendLine("On-screen content (OCR):");
+        user.AppendLine(screenContext);
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: MapLengthToTokens(settings.Length));
+    }
+
+    private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
+    {
+        ScreenAnalysisMode.SolveCodingTask =>
+            "You are a senior software engineer. Given the coding task shown on screen, provide a complete, " +
+            "working solution in the candidate's stack. Include a brief explanation before the code.",
+        ScreenAnalysisMode.DebugError =>
+            "You are a senior software engineer. Analyze the error or stack trace shown on screen. " +
+            "Identify the root cause and provide a clear fix. Be concise.",
+        ScreenAnalysisMode.ExplainCode =>
+            "You are a senior software engineer. Explain what the code on screen does, its design patterns, " +
+            "and any notable decisions. 3–5 sentences, spoken style.",
+        ScreenAnalysisMode.SystemDesign =>
+            "You are a senior software engineer. Provide a high-level system design approach for the " +
+            "requirements shown. Cover components, data flow, and key trade-offs. Be concise.",
+        _ =>
+            "You are a senior software engineer coaching a candidate through a technical interview. " +
+            "Analyze the content on screen and provide a helpful, concise response the candidate can use."
+    };
+
     private static void AppendCodeProfile(StringBuilder sb, CodeProfile p)
     {
         var fields = new[]
