@@ -7,9 +7,9 @@ namespace AIHelperNET.Infrastructure.Audio;
 public sealed class VoiceActivityDetector
 {
     private const float EnergyThreshold     = 0.00005f; // tuned for Arctis Nova Pro mic (quiet mic, low gain)
-    private const int   SilenceFramesToFlush = 6;       // ~600 ms pause triggers flush (100 ms/frame × 6)
+    private const int   SilenceFramesToFlush = 4;       // ~400 ms pause triggers flush (100 ms/frame × 4)
     private const int   MinFramesForSpeech   = 8;       // ~800 ms minimum — blocks noise bursts, allows normal speech
-    private const int   MaxWindowFrames      = 40;      // ~4 s max — prevents huge windows stalling Whisper
+    private const int   MaxWindowFrames      = 80;      // ~8 s max — fits full interview questions without mid-sentence cut
 
     public static async IAsyncEnumerable<SpeechWindow> AccumulateSpeechWindows(
         IAsyncEnumerable<AudioFrame> frames,
