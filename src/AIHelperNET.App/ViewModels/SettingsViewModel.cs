@@ -122,7 +122,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
 
         var dto = new AppSettingsDto(
             current?.ActiveBackend  ?? AiBackend.Claude,
-            current?.WhisperModel   ?? WhisperModelSize.Base,
+            current?.WhisperModel   ?? WhisperModelSize.Medium,
             new AnswerSettings(AnswerLength, AnswerComplexity, AnswerStyle, AnswerTone, AnswerFormat, OutputLanguage),
             new CodeProfile(NullIfEmpty(ProgrammingLanguage), NullIfEmpty(BackendFramework),
                 NullIfEmpty(FrontendFramework), NullIfEmpty(Database), NullIfEmpty(CloudDevOps),
