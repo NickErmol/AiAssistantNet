@@ -47,9 +47,9 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
                 if (IsKnownHallucination(seg.Text)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
-                lastEmitted = seg.Text;
+                lastEmitted = seg.Text.Trim();
                 yield return new TranscriptSegment(
-                    seg.Text.Trim(),
+                    lastEmitted,
                     window.Speaker,
                     DateTimeOffset.UtcNow,
                     seg.Probability);
