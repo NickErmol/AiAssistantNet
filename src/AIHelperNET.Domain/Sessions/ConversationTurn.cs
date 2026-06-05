@@ -39,7 +39,7 @@ public sealed class ConversationTurn
     public QuestionId InitialQuestionId { get; }
 
     /// <summary>The text of the detected question.</summary>
-    public string InitialQuestionText { get; }
+    public string InitialQuestionText { get; private set; }
 
     /// <summary>Current lifecycle status of this turn.</summary>
     public ConversationTurnStatus Status { get; private set; }
@@ -98,6 +98,14 @@ public sealed class ConversationTurn
     public void AddAnswerVersion(AnswerVersion version)
     {
         _answerVersions.Add(version);
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>Appends a continuation segment to the initial question text.</summary>
+    /// <param name="continuation">The text to append, separated by a space.</param>
+    public void AppendToQuestion(string continuation)
+    {
+        InitialQuestionText = InitialQuestionText + " " + continuation;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
