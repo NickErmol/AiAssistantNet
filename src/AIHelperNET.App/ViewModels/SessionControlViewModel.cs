@@ -80,7 +80,7 @@ public sealed partial class SessionControlViewModel(
                 await runner.StartAsync(
                     result.Value.Id,
                     new AudioDeviceSelection(settings?.MicDeviceId, settings?.LoopbackDeviceId),
-                    settings?.WhisperModel ?? WhisperModelSize.Base,
+                    settings?.WhisperModel ?? WhisperModelSize.Medium,
                     settings?.WhisperLanguage ?? "auto",
                     AudioSource);
             }
