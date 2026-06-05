@@ -5,6 +5,7 @@ using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Hotkeys;
+using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
 using AIHelperNET.Infrastructure.Transcription;
 using Microsoft.EntityFrameworkCore;
@@ -87,6 +88,7 @@ public partial class App : System.Windows.Application
         var levelVm = _host.Services.GetRequiredService<AudioLevelViewModel>();
         levelVm.Subscribe();
 
+        ScreenGrabber.StartTracking();
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
@@ -179,6 +181,7 @@ public partial class App : System.Windows.Application
     /// <inheritdoc/>
     protected override async void OnExit(ExitEventArgs e)
     {
+        ScreenGrabber.StopTracking();
         _host.Services.GetService<IGlobalHotkeyService>()?.UnregisterAll();
         var monitor = _host.Services.GetService<IAudioLevelMonitor>();
         if (monitor is not null) await monitor.StopAsync();

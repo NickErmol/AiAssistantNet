@@ -18,11 +18,58 @@ public static class ScreenGrabber
     [DllImport("user32.dll")]
     private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax,
+        IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc,
+        uint idProcess, uint idThread, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+    private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
+        int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+    private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    private const uint WINEVENT_OUTOFCONTEXT   = 0x0000;
+
+    private static IntPtr          _hookHandle       = IntPtr.Zero;
+    private static IntPtr          _lastContentWindow = IntPtr.Zero;
+    private static WinEventDelegate? _procDelegate;   // kept alive to prevent GC
+
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT { public int X, Y; }
+
+    /// <summary>Starts tracking foreground window changes so <see cref="CaptureForeground"/> can
+    /// find the last user-facing content window even when AIHelper has focus.</summary>
+    public static void StartTracking()
+    {
+        _procDelegate = OnForegroundChanged;
+        _hookHandle   = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+            IntPtr.Zero, _procDelegate, 0, 0, WINEVENT_OUTOFCONTEXT);
+    }
+
+    /// <summary>Stops the foreground-tracking hook.</summary>
+    public static void StopTracking()
+    {
+        if (_hookHandle != IntPtr.Zero)
+        {
+            UnhookWinEvent(_hookHandle);
+            _hookHandle = IntPtr.Zero;
+        }
+    }
+
+    private static void OnForegroundChanged(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
+        int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        _ = GetWindowThreadProcessId(hwnd, out uint pid);
+        if (pid != (uint)Environment.ProcessId)
+            _lastContentWindow = hwnd;
+    }
 
     public static Bitmap CapturePrimary()
     {
@@ -43,7 +90,13 @@ public static class ScreenGrabber
 
         _ = GetWindowThreadProcessId(hwnd, out uint pid);
         if (pid == (uint)Environment.ProcessId)
-            return CapturePrimary();
+        {
+            // AIHelper itself is focused (user clicked Capture button or used hotkey while AIHelper
+            // was active). Use the last non-AIHelper window recorded by the WinEvent hook.
+            hwnd = _lastContentWindow;
+            if (hwnd == IntPtr.Zero)
+                return CapturePrimary();
+        }
 
         if (!GetClientRect(hwnd, out RECT r))
             return CapturePrimary();
