@@ -32,9 +32,10 @@ public sealed class AudioLevelMonitor : IAudioLevelMonitor, IAsyncDisposable
                 : enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
 
             _mic = new WasapiCapture(micDevice);
+            var micFormat = _mic.WaveFormat;
             _mic.DataAvailable += (_, e) =>
             {
-                var peak = ComputePeak(e.Buffer, e.BytesRecorded, _mic.WaveFormat);
+                var peak = ComputePeak(e.Buffer, e.BytesRecorded, micFormat);
                 MicLevelChanged?.Invoke(peak);
             };
             _mic.StartRecording();
@@ -51,9 +52,10 @@ public sealed class AudioLevelMonitor : IAudioLevelMonitor, IAsyncDisposable
                 : enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
 
             _loopback = new WasapiLoopbackCapture(loopbackDevice);
+            var loopbackFormat = _loopback.WaveFormat;
             _loopback.DataAvailable += (_, e) =>
             {
-                var peak = ComputePeak(e.Buffer, e.BytesRecorded, _loopback.WaveFormat);
+                var peak = ComputePeak(e.Buffer, e.BytesRecorded, loopbackFormat);
                 SystemLevelChanged?.Invoke(peak);
             };
             _loopback.StartRecording();
