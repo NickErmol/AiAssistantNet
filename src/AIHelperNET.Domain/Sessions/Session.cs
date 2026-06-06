@@ -166,6 +166,25 @@ public sealed class Session
         return DomainResult.Ok(turn);
     }
 
+    /// <summary>
+    /// Creates a new conversation turn in the <see cref="ConversationTurnStatus.CollectingQuestion"/> state
+    /// for accumulating multi-fragment questions.
+    /// </summary>
+    /// <param name="questionId">The question ID for the first fragment.</param>
+    /// <param name="firstFragment">The first transcript fragment to collect.</param>
+    /// <param name="now">The current timestamp.</param>
+    /// <returns>The newly created turn, or a failure if the turn could not be created.</returns>
+    public DomainResult<ConversationTurn> StartCollectingTurn(QuestionId questionId, string firstFragment, DateTimeOffset now)
+    {
+        if (State != SessionState.Active)
+            return DomainResult.Fail<ConversationTurn>("Cannot add turn to a stopped session.");
+        var turn = ConversationTurn.Create(Id, questionId, firstFragment, now);
+        var result = turn.StartCollecting(firstFragment);
+        if (!result.IsSuccess) return DomainResult<ConversationTurn>.Fail(result.Error);
+        _turns.Add(turn);
+        return DomainResult<ConversationTurn>.Ok(turn);
+    }
+
 #pragma warning disable CS8618 // EF Core parameterless constructor — properties set by materialiser
     private Session() { }
 #pragma warning restore CS8618
