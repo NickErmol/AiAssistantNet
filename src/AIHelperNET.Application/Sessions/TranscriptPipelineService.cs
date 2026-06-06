@@ -71,7 +71,11 @@ public sealed partial class TranscriptPipelineService(
             FireAndForget(pendingCommand, ct);
     }
 
-    /// <summary>Drains the accumulator buffer — call on session stop to process any remaining buffered segments.</summary>
+    /// <summary>
+    /// Drains the accumulator buffer for the legacy 3-state path — call on session stop to process any
+    /// remaining buffered segments. When <see cref="IQuestionBoundaryClassifier"/> is configured (the
+    /// production default), the accumulator is not used and this method is a no-op.
+    /// </summary>
     public async Task FlushAccumulatorAsync(Session session, IUnitOfWork unitOfWork, CancellationToken ct)
     {
         var combined = _accumulator.Flush();

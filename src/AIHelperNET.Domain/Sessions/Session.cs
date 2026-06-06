@@ -178,6 +178,8 @@ public sealed class Session
     {
         if (State != SessionState.Active)
             return DomainResult.Fail<ConversationTurn>("Cannot add turn to a stopped session.");
+        if (_questions.All(q => q.Id != questionId))
+            return DomainResult.Fail<ConversationTurn>("Unknown question.");
         var turn = ConversationTurn.Create(Id, questionId, firstFragment, now);
         var result = turn.StartCollecting(firstFragment);
         if (!result.IsSuccess) return DomainResult<ConversationTurn>.Fail(result.Error);

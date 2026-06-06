@@ -6,3 +6,6 @@ obj/
 .idea/
 *.DS_Store
 .superpowers/
+*.log
+build.log
+test_output.log
