@@ -100,7 +100,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
     private async Task SaveApiKeyAsync()
     {
         if (string.IsNullOrWhiteSpace(ApiKeyInput)) return;
-        var secure = new System.Security.SecureString();
+        using var secure = new System.Security.SecureString();
         foreach (var c in ApiKeyInput) secure.AppendChar(c);
         secure.MakeReadOnly();
         var result = await mediator.Send(new SaveApiKeyCommand(secure));

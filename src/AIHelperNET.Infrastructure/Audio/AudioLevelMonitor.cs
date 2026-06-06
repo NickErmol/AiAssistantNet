@@ -71,6 +71,8 @@ public sealed class AudioLevelMonitor : IAudioLevelMonitor, IAsyncDisposable
     public Task StopAsync()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
         _mic?.StopRecording();
         _loopback?.StopRecording();
         _mic?.Dispose();
