@@ -49,7 +49,18 @@ public sealed class SessionRunner(
         if (_cts is null) return;
         await _cts.CancelAsync();
         if (_pipelineTask is not null)
-            await _pipelineTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                await _pipelineTask.WaitAsync(timeout.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Warning("SessionRunner: pipeline did not stop within 5 s; abandoning");
+            }
+        }
         _sessionScope?.Dispose();
         _sessionScope = null;
         _cts          = null;
@@ -183,6 +194,11 @@ public sealed class SessionRunner(
                         {
                             await FlushAsync(); // timeout — no follow-on arrived
                             continue;
+                        }
+                        catch (System.Threading.Channels.ChannelClosedException)
+                        {
+                            await FlushAsync(); // channel closed during merge window — drain and exit
+                            break;
                         }
                     }
 
