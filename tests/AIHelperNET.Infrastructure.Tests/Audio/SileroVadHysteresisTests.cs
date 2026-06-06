@@ -7,7 +7,7 @@ namespace AIHelperNET.Infrastructure.Tests.Audio;
 public sealed class SileroVadHysteresisTests
 {
     // Dummy 512-sample chunk — content irrelevant for hysteresis tests.
-    private static float[] Chunk => new float[512];
+    private static readonly float[] Chunk = new float[512];
 
     [Fact]
     public void AllSilence_EmitsNoWindows()

@@ -19,6 +19,7 @@ public sealed class VadWindowAccumulator
     private int           _confirmCount;
     private int           _silenceCount;
     private int           _chunkCount;
+    private int           _totalBufferedCount;
     private readonly List<float> _confirmBuffer = new();
     private readonly List<float> _buffer        = new();
     private Speaker       _lastSpeaker;
@@ -39,14 +40,15 @@ public sealed class VadWindowAccumulator
 
                 if (_confirmCount >= StartConfirmCount)
                 {
-                    _inSpeech     = true;
-                    _silenceCount = 0;
-                    _chunkCount   = _confirmCount;
+                    _inSpeech           = true;
+                    _silenceCount       = 0;
+                    _chunkCount         = _confirmCount;
+                    _totalBufferedCount = _confirmCount;
                     _buffer.AddRange(_confirmBuffer);
                     _confirmBuffer.Clear();
                     _confirmCount = 0;
 
-                    if (_chunkCount >= MaxChunks) return FlushWindow();
+                    if (_totalBufferedCount >= MaxChunks) return FlushWindow();
                 }
             }
             else
@@ -59,7 +61,8 @@ public sealed class VadWindowAccumulator
 
         // In speech
         _buffer.AddRange(samples);
-        _lastSpeaker = speaker;
+        _lastSpeaker        = speaker;
+        _totalBufferedCount++;
 
         if (probability >= SpeechContinueThreshold)
         {
@@ -71,7 +74,7 @@ public sealed class VadWindowAccumulator
             _silenceCount++;
         }
 
-        if (_chunkCount >= MaxChunks)
+        if (_totalBufferedCount >= MaxChunks)
             return FlushWindow();
 
         if (_silenceCount >= SilenceFlushCount)
@@ -99,10 +102,11 @@ public sealed class VadWindowAccumulator
 
     private void Reset()
     {
-        _inSpeech     = false;
-        _confirmCount = 0;
-        _silenceCount = 0;
-        _chunkCount   = 0;
+        _inSpeech           = false;
+        _confirmCount       = 0;
+        _silenceCount       = 0;
+        _chunkCount         = 0;
+        _totalBufferedCount = 0;
         _buffer.Clear();
         _confirmBuffer.Clear();
     }
