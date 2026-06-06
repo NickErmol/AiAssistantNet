@@ -9,6 +9,7 @@ using AIHelperNET.Domain.ValueObjects;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mediator;
+using Serilog;
 
 namespace AIHelperNET.App.ViewModels;
 
@@ -109,12 +110,18 @@ public sealed partial class SessionControlViewModel(
 
     partial void OnModeChanged(SessionMode value)
     {
-        if (IsSessionActive) _ = ChangeModeAsync();
+        if (IsSessionActive)
+            _ = ChangeModeAsync().ContinueWith(
+                t => Log.Error(t.Exception, "SessionControlViewModel: mode change failed"),
+                TaskContinuationOptions.OnlyOnFaulted);
     }
 
     partial void OnAudioSourceChanged(AudioSourceMode value)
     {
-        if (IsSessionActive) _ = ChangeModeAsync();
+        if (IsSessionActive)
+            _ = ChangeModeAsync().ContinueWith(
+                t => Log.Error(t.Exception, "SessionControlViewModel: audio-source change failed"),
+                TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary>Toggles the visibility of the sidebar panel.</summary>
