@@ -168,10 +168,14 @@ public sealed class ConversationTurn
 
     /// <summary>Appends a transcript fragment to the collection in progress.</summary>
     /// <param name="fragment">The fragment to append.</param>
-    public void AddFragment(string fragment)
+    /// <returns>A <see cref="DomainResult"/> indicating success or failure.</returns>
+    public DomainResult AddFragment(string fragment)
     {
+        if (Status != ConversationTurnStatus.CollectingQuestion)
+            return DomainResult.Fail("Turn is not in CollectingQuestion state.");
         _questionFragments.Add(fragment);
         UpdatedAt = DateTimeOffset.UtcNow;
+        return DomainResult.Ok();
     }
 
     /// <summary>Finalises the collected fragments into <see cref="InitialQuestionText"/> and marks the turn as <see cref="ConversationTurnStatus.Detected"/>.</summary>
