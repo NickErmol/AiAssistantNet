@@ -10,7 +10,7 @@ using Microsoft.Win32;
 
 namespace AIHelperNET.App.ViewModels;
 
-public sealed class SessionSummaryVm(SessionSummaryDto dto)
+public sealed class SessionSummaryVm(SessionSummaryDto dto) : ObservableObject
 {
     public SessionId         Id            => dto.Id;
     public string            DateLabel     => dto.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
@@ -23,11 +23,15 @@ public sealed class SessionSummaryVm(SessionSummaryDto dto)
     public bool IsExpanded
     {
         get => _isExpanded;
-        set { _isExpanded = value; OnIsExpandedChanged?.Invoke(); }
+        set => SetProperty(ref _isExpanded, value);
     }
-    public event Action? OnIsExpandedChanged;
 
-    public SessionDetailDto? Detail { get; set; }
+    private SessionDetailDto? _detail;
+    public SessionDetailDto? Detail
+    {
+        get => _detail;
+        set => SetProperty(ref _detail, value);
+    }
 }
 
 public sealed partial class HistoryViewModel(IMediator mediator) : ObservableObject
@@ -64,7 +68,6 @@ public sealed partial class HistoryViewModel(IMediator mediator) : ObservableObj
         {
             vm.IsExpanded = false;
         }
-        OnPropertyChanged(nameof(Sessions));
     }
 
     [RelayCommand]
