@@ -41,8 +41,18 @@ public sealed class SileroModelProvider : IAsyncDisposable
         using var response   = await httpClient.GetAsync(ModelUrl, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        await using var file   = File.Create(targetPath);
-        await stream.CopyToAsync(file, ct);
+        var tmp = targetPath + ".tmp";
+        try
+        {
+            await using var file = File.Create(tmp);
+            await stream.CopyToAsync(file, ct);
+            File.Move(tmp, targetPath, overwrite: true);
+        }
+        catch
+        {
+            File.Delete(tmp);
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
