@@ -92,6 +92,7 @@ public partial class App : System.Windows.Application
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
+        PreWarmSileroModel();
     }
 
     private void PreWarmWhisperModel()
@@ -128,6 +129,24 @@ public partial class App : System.Windows.Application
                     Log.Warning(ex, "Whisper: Medium model download failed");
                 }
             });
+        });
+    }
+
+    private void PreWarmSileroModel()
+    {
+        var provider = _host.Services.GetRequiredService<SileroModelProvider>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                Log.Information("Silero: pre-warming VAD model in background…");
+                await provider.GetSessionAsync(CancellationToken.None);
+                Log.Information("Silero: VAD model ready");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Silero: pre-warm failed");
+            }
         });
     }
 
