@@ -41,11 +41,11 @@ public sealed class RegenerateAnswerWithScreenHandler(
         var turn = session.ConversationTurns.FirstOrDefault(t => t.Id == request.TurnId);
         if (turn is null) return Result.Fail("ConversationTurn not found.");
 
-        turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
-
         var start = session.StartAnswer(turn.InitialQuestionId, clock.GetUtcNow());
         if (start.IsFailed) return Result.Fail(start.Error);
         var answer = start.Value;
+
+        turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
 
         var prompt = PromptBuilderService.BuildWithScreenMode(
             session.CodeProfile, session.AnswerSettings,

@@ -44,11 +44,11 @@ public sealed class GenerateFollowUpHandler(
             .OrderByDescending(v => v.CreatedAt)
             .FirstOrDefault()?.Text ?? string.Empty;
 
-        turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
-
         var start = session.StartAnswer(turn.InitialQuestionId, clock.GetUtcNow());
         if (start.IsFailed) return Result.Fail(start.Error);
         var answer = start.Value;
+
+        turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
 
         var prompt = PromptBuilderService.BuildFollowUp(
             session.CodeProfile, session.AnswerSettings,
