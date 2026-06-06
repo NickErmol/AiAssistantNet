@@ -44,13 +44,15 @@ public sealed class SileroModelProvider : IAsyncDisposable
         var tmp = targetPath + ".tmp";
         try
         {
-            await using var file = File.Create(tmp);
-            await stream.CopyToAsync(file, ct);
+            await using (var file = File.Create(tmp))
+            {
+                await stream.CopyToAsync(file, ct);
+            } // file closed before rename; Windows requires the handle be released first
             File.Move(tmp, targetPath, overwrite: true);
         }
         catch
         {
-            File.Delete(tmp);
+            if (File.Exists(tmp)) File.Delete(tmp);
             throw;
         }
     }
