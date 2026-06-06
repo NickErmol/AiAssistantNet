@@ -9,10 +9,23 @@ namespace AIHelperNET.Application.Answers;
 public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
+    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?)"/> using <paramref name="question"/>.Text.</remarks>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         DetectedQuestion question,
+        string? screenContext = null)
+        => Build(profile, settings, question.Text, screenContext);
+
+    /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context using an explicit question text.</summary>
+    /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
+    /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
+    /// <param name="questionText">The full question text to answer, e.g. the assembled multi-fragment text.</param>
+    /// <param name="screenContext">Optional OCR text captured from the screen.</param>
+    public static AnswerPrompt Build(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string questionText,
         string? screenContext = null)
     {
         var system = new StringBuilder();
@@ -43,7 +56,7 @@ public sealed class PromptBuilderService
                 $"Answer in: {settings.OutputLanguage}.");
 
         var user = new StringBuilder();
-        user.AppendLine(CultureInfo.InvariantCulture, $"Question: {question.Text}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Question: {questionText}");
         if (!string.IsNullOrWhiteSpace(screenContext))
             user.AppendLine(CultureInfo.InvariantCulture, $"\nOn-screen context (OCR):\n{screenContext}");
 
