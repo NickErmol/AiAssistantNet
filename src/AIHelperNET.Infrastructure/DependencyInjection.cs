@@ -60,6 +60,9 @@ public static class DependencyInjection
         services.AddHttpClient<HaikuQuestionClassifier>();
         services.AddSingleton<IQuestionClassifier, HaikuQuestionClassifier>();
 
+        services.AddHttpClient<QuestionBoundaryClassifier>();
+        services.AddSingleton<IQuestionBoundaryClassifier, QuestionBoundaryClassifier>();
+
         services.AddHttpClient<ClaudeAnswerProvider>();
         services.AddSingleton<ClaudeAnswerProvider>();
         services.AddSingleton<IOllamaApiClient>(sp =>
