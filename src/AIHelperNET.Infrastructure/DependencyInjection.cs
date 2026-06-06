@@ -46,6 +46,8 @@ public static class DependencyInjection
         services.AddSingleton<IAudioCaptureService, NAudioCaptureService>();
         services.AddSingleton<IAudioLevelMonitor, AudioLevelMonitor>();
         services.AddSingleton<WhisperModelProvider>();
+        services.AddHttpClient(nameof(SileroModelProvider));
+        services.AddSingleton<SileroModelProvider>();
         services.AddSingleton<ITranscriptionService, WhisperTranscriptionService>();
 
         // OCR
