@@ -49,6 +49,17 @@
         <Setter Property="Margin"  Value="0,0,4,0"/>
     </Style>
 
+    <!-- Implicit ToggleButton style — prevents WPF theme ButtonBase lookup error
+         when an implicit Button style is present in app resources. -->
+    <Style TargetType="ToggleButton">
+        <Setter Property="Background"      Value="{DynamicResource Brush.Background.Button}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource Brush.Foreground.Button}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="6,3"/>
+        <Setter Property="FontSize"        Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+    </Style>
+
     <!-- IconBtn — transparent icon button (title bar, sidebar hide) -->
     <Style x:Key="IconBtn" TargetType="Button">
         <Setter Property="Background"      Value="Transparent"/>
@@ -82,6 +93,13 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- FieldLabel — small label above a form field -->
+    <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+        <Setter Property="FontSize"   Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Secondary}"/>
+        <Setter Property="Margin"     Value="0,4,0,2"/>
     </Style>
 
     <!-- SectionLabel — small-caps heading (TRANSCRIPT, MODE, STATUS …) -->

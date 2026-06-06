@@ -5,6 +5,7 @@ using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Hotkeys;
+using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
 using AIHelperNET.Infrastructure.Transcription;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += (_, ex) => Log.Fatal(ex.Exception, "Unhandled dispatcher exception");
 
         var builder = Host.CreateApplicationBuilder();
         builder.ConfigureAIHelper();
@@ -38,14 +40,29 @@ public partial class App : System.Windows.Application
 
         var overlay = _host.Services.GetRequiredService<MainOverlayWindow>();
 
+        // Resolve ConversationTurnViewModel early — referenced in both transcript and answer sink handlers.
+        var turnVm = _host.Services.GetRequiredService<ConversationTurnViewModel>();
+
         // Wire TranscriptSink → TranscriptViewModel
         var transcriptSink = _host.Services.GetRequiredService<TranscriptSink>();
         var transcriptVm   = _host.Services.GetRequiredService<TranscriptViewModel>();
-        transcriptSink.SetHandler(item => transcriptVm.AddItem(item));
+        transcriptSink.SetHandler(item =>
+        {
+            transcriptVm.AddItem(item);
+
+            // Keep the last 5 interviewer lines available for screen-analysis prompts.
+            if (item.Speaker == AIHelperNET.Domain.Sessions.Speaker.Other)
+            {
+                var last5 = transcriptVm.Items
+                    .Where(i => i.SpeakerLabel == "Other")
+                    .TakeLast(5)
+                    .Select(i => i.Text);
+                turnVm.UpdateInterviewerLines(last5);
+            }
+        });
 
         // Wire AnswerStreamSink → ConversationTurnViewModel
         var answerSink = _host.Services.GetRequiredService<AnswerStreamSink>();
-        var turnVm     = _host.Services.GetRequiredService<ConversationTurnViewModel>();
         answerSink.SetHandlers(
             onChunk:    (id, type, chunk) => turnVm.OnChunk(id, type, chunk),
             onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
@@ -58,6 +75,20 @@ public partial class App : System.Windows.Application
         try { await turnVm.LoadFontSizeAsync(); }
         catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
 
+        // Start always-on audio level monitoring
+        var levelMonitor = _host.Services.GetRequiredService<IAudioLevelMonitor>();
+        try
+        {
+            var settingsStore  = _host.Services.GetRequiredService<ISettingsStore>();
+            var appSettings    = await settingsStore.LoadAsync(CancellationToken.None);
+            await levelMonitor.StartAsync(appSettings.MicDeviceId, appSettings.LoopbackDeviceId, CancellationToken.None);
+        }
+        catch (Exception ex) { Log.Warning(ex, "Failed to start audio level monitor"); }
+
+        var levelVm = _host.Services.GetRequiredService<AudioLevelViewModel>();
+        levelVm.Subscribe();
+
+        ScreenGrabber.StartTracking();
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
@@ -125,7 +156,7 @@ public partial class App : System.Windows.Application
                     _ = sessionVm.ToggleSessionCommand.ExecuteAsync(null);
                     break;
                 case HotkeyId.CaptureScreen:
-                    _ = turnVm2.CaptureScreenCommand.ExecuteAsync(null);
+                    _ = turnVm2.CaptureScreenCommand.ExecuteAsync(sessionVm);
                     break;
                 case HotkeyId.GenerateAnswer:
                     _ = turnVm2.RegenerateCommand.ExecuteAsync(turnVm2.Turns.FirstOrDefault());
@@ -150,7 +181,10 @@ public partial class App : System.Windows.Application
     /// <inheritdoc/>
     protected override async void OnExit(ExitEventArgs e)
     {
+        ScreenGrabber.StopTracking();
         _host.Services.GetService<IGlobalHotkeyService>()?.UnregisterAll();
+        var monitor = _host.Services.GetService<IAudioLevelMonitor>();
+        if (monitor is not null) await monitor.StopAsync();
         using (_host) await _host.StopAsync();
         Serilog.Log.CloseAndFlush();
         base.OnExit(e);

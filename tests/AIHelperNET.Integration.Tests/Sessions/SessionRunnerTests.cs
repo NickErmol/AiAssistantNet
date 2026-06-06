@@ -51,7 +51,8 @@ public class SessionRunnerTests
         var scopeFactory   = MakeScopeFactory(session);
         var transcriptSink = Substitute.For<ITranscriptSink>();
         var turnSink       = Substitute.For<IConversationTurnSink>();
-        var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink);
+        var classifier     = Substitute.For<IQuestionClassifier>();
+        var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink, classifier);
         var capture        = new FakeAudioCaptureService(captureFrames);
         var transcription  = new FakeTranscriptionService();
         return new SessionRunner(scopeFactory, capture, transcription, pipeline);
@@ -69,7 +70,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.Both);
+            WhisperModelSize.Base, "auto", AudioSourceMode.Both);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -89,7 +90,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.MicrophoneOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.MicrophoneOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -109,7 +110,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, AudioSourceMode.SystemAudioOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.SystemAudioOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -144,6 +145,7 @@ public class SessionRunnerTests
         public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
             IAsyncEnumerable<AudioFrame> frames,
             WhisperModelSize model,
+            string language,
             [EnumeratorCancellation] CancellationToken ct)
         {
             await foreach (var frame in frames.WithCancellation(ct))

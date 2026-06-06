@@ -24,6 +24,7 @@ public sealed class SessionRunner(
         SessionId sessionId,
         AudioDeviceSelection devices,
         WhisperModelSize model,
+        string language,
         AudioSourceMode audioSource)
     {
         _sessionScope = scopeFactory.CreateScope();
@@ -39,7 +40,7 @@ public sealed class SessionRunner(
         }
 
         _cts          = new CancellationTokenSource();
-        _pipelineTask = RunAsync(result.Value, devices, model, audioSource, _cts.Token);
+        _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, _cts.Token);
     }
 
     /// <summary>Stops audio capture and waits for the pipeline to drain.</summary>
@@ -48,7 +49,18 @@ public sealed class SessionRunner(
         if (_cts is null) return;
         await _cts.CancelAsync();
         if (_pipelineTask is not null)
-            await _pipelineTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                await _pipelineTask.WaitAsync(timeout.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Warning("SessionRunner: pipeline did not stop within 5 s; abandoning");
+            }
+        }
         _sessionScope?.Dispose();
         _sessionScope = null;
         _cts          = null;
@@ -59,6 +71,7 @@ public sealed class SessionRunner(
         Session session,
         AudioDeviceSelection devices,
         WhisperModelSize model,
+        string language,
         AudioSourceMode audioSource,
         CancellationToken ct)
     {
@@ -108,7 +121,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, ct)
+                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, language, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);
@@ -125,7 +138,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, ct)
+                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, language, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);
@@ -182,6 +195,11 @@ public sealed class SessionRunner(
                             await FlushAsync(); // timeout — no follow-on arrived
                             continue;
                         }
+                        catch (System.Threading.Channels.ChannelClosedException)
+                        {
+                            await FlushAsync(); // channel closed during merge window — drain and exit
+                            break;
+                        }
                     }
 
                     if (pending is null)
@@ -208,6 +226,7 @@ public sealed class SessionRunner(
             finally
             {
                 await FlushAsync(); // drain whatever remains
+                await pipeline.FlushAccumulatorAsync(session, uow, CancellationToken.None);
             }
         }, CancellationToken.None);
 

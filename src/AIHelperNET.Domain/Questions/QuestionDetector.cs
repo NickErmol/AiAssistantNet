@@ -4,6 +4,7 @@ namespace AIHelperNET.Domain.Questions;
 public sealed class QuestionDetector
 {
     private const double DuplicateThreshold = 0.6;
+    private const int MinWords = 4;
 
     private static readonly HashSet<string> Interrogatives = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -15,6 +16,17 @@ public sealed class QuestionDetector
     {
         "explain","describe","write","implement","design","compare","optimize",
         "refactor","debug","walk","tell","give","show"
+    };
+
+    // Whisper hallucination phrases that start with interrogative words and would otherwise pass.
+    // Compared after stripping punctuation and lowercasing.
+    private static readonly HashSet<string> NoisePhrases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "software engineering system design coding",
+        "software engineering system design",
+        "software engineering system design data structure coding",
+        "software engineering system design software engineering",
+        "software engineering system design algorithms data structures coding",
     };
 
     /// <summary>
@@ -31,6 +43,10 @@ public sealed class QuestionDetector
             return QuestionDetectionResult.NotAQuestion();
 
         var normalized = text.Trim();
+
+        if (IsNoisePhrase(normalized))
+            return QuestionDetectionResult.NotAQuestion();
+
         if (!LooksLikeQuestion(normalized))
             return QuestionDetectionResult.NotAQuestion();
 
@@ -45,9 +61,23 @@ public sealed class QuestionDetector
 
     private static bool LooksLikeQuestion(string text)
     {
+        if (text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < MinWords)
+            return false;
         if (text.EndsWith('?')) return true;
         var first = FirstWord(text);
         return Interrogatives.Contains(first) || ImperativeVerbs.Contains(first);
+    }
+
+    private static bool IsNoisePhrase(string text)
+    {
+        var stripped = new string(
+            text.ToLowerInvariant()
+                .Where(c => char.IsLetterOrDigit(c) || c == ' ')
+                .ToArray())
+            .Trim();
+        // Also try collapsing repeated words (e.g. "software engineering software engineering")
+        return NoisePhrases.Contains(stripped) ||
+               NoisePhrases.Any(p => stripped.StartsWith(p, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Computes the Jaccard similarity coefficient between two token sets.</summary>

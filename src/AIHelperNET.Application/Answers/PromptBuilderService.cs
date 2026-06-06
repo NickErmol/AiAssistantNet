@@ -54,6 +54,99 @@ public sealed class PromptBuilderService
             MaxTokens: MapLengthToTokens(settings.Length));
     }
 
+    /// <summary>Builds a follow-up prompt with the original Q+A injected as context.</summary>
+    public static AnswerPrompt BuildFollowUp(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string originalQuestion,
+        string previousAnswer,
+        string followUpText)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(
+            "You are a senior software engineer coaching a candidate through a technical job interview. " +
+            "You previously answered a question. Now the candidate asks a follow-up. " +
+            "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
+        AppendCodeProfile(system, profile);
+
+        var user = new StringBuilder();
+        user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Your previous answer: {previousAnswer}");
+        user.AppendLine(CultureInfo.InvariantCulture, $"Follow-up: {followUpText}");
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: MapLengthToTokens(settings.Length));
+    }
+
+    /// <summary>Builds a prompt for screen-based analysis with mode-specific instructions.</summary>
+    public static AnswerPrompt BuildWithScreenMode(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string screenContext,
+        IEnumerable<string> interviewerLines,
+        ScreenAnalysisMode mode)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(ModeSystemPrompt(mode));
+        AppendCodeProfile(system, profile);
+
+        var user = new StringBuilder();
+        var lines = interviewerLines.ToList();
+        if (lines.Count > 0)
+        {
+            user.AppendLine("Interviewer context (recent speech):");
+            foreach (var line in lines) user.AppendLine(CultureInfo.InvariantCulture, $"- {line}");
+            user.AppendLine();
+        }
+        user.AppendLine("On-screen content (OCR):");
+        user.AppendLine(screenContext);
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 500));
+    }
+
+    private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
+    {
+        ScreenAnalysisMode.SolveCodingTask =>
+            "You are a senior software engineer. Given the coding task shown on screen, " +
+            "provide the solution FIRST (working code), then a brief explanation after. " +
+            "Do not restate the task or repeat code from the screen.",
+        ScreenAnalysisMode.DebugError =>
+            "You are a senior software engineer. " +
+            "State the root cause and fix FIRST, then explain why. Be concise. " +
+            "Do not repeat the error message or stack trace.",
+        ScreenAnalysisMode.ExplainCode =>
+            "You are a senior software engineer. " +
+            "State what the code does in one sentence FIRST, then explain patterns and notable decisions. " +
+            "3–5 sentences total, spoken style. Do not repeat the code.",
+        ScreenAnalysisMode.SystemDesign =>
+            "You are a senior software engineer. " +
+            "State the recommended approach FIRST, then cover components, data flow, and trade-offs. " +
+            "Be concise. Do not restate the requirements.",
+        ScreenAnalysisMode.MultipleChoice =>
+            "You are a senior software engineer answering a multiple-choice question. " +
+            "State the answer letter FIRST (e.g. 'Answer: A'), then explain why in one sentence. " +
+            "Then one sentence per wrong option saying why it fails.\n" +
+            "RULES — no exceptions:\n" +
+            "- Only the DEFAULT output of each option as written matters. Ignore what is possible with extra syntax.\n" +
+            "- Best-practice potential does NOT make an option correct.\n" +
+            "IMPORTANT for SQL FOR XML with SELECT * and no column aliases:\n" +
+            "  FOR XML RAW  → <row col=\"val\"/>  (attributes, element name = 'row') ✓ matches attribute format\n" +
+            "  FOR XML AUTO → <TableName col=\"val\"/>  (attributes, element name = table name)\n" +
+            "  FOR XML PATH → <row><col>val</col></row>  (child elements, NOT attributes)\n" +
+            "Do not restate the question or options.",
+        _ =>
+            "You are a senior software engineer coaching a candidate through a technical interview. " +
+            "Give the answer or conclusion FIRST, then explain. " +
+            "Do not restate or repeat the on-screen content."
+    };
+
     private static void AppendCodeProfile(StringBuilder sb, CodeProfile p)
     {
         var fields = new[]

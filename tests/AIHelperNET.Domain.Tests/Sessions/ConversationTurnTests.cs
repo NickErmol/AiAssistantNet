@@ -81,4 +81,21 @@ public class ConversationTurnTests
         turn.Resolve();
         turn.Status.Should().Be(ConversationTurnStatus.Resolved);
     }
+
+    [Fact]
+    public void AppendToQuestion_AppendsTextWithSpace()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "Can we use them", Now);
+        turn.AppendToQuestion("and what is the difference?");
+        turn.InitialQuestionText.Should().Be("Can we use them and what is the difference?");
+    }
+
+    [Fact]
+    public void AppendToQuestion_UpdatesUpdatedAt()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "Initial question text here?", Now);
+        var before = turn.UpdatedAt;
+        turn.AppendToQuestion("extra");
+        turn.UpdatedAt.Should().BeAfter(before);
+    }
 }

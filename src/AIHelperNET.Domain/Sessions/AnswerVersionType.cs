@@ -10,5 +10,7 @@ public enum AnswerVersionType
     /// <summary>Regenerated with screen OCR context included.</summary>
     UpdatedWithScreen,
     /// <summary>Manually triggered regeneration.</summary>
-    ManuallyRegenerated
+    ManuallyRegenerated,
+    /// <summary>Continuation of a previous answer with user-supplied follow-up text.</summary>
+    FollowUp
 }
