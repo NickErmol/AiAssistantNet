@@ -15,6 +15,7 @@ public static class SileroVadDetector
     private static readonly int[]  InputShape = { 1, ChunkSize };
     private static readonly int[]  HcShape    = { 2, 1, 64 };
     private static readonly int[]  SrShape    = { 1 };
+    // ONNX Runtime treats input tensors as read-only; sharing this static array is safe for Silero VAD v4.
     private static readonly long[] SrData     = { 16000L };
 
     public static async IAsyncEnumerable<SpeechWindow> AccumulateSpeechWindows(
