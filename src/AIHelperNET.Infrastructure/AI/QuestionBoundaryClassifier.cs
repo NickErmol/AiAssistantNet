@@ -55,6 +55,7 @@ public sealed class QuestionBoundaryClassifier(
         var userMessage = JsonSerializer.Serialize(new
         {
             active_turn_status = activeTurnStatusStr,
+            speaker_of_latest = speaker.ToString(),
             recent_items = recentItemsList,
             text_to_classify = textToClassify
         });
@@ -88,7 +89,10 @@ public sealed class QuestionBoundaryClassifier(
                 return BoundaryClassificationResult.Ambiguous(latestItem.Text);
             }
 
-            return ParseResponse(json, latestItem.Text);
+            var result = ParseResponse(json, latestItem.Text);
+            Log.Debug("QuestionBoundaryClassifier: {Label} ({Confidence:F2}) — {Reason}",
+                result.Classification, result.Confidence, result.Reason);
+            return result;
         }
         finally
         {
@@ -118,8 +122,9 @@ public sealed class QuestionBoundaryClassifier(
                 label is BoundaryLabel.QuestionStarted or BoundaryLabel.QuestionComplete or BoundaryLabel.TaskComplete or BoundaryLabel.NewQuestion,
                 normalizedText, reason);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "QuestionBoundaryClassifier: failed to parse response");
             return BoundaryClassificationResult.Ambiguous(originalText);
         }
     }
