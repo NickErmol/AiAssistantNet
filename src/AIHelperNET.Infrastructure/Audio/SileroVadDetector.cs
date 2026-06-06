@@ -30,7 +30,7 @@ public static class SileroVadDetector
         var h = new float[2 * 1 * 64]; // [2,1,64]
         var c = new float[2 * 1 * 64]; // [2,1,64]
 
-        int totalChunks = 0, speechChunks = 0;
+        int totalChunks = 0;
 
         await foreach (var frame in frames.WithCancellation(ct))
         {
@@ -43,7 +43,6 @@ public static class SileroVadDetector
                 totalChunks++;
 
                 var prob = RunInference(session, chunk, h, c);
-                if (prob >= 0.35f) speechChunks++;
 
                 var window = acc.Feed(prob, chunk, frame.Speaker);
                 if (window is not null)
@@ -51,7 +50,7 @@ public static class SileroVadDetector
                     // Reset LSTM so the next window starts with a clean state.
                     Array.Clear(h);
                     Array.Clear(c);
-                    Log.Information("SileroVAD: emitting SpeechWindow speaker={S} samples={N}",
+                    Log.Information("SileroVAD: emitting SpeechWindow speaker={Speaker} samples={SampleCount}",
                         window.Speaker, window.Samples.Length);
                     yield return window;
                 }
@@ -62,12 +61,12 @@ public static class SileroVadDetector
         var final = acc.Flush();
         if (final is not null)
         {
-            Log.Information("SileroVAD: flushing final SpeechWindow speaker={S} samples={N}",
+            Log.Information("SileroVAD: flushing final SpeechWindow speaker={Speaker} samples={SampleCount}",
                 final.Speaker, final.Samples.Length);
             yield return final;
         }
 
-        Log.Information("SileroVAD: done — totalChunks={T} speechChunks={S}", totalChunks, speechChunks);
+        Log.Information("SileroVAD: done — totalChunks={TotalChunks}", totalChunks);
     }
 
     private static float RunInference(InferenceSession session, float[] chunk, float[] h, float[] c)
