@@ -170,8 +170,10 @@ public sealed partial class TranscriptPipelineService(
     private GenerateAnswerCommand? HandleQuestionComplete(Session session, TranscriptItem item, ConversationTurn? activeTurn)
     {
         _collectionStartedAt = null;
-        _currentAnswerCts?.Cancel();
+        var old = _currentAnswerCts;
         _currentAnswerCts = new CancellationTokenSource();
+        old?.Cancel();
+        old?.Dispose();
 
         if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
         {
@@ -189,8 +191,10 @@ public sealed partial class TranscriptPipelineService(
     private GenerateAnswerCommand? HandleAdditionalRequirement(Session session, TranscriptItem item, ConversationTurn? activeTurn)
     {
         if (activeTurn is null) return null;
-        _currentAnswerCts?.Cancel();
+        var old = _currentAnswerCts;
         _currentAnswerCts = new CancellationTokenSource();
+        old?.Cancel();
+        old?.Dispose();
         activeTurn.AppendToQuestion(item.Text);
         return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
     }
@@ -212,8 +216,10 @@ public sealed partial class TranscriptPipelineService(
             activeTurn.AttachClarificationResponse(item.Id);
             if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
                 activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
-            _currentAnswerCts?.Cancel();
+            var old = _currentAnswerCts;
             _currentAnswerCts = new CancellationTokenSource();
+            old?.Cancel();
+            old?.Dispose();
             return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
         }
     }
@@ -221,8 +227,10 @@ public sealed partial class TranscriptPipelineService(
     private GenerateAnswerCommand? ForceCompleteCollection(Session session, ConversationTurn activeTurn)
     {
         _collectionStartedAt = null;
-        _currentAnswerCts?.Cancel();
+        var old = _currentAnswerCts;
         _currentAnswerCts = new CancellationTokenSource();
+        old?.Cancel();
+        old?.Dispose();
         activeTurn.CompleteQuestion();
         turnSink.OnTurnStatusChanged(activeTurn.Id, ConversationTurnStatus.Detected);
         return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
@@ -311,15 +319,22 @@ public sealed partial class TranscriptPipelineService(
     }
 
     /// <summary>Releases resources owned by this service.</summary>
-    public void Dispose() => _currentAnswerCts?.Dispose();
-
-    private void FireAndForget(GenerateAnswerCommand command, CancellationToken ct)
+    public void Dispose()
     {
+        _currentAnswerCts?.Cancel();
+        _currentAnswerCts?.Dispose();
+    }
+
+    private void FireAndForget(GenerateAnswerCommand command, CancellationToken sessionCt)
+    {
+        var requestCt = _currentAnswerCts?.Token ?? CancellationToken.None;
         _ = Task.Run(async () =>
         {
             using var scope  = scopeFactory.CreateScope();
             var mediator     = scope.ServiceProvider.GetRequiredService<IMediator>();
-            await mediator.Send(command, CancellationToken.None);
+            // Use the per-request token so new context cancels this generation.
+            // Session stop is ignored here intentionally (fire-and-forget completes on its own).
+            await mediator.Send(command, requestCt);
         }, CancellationToken.None);
     }
 
