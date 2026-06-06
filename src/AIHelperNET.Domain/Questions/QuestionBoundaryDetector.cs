@@ -29,7 +29,7 @@ public sealed class QuestionBoundaryDetector
     [
         "okay", "ok", "right", "sure", "great", "thanks", "thank you",
         "can you hear me", "give me a second", "one moment", "let me think",
-        "alright", "sounds good", "got it", "perfect", "yep", "nope", "yes", "no",
+        "alright", "sounds good", "got it", "perfect", "yep", "nope",
         "i will share my screen", "i'll share my screen"
     ];
 
@@ -99,12 +99,10 @@ public sealed class QuestionBoundaryDetector
         }
 
         // Rule 3: Filler list match → Unrelated
-        foreach (var filler in FillerPhrases)
+        var matchedFiller = FindFillerPhrase(normalizedLower);
+        if (matchedFiller is not null)
         {
-            if (normalizedLower.StartsWith(filler, StringComparison.OrdinalIgnoreCase))
-            {
-                return Unrelated(normalized, 0.90, $"Starts with filler phrase '{filler}'");
-            }
+            return Unrelated(normalized, 0.90, $"Starts with filler phrase '{matchedFiller}'");
         }
 
         // Rule 4: Speaker == Me AND active turn → ClarificationOfCurrentQuestion
@@ -271,4 +269,31 @@ public sealed class QuestionBoundaryDetector
 
     private static string FirstWord(string text) =>
         text.Split(' ')[0].ToLowerInvariant().Trim('.', '?', '!');
+
+    /// <summary>
+    /// Detects if text starts with a filler phrase, using word-boundary awareness for single-word fillers.
+    /// Multi-word fillers use StartsWith; single-word fillers must be complete words.
+    /// </summary>
+    private static string? FindFillerPhrase(string normalizedLower)
+    {
+        foreach (var filler in FillerPhrases)
+        {
+            if (!normalizedLower.StartsWith(filler, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Multi-word fillers: StartsWith is sufficient
+            if (filler.Contains(' '))
+                return filler;
+
+            // Single-word fillers: ensure it's a complete word (end of string or followed by space/punctuation)
+            if (normalizedLower.Length == filler.Length)
+                return filler;
+
+            var nextChar = normalizedLower[filler.Length];
+            if (nextChar == ' ' || nextChar == ',' || nextChar == '.' || nextChar == '!' || nextChar == '?')
+                return filler;
+        }
+
+        return null;
+    }
 }
