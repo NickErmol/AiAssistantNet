@@ -141,15 +141,8 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
         var turn = Turns.FirstOrDefault(t => t.Id == turnId);
         if (turn is null) return;
 
-        var version = turn.AnswerVersions.FirstOrDefault(v => v.IsLatest);
-        if (version is null)
-        {
-            foreach (var v in turn.AnswerVersions) v.IsLatest = false;
-            version = new AnswerVersionVm(AnswerVersionId.New(), versionType, DateTimeOffset.UtcNow)
-                { IsLatest = true };
-            turn.AnswerVersions.Insert(0, version);
-            turn.LatestVersion = version;
-        }
+        var version = turn.AnswerVersions.FirstOrDefault(v => v.IsLatest)
+            ?? CreateNewVersion(turn, AnswerVersionId.New(), versionType);
         version.Text += chunk;
     }
 
@@ -164,11 +157,19 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     {
         var turn = Turns.FirstOrDefault(t => t.Id == turnId);
         if (turn is null) return;
+        CreateNewVersion(turn, AnswerVersionId.New(), AnswerVersionType.Preliminary,
+            $"[Error: {errorMessage}]");
+    }
+
+    private static AnswerVersionVm CreateNewVersion(
+        TurnVm turn, AnswerVersionId id, AnswerVersionType type, string text = "")
+    {
         foreach (var v in turn.AnswerVersions) v.IsLatest = false;
-        var errVersion = new AnswerVersionVm(AnswerVersionId.New(), AnswerVersionType.Preliminary,
-            DateTimeOffset.UtcNow) { Text = $"[Error: {errorMessage}]", IsLatest = true };
-        turn.AnswerVersions.Insert(0, errVersion);
-        turn.LatestVersion = errVersion;
+        var version = new AnswerVersionVm(id, type, DateTimeOffset.UtcNow)
+            { Text = text, IsLatest = true };
+        turn.AnswerVersions.Insert(0, version);
+        turn.LatestVersion = version;
+        return version;
     }
 
     /// <summary>Adds a new turn to the top of the list.</summary>
