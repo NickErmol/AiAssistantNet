@@ -5,7 +5,9 @@ using Whisper.net;
 
 namespace AIHelperNET.Infrastructure.Transcription;
 
-public sealed class WhisperTranscriptionService(WhisperModelProvider models) : ITranscriptionService
+public sealed class WhisperTranscriptionService(
+    WhisperModelProvider whisperModels,
+    SileroModelProvider  sileroModels) : ITranscriptionService
 {
     // Serialises Build() across mic and loopback tasks. Concurrent KV-cache allocation for
     // medium/large models causes both builds to stall indefinitely; sequential builds complete.
@@ -29,36 +31,31 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
         string language,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var factory = await models.GetFactoryAsync(model, ct);
-        var lang = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
+        var factory = await whisperModels.GetFactoryAsync(model, ct);
+        var lang    = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
 
-        // Processor is built lazily on the first speech window so the VAD loop starts immediately.
-        // The build lock serialises mic and loopback builds: concurrent KV-cache allocation for
-        // medium/large models stalls both builds indefinitely; sequential builds complete normally.
         string? lastEmitted = null;
-        WhisperProcessor? processor = null;
 
-        try
+        await foreach (var window in SileroVadDetector.AccumulateSpeechWindows(frames, sileroModels, ct))
         {
-        await foreach (var window in VoiceActivityDetector.AccumulateSpeechWindows(frames, ct))
-        {
-            if (processor is null)
+            await _buildLock.WaitAsync(ct);
+            WhisperProcessor processor;
+            try
             {
-                await _buildLock.WaitAsync(ct);
-                try
-                {
-                    processor = factory.CreateBuilder()
-                        .WithLanguage(lang ?? "en")
-                        .WithTemperature(0)            // greedy decoding — eliminates random word substitutions
-                        .WithPrompt(InitialPrompt)     // primes vocabulary, reduces nonsense outputs
-                        .WithNoSpeechThreshold(0.6f)   // drop segments Whisper itself flags as silent
-                        .WithSingleSegment()           // one result per VAD window — prevents within-window splits
-                        .Build();
-                }
-                finally { _buildLock.Release(); }
+                processor = factory.CreateBuilder()
+                    .WithLanguage(lang ?? "en")
+                    .WithTemperature(0)            // greedy decoding — no random word substitutions
+                    .WithNoContext()               // prevent stale KV-cache from previous windows
+                    .WithPrompt(lastEmitted ?? InitialPrompt) // rolling context for vocabulary continuity
+                    .WithNoSpeechThreshold(0.6f)
+                    .WithSingleSegment()
+                    .Build();
             }
+            finally { _buildLock.Release(); }
 
-            await foreach (var seg in processor!.ProcessAsync(window.Samples, ct))
+            await using var _ = (IAsyncDisposable)processor;
+
+            await foreach (var seg in processor.ProcessAsync(window.Samples, ct))
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
                 if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
@@ -74,8 +71,6 @@ public sealed class WhisperTranscriptionService(WhisperModelProvider models) : I
                     seg.Probability);
             }
         }
-        } // end try
-        finally { if (processor is not null) await ((IAsyncDisposable)processor).DisposeAsync(); }
     }
 
     private static int WordCount(string text) =>
