@@ -2,6 +2,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers.Commands;
 using AIHelperNET.Application.Sessions;
 using AIHelperNET.Domain.Ids;
+using AIHelperNET.Domain.Questions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
@@ -262,5 +263,181 @@ public class TranscriptPipelineServiceTests
         await ProcessAndFlushAsync(svc, session, item, uow);
 
         turnSink.DidNotReceive().OnTurnCreated(Arg.Any<ConversationTurnId>(), Arg.Any<string>());
+    }
+
+    // ── Boundary-detection path (boundaryClassifier != null) ────────────────
+
+    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow)
+        MakeSvcWithBoundary(ITranscriptSink sink, IQuestionBoundaryClassifier boundaryClassifier)
+    {
+        var mediator = Substitute.For<IMediator>();
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result>(Result.Ok()));
+#pragma warning restore CA2012
+
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IMediator)).Returns(mediator);
+
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+
+        var factory = Substitute.For<IServiceScopeFactory>();
+        factory.CreateScope().Returns(scope);
+
+        var turnSink = Substitute.For<IConversationTurnSink>();
+
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+
+        return (new TranscriptPipelineService(factory, sink, turnSink,
+            Substitute.For<IQuestionClassifier>(), null, boundaryClassifier),
+            mediator, turnSink, uow);
+    }
+
+    [Fact]
+    public async Task BoundaryPath_QuestionStarted_CreatesTurnWithCollectingStatus()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var boundaryClassifier = Substitute.For<IQuestionBoundaryClassifier>();
+        boundaryClassifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BoundaryClassificationResult(
+                BoundaryLabel.QuestionStarted, 0.90,
+                ShouldGenerateAnswer: false,
+                ShouldRefineExistingAnswer: false,
+                ShouldCreateNewTurn: true,
+                NormalizedQuestionText: "Let's say we have a payment service.",
+                Reason: "test")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, boundaryClassifier);
+
+        var item = MakeItem(Speaker.Other, "Let's say we have a payment service.");
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(1);
+        session.ConversationTurns[0].Status.Should().Be(ConversationTurnStatus.CollectingQuestion);
+
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_QuestionComplete_TransitionsTurnAndFiresAnswer()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Heuristic already returns high-confidence for both — no AI fallback needed
+        // First call: QuestionStarted (heuristic returns high confidence)
+        // Second call: QuestionComplete (heuristic returns high confidence)
+        // We don't need a real boundary classifier since the heuristic in the
+        // service will handle "Let's say…" and "What is DDD?" correctly.
+        // Use the real heuristic by NOT supplying a boundaryClassifier,
+        // but we need the boundary path, so supply a classifier that is never called
+        // (high confidence heuristic results skip AI).
+        var neverCalledClassifier = Substitute.For<IQuestionBoundaryClassifier>();
+        neverCalledClassifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
+
+        // First item: scenario setup → QuestionStarted
+        var first = MakeItem(Speaker.Other, "Let's say we have a payment service.");
+        await svc.ProcessAsync(session, first, uow, CancellationToken.None);
+        session.ConversationTurns.Should().HaveCount(1);
+        session.ConversationTurns[0].Status.Should().Be(ConversationTurnStatus.CollectingQuestion);
+
+        // Second item: complete question — must be ≥4 words so Rule 2 doesn't fire Unrelated
+        var second = MakeItem(Speaker.Other, "What exactly is DDD?");
+        await svc.ProcessAsync(session, second, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(1, "QuestionComplete should reuse the collecting turn");
+        session.ConversationTurns[0].Status.Should().Be(ConversationTurnStatus.Detected);
+
+        await Task.Delay(200);
+        await mediator.Received(1).Send(
+            Arg.Is<GenerateAnswerCommand>(c => c.TurnId == session.ConversationTurns[0].Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_AdditionalRequirement_FiresRefinement()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Set up a preliminary-ready turn manually so the second item has an active turn
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+
+        // Heuristic will return AdditionalRequirement for "Also assume…" with PreliminaryReady
+        var neverCalledClassifier = Substitute.For<IQuestionBoundaryClassifier>();
+        neverCalledClassifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
+
+        var item = MakeItem(Speaker.Other, "Also assume validation errors should not be retried.");
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        await Task.Delay(200);
+        await mediator.Received(1).Send(
+            Arg.Is<GenerateAnswerCommand>(c => c.TurnId == turn.Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_MeSpeaker_ClarificationNoAnswer()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Set up a preliminary-ready turn
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+
+        // Heuristic: Speaker.Me + active turn → ClarificationOfCurrentQuestion (Rule 4, confidence 0.85)
+        var neverCalledClassifier = Substitute.For<IQuestionBoundaryClassifier>();
+        neverCalledClassifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
+
+        var clarification = MakeItem(Speaker.Me, "Should it cover all error types?");
+        await svc.ProcessAsync(session, clarification, uow, CancellationToken.None);
+
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+        turn.ClarificationQuestionIds.Should().HaveCount(1);
     }
 }
