@@ -95,4 +95,115 @@ public class PromptBuilderServiceTests
         prompt.User.Should().Contain("CQRS separates reads and writes.");
         prompt.User.Should().Contain("Can you give an example?");
     }
+
+    // ── Context-aware prompting ────────────────────────────────────────────────
+    [Fact]
+    public void Build_WithNoContext_UserContainsOnlyQuestion()
+    {
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What is the pattern?");
+
+        prompt.User.Should().Contain("Question: What is the pattern?");
+        prompt.User.Should().NotContain("Conversation context");
+    }
+
+    [Fact]
+    public void Build_WithTranscriptContext_InjectsTranscriptBlock()
+    {
+        var items = new List<TranscriptItem>
+        {
+            TranscriptItem.Create(Speaker.Other, "You tell me about fabric decorator builder", Now, 0.9f),
+            TranscriptItem.Create(Speaker.Me,    "What is the pattern?", Now.AddSeconds(10), 0.9f),
+        };
+
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What is the pattern?",
+            recentTranscript: items);
+
+        prompt.User.Should().Contain("Conversation context");
+        prompt.User.Should().Contain("[Transcript] Interviewer: You tell me about fabric decorator builder");
+        prompt.User.Should().Contain("[Transcript] Me: What is the pattern?");
+        prompt.User.Should().Contain("Question: What is the pattern?");
+    }
+
+    [Fact]
+    public void Build_WithQAContext_InjectsQABlock()
+    {
+        var qa = new List<(string Question, string Answer)>
+        {
+            ("What is a design pattern?", "A design pattern is a reusable solution to a common problem."),
+        };
+
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What is the pattern?",
+            recentQA: qa);
+
+        prompt.User.Should().Contain("Conversation context");
+        prompt.User.Should().Contain("[Q&A] Q: What is a design pattern?");
+        prompt.User.Should().Contain("A design pattern is a reusable solution");
+    }
+
+    [Fact]
+    public void Build_WithBothContextTypes_InjectsBothBlocks()
+    {
+        var items = new List<TranscriptItem>
+        {
+            TranscriptItem.Create(Speaker.Other, "You tell me about patterns", Now, 0.9f),
+        };
+        var qa = new List<(string Question, string Answer)>
+        {
+            ("What is OOP?", "OOP stands for Object-Oriented Programming."),
+        };
+
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What is the pattern?",
+            recentTranscript: items,
+            recentQA: qa);
+
+        prompt.User.Should().Contain("[Transcript] Interviewer: You tell me about patterns");
+        prompt.User.Should().Contain("[Q&A] Q: What is OOP?");
+        prompt.User.Should().Contain("Question: What is the pattern?");
+    }
+
+    [Fact]
+    public void Build_QAAnswerLongerThan200Chars_IsTruncated()
+    {
+        var longAnswer = new string('A', 250);
+        var qa = new List<(string Question, string Answer)>
+        {
+            ("Short question?", longAnswer),
+        };
+
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What is the pattern?",
+            recentQA: qa);
+
+        // The answer in the prompt should be capped at 200 chars + ellipsis
+        prompt.User.Should().NotContain(longAnswer);       // full 250-char string absent
+        prompt.User.Should().Contain(new string('A', 200)); // first 200 chars present
+    }
+
+    [Fact]
+    public void Build_WithScreenContextAndTranscript_BothAppearInUser()
+    {
+        var items = new List<TranscriptItem>
+        {
+            TranscriptItem.Create(Speaker.Other, "Explain this code", Now, 0.9f),
+        };
+
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty, AnswerSettings.Default,
+            "What does this do?",
+            screenContext: "void Main() { }",
+            recentTranscript: items);
+
+        prompt.User.Should().Contain("[Transcript] Interviewer: Explain this code");
+        prompt.User.Should().Contain("void Main()");
+        prompt.User.Should().Contain("Question: What does this do?");
+    }
 }
