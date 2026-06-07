@@ -118,6 +118,15 @@ public sealed partial class TranscriptPipelineService(
             {
                 if (logger is not null)
                     Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
+                // When AI fails, re-classify without active-turn bias for any non-collecting turn.
+                // The pipeline's turn status is stale (answer handler updates a separate Session
+                // instance), so drop the context and let Rule 9/10 fire for genuine new questions.
+                if (result.Classification == BoundaryLabel.ClarificationOfCurrentQuestion
+                    && activeTurnStatus is not null
+                    && activeTurnStatus != ConversationTurnStatus.CollectingQuestion)
+                {
+                    result = _boundaryDetector.Evaluate(item.Text, item.Speaker, null, recentTexts);
+                }
             }
         }
 
@@ -135,9 +144,16 @@ public sealed partial class TranscriptPipelineService(
                 return HandleQuestionStarted(session, item);
 
             case BoundaryLabel.QuestionContinued:
-                if (activeTurn is not null)
+                // Only a turn that is still being collected can absorb a continuation fragment.
+                // Once a question is complete (the in-memory turn is stuck at Detected because the
+                // answer handler runs in a separate scope), a "continuation" is really a new
+                // question — otherwise AddFragment fails and the segment is silently dropped.
+                if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
+                {
                     activeTurn.AddFragment(item.Text);
-                return null;
+                    return null;
+                }
+                return HandleNewQuestion(session, item.Text, item.Timestamp);
 
             case BoundaryLabel.QuestionComplete:
             case BoundaryLabel.TaskComplete:
@@ -216,6 +232,15 @@ public sealed partial class TranscriptPipelineService(
         }
         else
         {
+            // An interviewer "clarification" only makes sense while we are actually waiting on
+            // one. If the turn is already complete (Detected/answered), this is a new question —
+            // not a clarification response — so open a fresh turn instead of refining the old one.
+            if (activeTurn.Status is not (ConversationTurnStatus.AwaitingClarification
+                                          or ConversationTurnStatus.ClarificationReceived))
+            {
+                return HandleNewQuestion(session, item.Text, item.Timestamp);
+            }
+
             // Other speaker adds clarification context
             activeTurn.AttachClarificationResponse(item.Id);
             if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
