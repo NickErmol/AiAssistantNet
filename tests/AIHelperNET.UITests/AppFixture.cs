@@ -24,8 +24,8 @@ public sealed class AppFixture : IAsyncLifetime
     {
         foreach (var p in Process.GetProcessesByName("AIHelperNET.App"))
         {
-            p.Kill();
-            await p.WaitForExitAsync();
+            p.Kill(entireProcessTree: true);
+            await Task.WhenAny(p.WaitForExitAsync(), Task.Delay(5000));
         }
 
         await Task.Delay(800);
@@ -41,7 +41,7 @@ public sealed class AppFixture : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _app?.Kill();
+        try { _app?.Kill(); } catch { /* process may have already exited */ }
         Automation.Dispose();
         return Task.CompletedTask;
     }

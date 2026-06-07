@@ -10,5 +10,6 @@
     <Project Path="tests/AIHelperNET.Domain.Tests/AIHelperNET.Domain.Tests.csproj" />
     <Project Path="tests/AIHelperNET.Infrastructure.Tests/AIHelperNET.Infrastructure.Tests.csproj" />
     <Project Path="tests/AIHelperNET.Integration.Tests/AIHelperNET.Integration.Tests.csproj" />
+    <Project Path="tests/AIHelperNET.UITests/AIHelperNET.UITests.csproj" />
   </Folder>
 </Solution>
