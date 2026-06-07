@@ -59,7 +59,7 @@ public sealed class UIControlTests(AppFixture fixture)
         fixture.Main.RadioAudioBoth.IsChecked.Should().BeTrue();
 
         // Restore default
-        fixture.Main.RadioAudioBoth.Click();
+        fixture.Main.RadioAudioMicOnly.Click();
     }
 
     // ── Screen mode radio buttons ─────────────────────────────────────────────
@@ -110,7 +110,7 @@ public sealed class UIControlTests(AppFixture fixture)
             () => fixture.Main.HistoryPanel,
             TimeSpan.FromSeconds(3)).Result;
 
-        panel.Should().NotBeNull("history panel should be visible after clicking 📋");
+        panel.Should().NotBeNull("history panel should be visible after clicking the history button");
 
         fixture.Main.BtnToggleHistory.Click();
         Thread.Sleep(400);
