@@ -9,24 +9,36 @@ namespace AIHelperNET.Application.Answers;
 public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
-    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?)"/> using <paramref name="question"/>.Text.</remarks>
+    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?)"/> using <paramref name="question"/>.Text.</remarks>
+    /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
+    /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
+    /// <param name="question">The detected question whose <c>Text</c> is forwarded.</param>
+    /// <param name="screenContext">Optional OCR text captured from the screen.</param>
+    /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         DetectedQuestion question,
-        string? screenContext = null)
-        => Build(profile, settings, question.Text, screenContext);
+        string? screenContext = null,
+        IReadOnlyList<TranscriptItem>? recentTranscript = null,
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
+        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA);
 
-    /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context using an explicit question text.</summary>
+    /// <summary>Constructs an <see cref="AnswerPrompt"/> using an explicit question text.</summary>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
     /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
-    /// <param name="questionText">The full question text to answer, e.g. the assembled multi-fragment text.</param>
+    /// <param name="questionText">The full question text to answer.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
+    /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         string questionText,
-        string? screenContext = null)
+        string? screenContext = null,
+        IReadOnlyList<TranscriptItem>? recentTranscript = null,
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
     {
         var system = new StringBuilder();
 
@@ -56,6 +68,37 @@ public sealed class PromptBuilderService
                 $"Answer in: {settings.OutputLanguage}.");
 
         var user = new StringBuilder();
+
+        var hasTranscript = recentTranscript is { Count: > 0 };
+        var hasQA         = recentQA         is { Count: > 0 };
+
+        if (hasTranscript || hasQA)
+        {
+            user.AppendLine("Conversation context (recent discussion):");
+
+            if (hasTranscript)
+            {
+                foreach (var item in recentTranscript!)
+                {
+                    var speaker = item.Speaker == Speaker.Me ? "Me" : "Interviewer";
+                    user.AppendLine(CultureInfo.InvariantCulture,
+                        $"[Transcript] {speaker}: {item.Text}");
+                }
+            }
+
+            if (hasQA)
+            {
+                foreach (var (q, a) in recentQA!)
+                {
+                    var cappedAnswer = a.Length > 200 ? a[..200] + "…" : a;
+                    user.AppendLine(CultureInfo.InvariantCulture,
+                        $"[Q&A] Q: {q}  A: {cappedAnswer}");
+                }
+            }
+
+            user.AppendLine();
+        }
+
         user.AppendLine(CultureInfo.InvariantCulture, $"Question: {questionText}");
         if (!string.IsNullOrWhiteSpace(screenContext))
             user.AppendLine(CultureInfo.InvariantCulture, $"\nOn-screen context (OCR):\n{screenContext}");
