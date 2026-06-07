@@ -66,8 +66,8 @@ public sealed class GenerateAnswerHandler(
             .Select(t =>
             {
                 var ans = t.AnswerVersions[^1].Text;
-                return (Question: t.InitialQuestionText ?? t.AnswerVersions[0].Text,
-                        Answer: ans.Length > 200 ? ans[..200] + "…" : ans);
+                return (Question: t.InitialQuestionText ?? "(unknown question)",
+                        Answer: ans);
             })
             .ToList();
 
