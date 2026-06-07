@@ -224,7 +224,7 @@ public sealed class QuestionBoundaryDetector
         // Rule 9.5: Indirect imperative — "you [imperative-verb] …" (≥5 words)
         // Handles phrases like "You tell me about X", "You explain how Y works"
         if (words.Length >= 5
-            && words[0].Equals("you", StringComparison.OrdinalIgnoreCase)
+            && words[0].Trim(',', '.', '?', '!').Equals("you", StringComparison.OrdinalIgnoreCase)
             && Imperatives.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
         {
             return new BoundaryClassificationResult(
@@ -234,7 +234,7 @@ public sealed class QuestionBoundaryDetector
                 ShouldRefineExistingAnswer: false,
                 ShouldCreateNewTurn: true,
                 NormalizedQuestionText: normalized,
-                Reason: $"Indirect imperative 'you {words[1]}'");
+                Reason: $"Indirect imperative 'you {words[1].ToLowerInvariant().Trim('.', '?', '!')}'");
         }
 
         // Rule 10: TaskComplete — imperative first word with ≥4 words

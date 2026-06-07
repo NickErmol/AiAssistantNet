@@ -407,4 +407,19 @@ public sealed class QuestionBoundaryDetectorTests
 
         result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
     }
+
+    [Fact]
+    public void YouImperative_SpeakerMe_ActiveTurn_Rule4TakesPriorityOverRule9Point5()
+    {
+        // Rule 4 fires before Rule 9.5: Speaker.Me + active turn → ClarificationOfCurrentQuestion,
+        // not TaskComplete, even when the sentence starts with "you [imperative]".
+        var result = _sut.Evaluate(
+            "You explain how builder pattern works",
+            Speaker.Me,
+            ConversationTurnStatus.CollectingQuestion,
+            NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.ClarificationOfCurrentQuestion);
+        result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
+    }
 }
