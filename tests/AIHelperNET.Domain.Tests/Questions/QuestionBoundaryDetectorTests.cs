@@ -159,6 +159,53 @@ public sealed class QuestionBoundaryDetectorTests
         result.ShouldGenerateAnswer.Should().BeFalse();
         result.ShouldCreateNewTurn.Should().BeFalse();
         result.ShouldRefineExistingAnswer.Should().BeFalse();
+        // Non-CollectingQuestion → low confidence so AI classifier can distinguish clarification vs new question
+        result.Confidence.Should().Be(0.50);
+    }
+
+    [Fact]
+    public void MeSpeaker_WithCollectingTurn_ReturnsClarificationHighConfidence()
+    {
+        // Only CollectingQuestion gets high confidence: interviewer is mid-sentence,
+        // so Speaker.Me is reliably a clarification interjection.
+        var result = _sut.Evaluate(
+            "Should it cover all error types?",
+            Speaker.Me,
+            ConversationTurnStatus.CollectingQuestion,
+            NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.ClarificationOfCurrentQuestion);
+        result.Confidence.Should().Be(0.85);
+    }
+
+    [Fact]
+    public void MeSpeaker_WithDetectedTurn_ReturnsLowConfidenceForAIClassifier()
+    {
+        // Detected (and any non-CollectingQuestion) status uses low confidence because the
+        // pipeline's view of turn status is stale — AI classifier must decide.
+        var result = _sut.Evaluate(
+            "Should it cover all error types?",
+            Speaker.Me,
+            ConversationTurnStatus.Detected,
+            NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.ClarificationOfCurrentQuestion);
+        result.Confidence.Should().Be(0.50);
+    }
+
+    [Fact]
+    public void MeSpeaker_WithAnsweredTurn_NewQuestion_HasLowConfidenceForAIClassifier()
+    {
+        // A completely new interview question from Speaker.Me when a turn is already answered
+        // must have confidence < 0.7 so the AI classifier is invoked.
+        var result = _sut.Evaluate(
+            "What's the difference between static constructor and private constructor?",
+            Speaker.Me,
+            ConversationTurnStatus.PreliminaryReady,
+            NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.ClarificationOfCurrentQuestion);
+        result.Confidence.Should().BeLessThan(0.7, "AI classifier must be called to decide if this is truly a clarification or a new question");
     }
 
     // ── Rule 3 + Rule 2: filler ─────────────────────────────────────────────
@@ -290,5 +337,74 @@ public sealed class QuestionBoundaryDetectorTests
 
         result.Classification.Should().Be(BoundaryLabel.AdditionalRequirement);
         result.ShouldRefineExistingAnswer.Should().BeTrue();
+    }
+
+    // ── Rule 9.5: indirect imperative "you [verb]" ─────────────────────────────
+    [Fact]
+    public void YouTellMeAbout_FiveWords_ReturnsTaskComplete()
+    {
+        var result = _sut.Evaluate(
+            "You tell me about patterns",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+        result.ShouldCreateNewTurn.Should().BeTrue();
+    }
+
+    [Fact]
+    public void YouTellMeAbout_NineWords_ReturnsTaskComplete()
+    {
+        var result = _sut.Evaluate(
+            "You tell me about such patterns as fabric decorator builder",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+        result.ShouldCreateNewTurn.Should().BeTrue();
+    }
+
+    [Fact]
+    public void YouExplain_ReturnsTaskComplete()
+    {
+        var result = _sut.Evaluate(
+            "You explain how builder pattern works",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+    }
+
+    [Fact]
+    public void YouAreRight_NotImperative_DoesNotReturnTaskComplete()
+    {
+        // "are" is not in Imperatives — should NOT match Rule 9.5
+        var result = _sut.Evaluate(
+            "You are right about the factory pattern",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
+    }
+
+    [Fact]
+    public void YouKnow_NotImperative_DoesNotReturnTaskComplete()
+    {
+        // "know" is not in Imperatives — should NOT match Rule 9.5
+        var result = _sut.Evaluate(
+            "You know what I mean about that",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
+    }
+
+    [Fact]
+    public void YouTell_OnlyFourWords_DoesNotReturnTaskComplete()
+    {
+        // 4 words — Rule 9.5 requires ≥5 words.
+        var result = _sut.Evaluate(
+            "You tell me this",
+            Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
     }
 }

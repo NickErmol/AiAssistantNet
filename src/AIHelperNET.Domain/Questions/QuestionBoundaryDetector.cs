@@ -106,16 +106,24 @@ public sealed class QuestionBoundaryDetector
         }
 
         // Rule 4: Speaker == Me AND active turn → ClarificationOfCurrentQuestion
+        // CollectingQuestion is the only state where the heuristic is reliable: the interviewer
+        // is mid-sentence, so Speaker.Me is almost certainly a clarification interjection.
+        // All other statuses use low confidence because the pipeline's view of turn status is
+        // stale (answer-handler runs in a separate DI scope and updates a different Session
+        // instance), so the AI classifier must decide between clarification and new question.
         if (speaker == Speaker.Me && activeTurnStatus is not null)
         {
+            var isCollecting = activeTurnStatus == ConversationTurnStatus.CollectingQuestion;
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.ClarificationOfCurrentQuestion,
-                Confidence: 0.85,
+                Confidence: isCollecting ? 0.85 : 0.50,
                 ShouldGenerateAnswer: false,
                 ShouldRefineExistingAnswer: false,
                 ShouldCreateNewTurn: false,
                 NormalizedQuestionText: normalized,
-                Reason: "Speaker is Me with an active turn — treating as clarification");
+                Reason: isCollecting
+                    ? "Speaker is Me while interviewer is collecting a question — treating as clarification"
+                    : "Speaker is Me with active turn — AI classifier needed (turn status may be stale)");
         }
 
         // Rule 5: Scenario setup starters → QuestionStarted
@@ -211,6 +219,22 @@ public sealed class QuestionBoundaryDetector
                 ShouldCreateNewTurn: true,
                 NormalizedQuestionText: normalized,
                 Reason: "Ends with '?' or interrogative start with sufficient word count");
+        }
+
+        // Rule 9.5: Indirect imperative — "you [imperative-verb] …" (≥5 words)
+        // Handles phrases like "You tell me about X", "You explain how Y works"
+        if (words.Length >= 5
+            && words[0].Equals("you", StringComparison.OrdinalIgnoreCase)
+            && Imperatives.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
+        {
+            return new BoundaryClassificationResult(
+                Classification: BoundaryLabel.TaskComplete,
+                Confidence: 0.85,
+                ShouldGenerateAnswer: true,
+                ShouldRefineExistingAnswer: false,
+                ShouldCreateNewTurn: true,
+                NormalizedQuestionText: normalized,
+                Reason: $"Indirect imperative 'you {words[1]}'");
         }
 
         // Rule 10: TaskComplete — imperative first word with ≥4 words
