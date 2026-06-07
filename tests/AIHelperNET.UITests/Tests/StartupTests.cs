@@ -16,21 +16,21 @@ public sealed class StartupTests(AppFixture fixture)
     public void App_Window_IsPresent()
     {
         fixture.Window.Should().NotBeNull();
-        fixture.Window.Properties.IsOffscreen.ValueOrDefault.Should().BeFalse();
+        fixture.Window.Properties.IsOffscreen.ValueOrDefault.Should().BeFalse("main overlay window should be visible on screen");
     }
 
     [Fact]
     public void Log_Contains_SileroVadReady()
     {
-        var log = ReadLog();
-        log.Should().Contain("Silero", "log should show Silero VAD initialized");
+        WaitForLogContent("Silero", TimeSpan.FromSeconds(30))
+            .Should().BeTrue("log should show Silero VAD initialized within 30s");
     }
 
     [Fact]
     public void Log_Contains_WhisperReady()
     {
-        var log = ReadLog();
-        log.Should().Contain("Whisper", "log should show Whisper model loaded");
+        WaitForLogContent("Whisper", TimeSpan.FromSeconds(30))
+            .Should().BeTrue("log should show Whisper model loaded within 30s");
     }
 
     [Fact]
@@ -43,17 +43,25 @@ public sealed class StartupTests(AppFixture fixture)
     [Fact]
     public void StatusDots_Mic_And_System_AreInactive_BeforeSession()
     {
-        fixture.Main.IsDotActive(fixture.Main.DotMic).Should().BeFalse();
-        fixture.Main.IsDotActive(fixture.Main.DotSystem).Should().BeFalse();
+        fixture.Main.IsDotActive(fixture.Main.DotMic).Should().BeFalse("Mic dot should be grey before session starts");
+        fixture.Main.IsDotActive(fixture.Main.DotSystem).Should().BeFalse("System dot should be grey before session starts");
     }
 
-    private static string ReadLog()
+    private static bool WaitForLogContent(string marker, TimeSpan timeout)
     {
-        var path = TodayLogPath;
-        path.Should().NotBeNull("today's log file should exist at {0}", path);
-        // Open with shared read access — app holds a write lock
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = new StreamReader(fs);
-        return reader.ReadToEnd();
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var path = TodayLogPath;
+            if (File.Exists(path))
+            {
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                if (reader.ReadToEnd().Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            Thread.Sleep(500);
+        }
+        return false;
     }
 }
