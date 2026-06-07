@@ -28,12 +28,14 @@
                 <Button Grid.Column="0" Content="▶"
                         Style="{StaticResource IconBtn}"
                         FontSize="9"
+                        AutomationProperties.AutomationId="Btn_ToggleSidebar"
                         Visibility="{Binding SessionControl.IsSidebarVisible,
                             Converter={StaticResource InverseBoolToVisibilityConverter}}"
                         Command="{Binding SessionControl.ToggleSidebarCommand}"
                         Margin="0,0,6,0"/>
 
                 <TextBlock Grid.Column="1"
+                           AutomationProperties.AutomationId="Header_StatusText"
                            Foreground="{DynamicResource Brush.Foreground.Secondary}"
                            FontSize="{DynamicResource Font.SM}"
                            VerticalAlignment="Center">
@@ -52,25 +54,30 @@
                     <Button Content="{Binding SessionControl.IsSessionActive,
                                 Converter={StaticResource BoolToStringConverter},
                                 ConverterParameter='Stop|Start'}"
+                            AutomationProperties.AutomationId="Btn_ToggleSession"
                             Command="{Binding SessionControl.ToggleSessionCommand}"
                             Style="{StaticResource ActionBtn}"/>
                     <Button x:Name="StealthBtn"
                             Content="🎥"
+                            AutomationProperties.AutomationId="Btn_ToggleStealth"
                             Style="{StaticResource IconBtn}"
                             FontSize="13"
                             Click="ToggleStealth_Click"
                             ToolTip="Toggle screen capture visibility"/>
                     <Button Content="◐"
+                            AutomationProperties.AutomationId="Btn_ToggleTheme"
                             Style="{StaticResource IconBtn}"
                             FontSize="13"
                             Click="ToggleTheme_Click"
                             ToolTip="Toggle theme"/>
                     <Button Content="&#128203;"
+                            AutomationProperties.AutomationId="Btn_ToggleHistory"
                             Style="{StaticResource IconBtn}"
                             FontSize="12"
                             Click="ToggleHistory_Click"
                             ToolTip="Session history"/>
                     <Button Content="⚙"
+                            AutomationProperties.AutomationId="Btn_OpenSettings"
                             Style="{StaticResource IconBtn}"
                             FontSize="11"
                             Click="OpenSettings_Click"/>
@@ -92,6 +99,7 @@
 
         <!-- Sidebar -->
         <Border DockPanel.Dock="Left"
+                AutomationProperties.AutomationId="Sidebar"
                 Width="{Binding SessionControl.IsSidebarVisible,
                     Converter={StaticResource BoolToWidthConverter},
                     ConverterParameter='120'}"
@@ -103,16 +111,19 @@
                 <TextBlock Style="{StaticResource SectionLabel}" Text="MODE" Margin="0,0,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Audio Only"
                              GroupName="Mode"
+                             AutomationProperties.AutomationId="Mode_AudioOnly"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=AudioOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Screen Only"
                              GroupName="Mode"
+                             AutomationProperties.AutomationId="Mode_ScreenOnly"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=ScreenOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Audio + Screen"
                              GroupName="Mode"
+                             AutomationProperties.AutomationId="Mode_AudioAndScreen"
                              IsChecked="{Binding SessionControl.Mode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=AudioAndScreen}"/>
@@ -121,16 +132,19 @@
                            Margin="0,10,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Mic Only"
                              GroupName="AudioSource"
+                             AutomationProperties.AutomationId="AudioSource_MicOnly"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=MicrophoneOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="System Only"
                              GroupName="AudioSource"
+                             AutomationProperties.AutomationId="AudioSource_SystemOnly"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=SystemAudioOnly}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Both"
                              GroupName="AudioSource"
+                             AutomationProperties.AutomationId="AudioSource_Both"
                              IsChecked="{Binding SessionControl.AudioSource,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=Both}"/>
@@ -139,6 +153,10 @@
                            Margin="0,10,0,4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
+                             AutomationProperties.AutomationId="StatusDot_Mic"
+                             AutomationProperties.HelpText="{Binding SessionControl.IsMicActive,
+                                 Converter={StaticResource BoolToStringConverter},
+                                 ConverterParameter='active|inactive'}"
                              Fill="{Binding SessionControl.IsMicActive,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
@@ -148,6 +166,10 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
+                             AutomationProperties.AutomationId="StatusDot_System"
+                             AutomationProperties.HelpText="{Binding SessionControl.IsSystemAudioActive,
+                                 Converter={StaticResource BoolToStringConverter},
+                                 ConverterParameter='active|inactive'}"
                              Fill="{Binding SessionControl.IsSystemAudioActive,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
@@ -157,6 +179,10 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
+                             AutomationProperties.AutomationId="StatusDot_OCR"
+                             AutomationProperties.HelpText="{Binding SessionControl.IsOcrReady,
+                                 Converter={StaticResource BoolToStringConverter},
+                                 ConverterParameter='active|inactive'}"
                              Fill="{Binding SessionControl.IsOcrReady,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
@@ -166,6 +192,10 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
                     <Ellipse Style="{StaticResource StatusDot}"
+                             AutomationProperties.AutomationId="StatusDot_AI"
+                             AutomationProperties.HelpText="{Binding SessionControl.IsAiConnected,
+                                 Converter={StaticResource BoolToStringConverter},
+                                 ConverterParameter='active|inactive'}"
                              Fill="{Binding SessionControl.IsAiConnected,
                                  Converter={StaticResource BoolToColorConverter},
                                  ConverterParameter='#44FF88|#444444'}"/>
@@ -200,31 +230,37 @@
                 <TextBlock Style="{StaticResource SectionLabel}" Text="SCREEN" Margin="0,10,0,4"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="General"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_General"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=General}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Solve coding"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_SolveCoding"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=SolveCodingTask}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Debug error"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_DebugError"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=DebugError}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Explain code"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_ExplainCode"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=ExplainCode}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="System design"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_SystemDesign"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=SystemDesign}"/>
                 <RadioButton Style="{StaticResource RadioBtn}" Content="Multiple choice"
                              GroupName="ScreenMode"
+                             AutomationProperties.AutomationId="ScreenMode_MultipleChoice"
                              IsChecked="{Binding SessionControl.ScreenAnalysisMode,
                                  Converter={StaticResource EnumToBoolConverter},
                                  ConverterParameter=MultipleChoice}"/>
@@ -234,12 +270,14 @@
                           FontSize="{DynamicResource Font.XS}"
                           Margin="0,4,0,0"/>
                 <Button Content="📷 Capture"
+                        AutomationProperties.AutomationId="Btn_Capture"
                         Style="{StaticResource ActionBtn}"
                         Margin="0,4,0,0"
                         Command="{Binding ConversationTurn.CaptureScreenCommand}"
                         CommandParameter="{Binding SessionControl}"/>
 
                 <Button Content="◀ Hide"
+                        AutomationProperties.AutomationId="Btn_HideSidebar"
                         HorizontalAlignment="Left"
                         Command="{Binding SessionControl.ToggleSidebarCommand}"
                         Style="{StaticResource IconBtn}"
@@ -304,6 +342,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,0,0,8"
+                                            AutomationProperties.AutomationId="TurnCard"
                                             Background="{DynamicResource Brush.Background.Card}"
                                             BorderBrush="{DynamicResource Brush.Border}"
                                             BorderThickness="1"
@@ -400,6 +439,7 @@
 
             <!-- History panel — starts collapsed -->
             <ctrl:HistoryPanel x:Name="HistoryPanelControl"
+                               AutomationProperties.AutomationId="Panel_History"
                                Visibility="Collapsed"/>
         </Grid>
     </DockPanel>
