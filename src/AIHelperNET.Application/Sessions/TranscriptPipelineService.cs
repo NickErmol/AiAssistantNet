@@ -119,9 +119,32 @@ public sealed partial class TranscriptPipelineService(
                 if (logger is not null)
                     Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
             }
+
+            // Safety net: Rule 4 forces every Speaker.Me utterance that lands during an active turn
+            // through the AI at low confidence, and the pipeline's turn status is stale (the answer
+            // handler runs in a separate DI scope). When neither the heuristic nor the AI produced a
+            // confident, actionable result — the AI threw, or returned NoQuestion/Ambiguous, or a
+            // low-confidence clarification — a clearly-formed question would be silently dropped or
+            // mis-folded. Re-check with the bias-free heuristic (no active-turn context) and, if it
+            // recognises a complete question or task, open a new turn instead of losing it.
+            if (result.Confidence < 0.7
+                && activeTurnStatus != ConversationTurnStatus.CollectingQuestion)
+            {
+                var neutral = _boundaryDetector.Evaluate(item.Text, item.Speaker, null, recentTexts);
+                if (neutral.Classification is BoundaryLabel.QuestionComplete
+                                           or BoundaryLabel.TaskComplete
+                                           or BoundaryLabel.NewQuestion)
+                {
+                    result = neutral;
+                }
+            }
         }
 
         item.SetBoundaryRole(LabelToRole(result.Classification));
+
+        if (logger is not null)
+            Log.BoundaryRouted(logger, item.Speaker, activeTurnStatus, result.Classification,
+                result.Confidence, item.Text[..Math.Min(60, item.Text.Length)]);
 
         return RouteLabel(session, item, result, activeTurn);
     }
@@ -135,9 +158,16 @@ public sealed partial class TranscriptPipelineService(
                 return HandleQuestionStarted(session, item);
 
             case BoundaryLabel.QuestionContinued:
-                if (activeTurn is not null)
+                // Only a turn that is still being collected can absorb a continuation fragment.
+                // Once a question is complete (the in-memory turn is stuck at Detected because the
+                // answer handler runs in a separate scope), a "continuation" is really a new
+                // question — otherwise AddFragment fails and the segment is silently dropped.
+                if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
+                {
                     activeTurn.AddFragment(item.Text);
-                return null;
+                    return null;
+                }
+                return HandleNewQuestion(session, item.Text, item.Timestamp);
 
             case BoundaryLabel.QuestionComplete:
             case BoundaryLabel.TaskComplete:
@@ -216,6 +246,15 @@ public sealed partial class TranscriptPipelineService(
         }
         else
         {
+            // An interviewer "clarification" only makes sense while we are actually waiting on
+            // one. If the turn is already complete (Detected/answered), this is a new question —
+            // not a clarification response — so open a fresh turn instead of refining the old one.
+            if (activeTurn.Status is not (ConversationTurnStatus.AwaitingClarification
+                                          or ConversationTurnStatus.ClarificationReceived))
+            {
+                return HandleNewQuestion(session, item.Text, item.Timestamp);
+            }
+
             // Other speaker adds clarification context
             activeTurn.AttachClarificationResponse(item.Id);
             if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
@@ -351,5 +390,11 @@ public sealed partial class TranscriptPipelineService(
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "BoundaryClassifier: call failed, using heuristic result for: {Text}")]
         internal static partial void BoundaryClassifierFailed(ILogger logger, Exception ex, string text);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "BoundaryRoute: speaker={Speaker} staleStatus={Status} -> {Label} ({Confidence:F2}) text='{Text}'")]
+        internal static partial void BoundaryRouted(
+            ILogger logger, Speaker speaker, ConversationTurnStatus? status, BoundaryLabel label,
+            double confidence, string text);
     }
 }
