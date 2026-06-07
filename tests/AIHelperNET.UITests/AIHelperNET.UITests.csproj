@@ -1,15 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CA1707</NoWarn>
+<IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1001;CA1515;CA1711;CA1822;NU1904</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="FluentResults" Version="4.0.0" />
+    <PackageReference Include="FlaUI.Core" Version="4.0.0" />
+    <PackageReference Include="FlaUI.UIA3" Version="4.0.0" />
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -19,11 +18,5 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\AIHelperNET.Application\AIHelperNET.Application.csproj" />
-    <ProjectReference Include="..\..\src\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
-    <ProjectReference Include="..\..\src\AIHelperNET.Infrastructure\AIHelperNET.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

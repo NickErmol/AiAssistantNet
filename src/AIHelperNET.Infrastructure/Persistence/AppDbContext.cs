@@ -47,6 +47,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasConversion(
                     dto => dto.ToUnixTimeMilliseconds(),
                     ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
+            t.Property(x => x.BoundaryRole).HasConversion<int>().HasDefaultValue(BoundaryRole.None);
         });
 
         s.OwnsMany(x => x.Questions, q =>
@@ -113,6 +114,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasColumnName("ClarificationResponseIds")
                 .HasColumnType("TEXT")
                 .HasDefaultValue("[]");
+            ct.Property("QuestionFragmentsJson")
+                .HasColumnName("QuestionFragments")
+                .HasColumnType("TEXT")
+                .HasDefaultValue("[]");
+            ct.Property(x => x.LastUpdateReason).HasConversion<int>().HasDefaultValue(TurnUpdateReason.InitialQuestionComplete);
 
             ct.OwnsMany(x => x.AnswerVersions, av =>
             {

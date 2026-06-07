@@ -13,6 +13,7 @@ public sealed class ConversationTurn
     private List<TranscriptItemId> _clarificationQuestionIds = [];
     private List<TranscriptItemId> _clarificationResponseIds = [];
     private readonly List<AnswerVersion> _answerVersions = [];
+    private List<string> _questionFragments = [];
 
     // EF Core JSON bridge — maps private lists to TEXT columns
     internal string ClarificationQuestionIdsJson
@@ -27,6 +28,13 @@ public sealed class ConversationTurn
         get => JsonSerializer.Serialize(_clarificationResponseIds.Select(id => id.Value));
         set => _clarificationResponseIds = string.IsNullOrEmpty(value) ? [] :
             JsonSerializer.Deserialize<Guid[]>(value)!.Select(g => new TranscriptItemId(g)).ToList();
+    }
+
+    internal string QuestionFragmentsJson
+    {
+        get => JsonSerializer.Serialize(_questionFragments);
+        set => _questionFragments = string.IsNullOrEmpty(value) ? [] :
+            JsonSerializer.Deserialize<List<string>>(value)!;
     }
 
     /// <summary>Unique identifier for this turn.</summary>
@@ -52,6 +60,12 @@ public sealed class ConversationTurn
 
     /// <summary>All answer versions generated for this turn, oldest first.</summary>
     public IReadOnlyList<AnswerVersion> AnswerVersions => _answerVersions;
+
+    /// <summary>Individual transcript fragments that make up the question being collected.</summary>
+    public IReadOnlyList<string> QuestionFragments => _questionFragments;
+
+    /// <summary>Reason for the most recent update to this turn.</summary>
+    public TurnUpdateReason LastUpdateReason { get; private set; }
 
     /// <summary>When this turn was created.</summary>
     public DateTimeOffset CreatedAt { get; }
@@ -137,6 +151,44 @@ public sealed class ConversationTurn
     {
         Status = ConversationTurnStatus.Resolved;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>Transitions the turn to <see cref="ConversationTurnStatus.CollectingQuestion"/> and records the first fragment.</summary>
+    /// <param name="firstFragment">The first transcript fragment to collect.</param>
+    /// <returns>A <see cref="DomainResult"/> indicating success or failure.</returns>
+    public DomainResult StartCollecting(string firstFragment)
+    {
+        if (TerminalStatuses.Contains(Status))
+            return DomainResult.Fail("Cannot start collecting from a terminal state.");
+        Status = ConversationTurnStatus.CollectingQuestion;
+        _questionFragments.Add(firstFragment);
+        UpdatedAt = DateTimeOffset.UtcNow;
+        return DomainResult.Ok();
+    }
+
+    /// <summary>Appends a transcript fragment to the collection in progress.</summary>
+    /// <param name="fragment">The fragment to append.</param>
+    /// <returns>A <see cref="DomainResult"/> indicating success or failure.</returns>
+    public DomainResult AddFragment(string fragment)
+    {
+        if (Status != ConversationTurnStatus.CollectingQuestion)
+            return DomainResult.Fail("Turn is not in CollectingQuestion state.");
+        _questionFragments.Add(fragment);
+        UpdatedAt = DateTimeOffset.UtcNow;
+        return DomainResult.Ok();
+    }
+
+    /// <summary>Finalises the collected fragments into <see cref="InitialQuestionText"/> and marks the turn as <see cref="ConversationTurnStatus.Detected"/>.</summary>
+    /// <returns>A <see cref="DomainResult"/> indicating success or failure.</returns>
+    public DomainResult CompleteQuestion()
+    {
+        if (Status != ConversationTurnStatus.CollectingQuestion)
+            return DomainResult.Fail("Turn is not in CollectingQuestion state.");
+        InitialQuestionText = string.Join(" ", _questionFragments);
+        Status = ConversationTurnStatus.Detected;
+        LastUpdateReason = TurnUpdateReason.InitialQuestionComplete;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        return DomainResult.Ok();
     }
 
 #pragma warning disable CS8618

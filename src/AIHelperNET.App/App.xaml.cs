@@ -71,6 +71,8 @@ public partial class App : System.Windows.Application
         // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel
         var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
         turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
+        turnCreatedSink.SetStatusHandler((id, status) =>
+            turnVm.GetTurn(id)?.Status = status);
 
         try { await turnVm.LoadFontSizeAsync(); }
         catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
@@ -92,6 +94,7 @@ public partial class App : System.Windows.Application
         overlay.Show();
         WireHotkeys(overlay);
         PreWarmWhisperModel();
+        PreWarmSileroModel();
     }
 
     private void PreWarmWhisperModel()
@@ -128,6 +131,24 @@ public partial class App : System.Windows.Application
                     Log.Warning(ex, "Whisper: Medium model download failed");
                 }
             });
+        });
+    }
+
+    private void PreWarmSileroModel()
+    {
+        var provider = _host.Services.GetRequiredService<SileroModelProvider>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                Log.Information("Silero: pre-warming VAD model in background…");
+                await provider.GetSessionAsync(CancellationToken.None);
+                Log.Information("Silero: VAD model ready");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Silero: pre-warm failed");
+            }
         });
     }
 

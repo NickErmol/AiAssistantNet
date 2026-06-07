@@ -42,6 +42,35 @@ public sealed class GenerateAnswerHandler(
         var question = session.Questions.FirstOrDefault(q => q.Id == turn.InitialQuestionId);
         if (question is null) return Result.Fail("Question not found.");
 
+        // For multi-fragment collected questions, InitialQuestionText contains the fully
+        // assembled text (all fragments joined). Fall back to question.Text only when the
+        // assembled text is absent (single-fragment / legacy turns).
+        var questionText = string.IsNullOrWhiteSpace(turn.InitialQuestionText)
+            ? question.Text
+            : turn.InitialQuestionText;
+
+        // Collect last 5 transcript items up to (and including) when this turn was created.
+        var recentTranscript = session.Transcript
+            .Where(t => t.Timestamp <= turn.CreatedAt)
+            .TakeLast(5)
+            .ToList();
+
+        // Collect last 2 completed turns (excluding the current one) with at least one answer version.
+        var recentQA = session.ConversationTurns
+            .Where(t => t.Id != cmd.TurnId
+                     && t.AnswerVersions.Count > 0
+                     && (t.Status == ConversationTurnStatus.PreliminaryReady
+                         || t.Status == ConversationTurnStatus.RefinedReady
+                         || t.Status == ConversationTurnStatus.Resolved))
+            .TakeLast(2)
+            .Select(t =>
+            {
+                var ans = t.AnswerVersions[^1].Text;
+                return (Question: t.InitialQuestionText ?? "(unknown question)",
+                        Answer: ans);
+            })
+            .ToList();
+
         var genStatus = cmd.VersionType == AnswerVersionType.Preliminary
             ? ConversationTurnStatus.GeneratingPreliminary
             : ConversationTurnStatus.GeneratingRefined;
@@ -52,7 +81,10 @@ public sealed class GenerateAnswerHandler(
         var answer = start.Value;
 
         var prompt = PromptBuilderService.Build(
-            session.CodeProfile, session.AnswerSettings, question, cmd.ScreenContext);
+            session.CodeProfile, session.AnswerSettings, questionText,
+            cmd.ScreenContext,
+            recentTranscript,
+            recentQA);
 
         var chunks = new System.Text.StringBuilder();
         try
