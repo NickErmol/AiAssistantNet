@@ -118,19 +118,33 @@ public sealed partial class TranscriptPipelineService(
             {
                 if (logger is not null)
                     Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
-                // When AI fails, re-classify without active-turn bias for any non-collecting turn.
-                // The pipeline's turn status is stale (answer handler updates a separate Session
-                // instance), so drop the context and let Rule 9/10 fire for genuine new questions.
-                if (result.Classification == BoundaryLabel.ClarificationOfCurrentQuestion
-                    && activeTurnStatus is not null
-                    && activeTurnStatus != ConversationTurnStatus.CollectingQuestion)
+            }
+
+            // Safety net: Rule 4 forces every Speaker.Me utterance that lands during an active turn
+            // through the AI at low confidence, and the pipeline's turn status is stale (the answer
+            // handler runs in a separate DI scope). When neither the heuristic nor the AI produced a
+            // confident, actionable result — the AI threw, or returned NoQuestion/Ambiguous, or a
+            // low-confidence clarification — a clearly-formed question would be silently dropped or
+            // mis-folded. Re-check with the bias-free heuristic (no active-turn context) and, if it
+            // recognises a complete question or task, open a new turn instead of losing it.
+            if (result.Confidence < 0.7
+                && activeTurnStatus != ConversationTurnStatus.CollectingQuestion)
+            {
+                var neutral = _boundaryDetector.Evaluate(item.Text, item.Speaker, null, recentTexts);
+                if (neutral.Classification is BoundaryLabel.QuestionComplete
+                                           or BoundaryLabel.TaskComplete
+                                           or BoundaryLabel.NewQuestion)
                 {
-                    result = _boundaryDetector.Evaluate(item.Text, item.Speaker, null, recentTexts);
+                    result = neutral;
                 }
             }
         }
 
         item.SetBoundaryRole(LabelToRole(result.Classification));
+
+        if (logger is not null)
+            Log.BoundaryRouted(logger, item.Speaker, activeTurnStatus, result.Classification,
+                result.Confidence, item.Text[..Math.Min(60, item.Text.Length)]);
 
         return RouteLabel(session, item, result, activeTurn);
     }
@@ -376,5 +390,11 @@ public sealed partial class TranscriptPipelineService(
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "BoundaryClassifier: call failed, using heuristic result for: {Text}")]
         internal static partial void BoundaryClassifierFailed(ILogger logger, Exception ex, string text);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "BoundaryRoute: speaker={Speaker} staleStatus={Status} -> {Label} ({Confidence:F2}) text='{Text}'")]
+        internal static partial void BoundaryRouted(
+            ILogger logger, Speaker speaker, ConversationTurnStatus? status, BoundaryLabel label,
+            double confidence, string text);
     }
 }

@@ -536,6 +536,77 @@ public class TranscriptPipelineServiceTests
         await mediator.Received(1).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
 
+    // ── Regression: AI classifier returns NoQuestion/Ambiguous for a clear Me-question ──
+    // Live repro: every Speaker.Me utterance during an active turn is forced through the AI at
+    // low confidence (Rule 4). When the AI returns NoQuestion (genuinely or via the Ambiguous
+    // fallback on a parse/HTTP failure), a clearly-formed question was silently dropped — only
+    // the first card ever appeared. A bias-free heuristic safety net must rescue it.
+
+    [Fact]
+    public async Task BoundaryPath_MeSpeaker_AIReturnsNoQuestion_ClearQuestion_CreatesNewTurn()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Prior completed turn so an active turn exists (Detected = the stuck in-memory status).
+        var q = DetectedQuestion.Create("What is dependency injection in .NET?", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
+
+        // AI classifier returns NoQuestion (Ambiguous fallback) for a clear question.
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        classifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("What are EF Core proxies?")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var item = MakeItem(Speaker.Me, "What are EF Core proxies?", T0.AddSeconds(60));
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(2,
+            "a clearly-formed question must not be dropped when the AI classifier returns NoQuestion");
+        await Task.Delay(150);
+        await mediator.Received(1).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_MeSpeaker_AIReturnsNoQuestion_NonQuestionNoise_DoesNotCreateTurn()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("What is dependency injection in .NET?", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        classifier
+            .ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(),
+                Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(),
+                Arg.Any<Speaker>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("yeah I think so as well")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        // Ambiguous chatter that the bias-free heuristic also does NOT see as a question.
+        var item = MakeItem(Speaker.Me, "yeah I think so as well", T0.AddSeconds(60));
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(1,
+            "non-question chatter must still be dropped — the safety net only rescues clear questions");
+        await Task.Delay(150);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task BoundaryPath_MultipleMe_Questions_EachCreatesOwnTurn_WhenAIClassifierAvailable()
     {
