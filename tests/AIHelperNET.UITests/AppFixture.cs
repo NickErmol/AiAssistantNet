@@ -11,7 +11,7 @@ public sealed class AppFixture : IAsyncLifetime
 {
     private static readonly string ExePath = Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory,
-            @"..\..\..\..\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\AIHelperNET.App.exe"));
+            @"..\..\..\..\..\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\AIHelperNET.App.exe"));
 
     private Application? _app;
 

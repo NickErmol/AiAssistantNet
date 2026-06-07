@@ -59,5 +59,7 @@ public sealed class MainWindow(Window window)
         HeaderStatusText.Properties.Name.ValueOrDefault ?? string.Empty;
 
     private AutomationElement Find(string id) =>
-        window.FindFirstDescendant(cf => cf.ByAutomationId(id));
+        window.FindFirstDescendant(cf => cf.ByAutomationId(id))
+        ?? throw new InvalidOperationException(
+               $"UI element '{id}' not found — check it is visible and has AutomationProperties.AutomationId set.");
 }
