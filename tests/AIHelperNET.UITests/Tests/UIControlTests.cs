@@ -123,20 +123,22 @@ public sealed class UIControlTests(AppFixture fixture)
     [Fact]
     public void Sidebar_HidesAndRestores()
     {
-        var sidebarBefore = fixture.Main.Sidebar.BoundingRectangle.Width;
-        sidebarBefore.Should().BeGreaterThan(0, "sidebar should be visible by default");
+        // BtnHideSidebar is inside the sidebar — its BoundingRectangle.Width is a reliable
+        // proxy for sidebar width since WPF clips children when the parent width is 0.
+        fixture.Main.BtnHideSidebar.BoundingRectangle.Width
+            .Should().BeGreaterThan(0, "sidebar should be visible by default");
 
         fixture.Main.BtnHideSidebar.Click();
         Thread.Sleep(400);
 
-        fixture.Main.Sidebar.BoundingRectangle.Width.Should().Be(0,
+        fixture.Main.BtnHideSidebar.BoundingRectangle.Width.Should().Be(0,
             "sidebar width should be 0 when hidden");
 
         // ▶ restore button appears when sidebar is hidden
         fixture.Main.BtnToggleSidebar.Click();
         Thread.Sleep(400);
 
-        fixture.Main.Sidebar.BoundingRectangle.Width.Should().BeGreaterThan(0,
+        fixture.Main.BtnHideSidebar.BoundingRectangle.Width.Should().BeGreaterThan(0,
             "sidebar should be restored");
     }
 }

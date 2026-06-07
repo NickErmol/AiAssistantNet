@@ -52,7 +52,13 @@ public sealed class SessionLifecycleTests(AppFixture fixture) : IDisposable
         fixture.Main.RadioAudioBoth.Click();
 
         fixture.Main.BtnToggleSession.Click();
-        Thread.Sleep(600);
+
+        // Both audio captures initialize concurrently — system audio can lag behind mic.
+        // Poll up to 5 s for each dot rather than using a fixed sleep.
+        FlaUI.Core.Tools.Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotMic),
+            TimeSpan.FromSeconds(5));
+        FlaUI.Core.Tools.Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotSystem),
+            TimeSpan.FromSeconds(5));
 
         fixture.Main.IsDotActive(fixture.Main.DotMic).Should().BeTrue("Mic dot should be green in Both mode");
         fixture.Main.IsDotActive(fixture.Main.DotSystem).Should().BeTrue("System dot should be green in Both mode");

@@ -31,7 +31,23 @@ public sealed class AppFixture : IAsyncLifetime
         await Task.Delay(800);
 
         _app = Application.Launch(ExePath);
-        Window = _app.GetMainWindow(Automation, TimeSpan.FromSeconds(15));
+
+        // GetMainWindow relies on Process.MainWindowHandle which is never set for
+        // ShowInTaskbar=False overlay windows. Poll GetAllTopLevelWindows instead.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        Window? found = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            found = _app.GetAllTopLevelWindows(Automation)
+                .FirstOrDefault(w =>
+                    (w.Properties.Name.ValueOrDefault ?? string.Empty)
+                    .Contains("AIHelper", StringComparison.OrdinalIgnoreCase));
+            if (found != null) break;
+            await Task.Delay(200);
+        }
+
+        Window = found ?? throw new InvalidOperationException(
+            $"AIHelper window not found within 15 s. Exe: {ExePath}");
 
         // Allow app to finish initializing (VAD + Whisper warm-up)
         await Task.Delay(3000);
