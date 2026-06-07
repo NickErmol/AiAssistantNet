@@ -152,53 +152,61 @@
                 <TextBlock Style="{StaticResource SectionLabel}" Text="STATUS"
                            Margin="0,10,0,4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <Ellipse Style="{StaticResource StatusDot}"
-                             AutomationProperties.AutomationId="StatusDot_Mic"
-                             AutomationProperties.HelpText="{Binding SessionControl.IsMicActive,
-                                 Converter={StaticResource BoolToStringConverter},
-                                 ConverterParameter='active|inactive'}"
-                             Fill="{Binding SessionControl.IsMicActive,
-                                 Converter={StaticResource BoolToColorConverter},
-                                 ConverterParameter='#44FF88|#444444'}"/>
+                    <ContentControl AutomationProperties.AutomationId="StatusDot_Mic"
+                                    AutomationProperties.HelpText="{Binding SessionControl.IsMicActive,
+                                        Converter={StaticResource BoolToStringConverter},
+                                        ConverterParameter='active|inactive'}"
+                                    Focusable="False" IsTabStop="False">
+                        <Ellipse Style="{StaticResource StatusDot}"
+                                 Fill="{Binding SessionControl.IsMicActive,
+                                     Converter={StaticResource BoolToColorConverter},
+                                     ConverterParameter='#44FF88|#444444'}"/>
+                    </ContentControl>
                     <TextBlock Text="Mic"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <Ellipse Style="{StaticResource StatusDot}"
-                             AutomationProperties.AutomationId="StatusDot_System"
-                             AutomationProperties.HelpText="{Binding SessionControl.IsSystemAudioActive,
-                                 Converter={StaticResource BoolToStringConverter},
-                                 ConverterParameter='active|inactive'}"
-                             Fill="{Binding SessionControl.IsSystemAudioActive,
-                                 Converter={StaticResource BoolToColorConverter},
-                                 ConverterParameter='#44FF88|#444444'}"/>
+                    <ContentControl AutomationProperties.AutomationId="StatusDot_System"
+                                    AutomationProperties.HelpText="{Binding SessionControl.IsSystemAudioActive,
+                                        Converter={StaticResource BoolToStringConverter},
+                                        ConverterParameter='active|inactive'}"
+                                    Focusable="False" IsTabStop="False">
+                        <Ellipse Style="{StaticResource StatusDot}"
+                                 Fill="{Binding SessionControl.IsSystemAudioActive,
+                                     Converter={StaticResource BoolToColorConverter},
+                                     ConverterParameter='#44FF88|#444444'}"/>
+                    </ContentControl>
                     <TextBlock Text="System"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <Ellipse Style="{StaticResource StatusDot}"
-                             AutomationProperties.AutomationId="StatusDot_OCR"
-                             AutomationProperties.HelpText="{Binding SessionControl.IsOcrReady,
-                                 Converter={StaticResource BoolToStringConverter},
-                                 ConverterParameter='active|inactive'}"
-                             Fill="{Binding SessionControl.IsOcrReady,
-                                 Converter={StaticResource BoolToColorConverter},
-                                 ConverterParameter='#44FF88|#444444'}"/>
+                    <ContentControl AutomationProperties.AutomationId="StatusDot_OCR"
+                                    AutomationProperties.HelpText="{Binding SessionControl.IsOcrReady,
+                                        Converter={StaticResource BoolToStringConverter},
+                                        ConverterParameter='active|inactive'}"
+                                    Focusable="False" IsTabStop="False">
+                        <Ellipse Style="{StaticResource StatusDot}"
+                                 Fill="{Binding SessionControl.IsOcrReady,
+                                     Converter={StaticResource BoolToColorConverter},
+                                     ConverterParameter='#44FF88|#444444'}"/>
+                    </ContentControl>
                     <TextBlock Text="OCR"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.XS}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <Ellipse Style="{StaticResource StatusDot}"
-                             AutomationProperties.AutomationId="StatusDot_AI"
-                             AutomationProperties.HelpText="{Binding SessionControl.IsAiConnected,
-                                 Converter={StaticResource BoolToStringConverter},
-                                 ConverterParameter='active|inactive'}"
-                             Fill="{Binding SessionControl.IsAiConnected,
-                                 Converter={StaticResource BoolToColorConverter},
-                                 ConverterParameter='#44FF88|#444444'}"/>
+                    <ContentControl AutomationProperties.AutomationId="StatusDot_AI"
+                                    AutomationProperties.HelpText="{Binding SessionControl.IsAiConnected,
+                                        Converter={StaticResource BoolToStringConverter},
+                                        ConverterParameter='active|inactive'}"
+                                    Focusable="False" IsTabStop="False">
+                        <Ellipse Style="{StaticResource StatusDot}"
+                                 Fill="{Binding SessionControl.IsAiConnected,
+                                     Converter={StaticResource BoolToColorConverter},
+                                     ConverterParameter='#44FF88|#444444'}"/>
+                    </ContentControl>
                     <TextBlock Text="AI"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.XS}"/>
