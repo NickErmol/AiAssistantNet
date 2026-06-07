@@ -20,5 +20,11 @@ public enum ConversationTurnStatus
     /// <summary>Turn dismissed by the user.</summary>
     Dismissed,
     /// <summary>Turn resolved — answer was used.</summary>
-    Resolved
+    Resolved,
+
+    /// <summary>Accumulating multi-fragment question, no answer yet.</summary>
+    CollectingQuestion = 9,
+
+    /// <summary>Got continuation/requirement after answer, ready to refine.</summary>
+    UpdatedContextReceived = 10
 }

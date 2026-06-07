@@ -42,6 +42,13 @@ public sealed class GenerateAnswerHandler(
         var question = session.Questions.FirstOrDefault(q => q.Id == turn.InitialQuestionId);
         if (question is null) return Result.Fail("Question not found.");
 
+        // For multi-fragment collected questions, InitialQuestionText contains the fully
+        // assembled text (all fragments joined). Fall back to question.Text only when the
+        // assembled text is absent (single-fragment / legacy turns).
+        var questionText = string.IsNullOrWhiteSpace(turn.InitialQuestionText)
+            ? question.Text
+            : turn.InitialQuestionText;
+
         var genStatus = cmd.VersionType == AnswerVersionType.Preliminary
             ? ConversationTurnStatus.GeneratingPreliminary
             : ConversationTurnStatus.GeneratingRefined;
@@ -52,7 +59,7 @@ public sealed class GenerateAnswerHandler(
         var answer = start.Value;
 
         var prompt = PromptBuilderService.Build(
-            session.CodeProfile, session.AnswerSettings, question, cmd.ScreenContext);
+            session.CodeProfile, session.AnswerSettings, questionText, cmd.ScreenContext);
 
         var chunks = new System.Text.StringBuilder();
         try

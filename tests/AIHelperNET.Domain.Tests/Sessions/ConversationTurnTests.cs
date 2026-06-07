@@ -98,4 +98,82 @@ public class ConversationTurnTests
         turn.AppendToQuestion("extra");
         turn.UpdatedAt.Should().BeAfter(before);
     }
+
+    // ── StartCollecting ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void StartCollecting_SetsCollectingQuestionStatus()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.Status.Should().Be(ConversationTurnStatus.CollectingQuestion);
+    }
+
+    [Fact]
+    public void StartCollecting_AddsFirstFragment()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.QuestionFragments.Should().HaveCount(1);
+        turn.QuestionFragments[0].Should().Be("Hello");
+    }
+
+    // ── AddFragment ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddFragment_AppendsToFragmentsList()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.AddFragment("World");
+        turn.QuestionFragments.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void AddFragment_WhenNotCollecting_ReturnsFail()
+    {
+        // Detected status (default) — not CollectingQuestion
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        var result = turn.AddFragment("extra");
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    // ── CompleteQuestion ────────────────────────────────────────────────────
+
+    [Fact]
+    public void CompleteQuestion_JoinsFragmentsIntoInitialQuestionText()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.AddFragment("World");
+        turn.CompleteQuestion();
+        turn.InitialQuestionText.Should().Be("Hello World");
+    }
+
+    [Fact]
+    public void CompleteQuestion_SetsStatusToDetected()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.CompleteQuestion();
+        turn.Status.Should().Be(ConversationTurnStatus.Detected);
+    }
+
+    [Fact]
+    public void CompleteQuestion_SetsLastUpdateReason()
+    {
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        turn.StartCollecting("Hello");
+        turn.CompleteQuestion();
+        turn.LastUpdateReason.Should().Be(TurnUpdateReason.InitialQuestionComplete);
+    }
+
+    [Fact]
+    public void CompleteQuestion_WhenNotCollecting_ReturnsFail()
+    {
+        // Detected status (default) — not CollectingQuestion
+        var turn = ConversationTurn.Create(SId, QId, "What is DI?", Now);
+        var result = turn.CompleteQuestion();
+        result.IsSuccess.Should().BeFalse();
+    }
 }

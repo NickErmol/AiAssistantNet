@@ -71,8 +71,22 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
         }
     }
 
-    /// <summary>Gets the human-readable status label.</summary>
-    public string StatusLabel                                 => Status.ToString();
+    /// <summary>Gets the human-readable status label for display.</summary>
+    public string StatusLabel => Status switch
+    {
+        ConversationTurnStatus.CollectingQuestion     => "Collecting question...",
+        ConversationTurnStatus.Detected               => "Detected",
+        ConversationTurnStatus.GeneratingPreliminary  => "Generating...",
+        ConversationTurnStatus.PreliminaryReady       => "Ready",
+        ConversationTurnStatus.UpdatedContextReceived => "Updating context...",
+        ConversationTurnStatus.AwaitingClarification  => "Awaiting clarification...",
+        ConversationTurnStatus.ClarificationReceived  => "Clarification received",
+        ConversationTurnStatus.GeneratingRefined      => "Refining...",
+        ConversationTurnStatus.RefinedReady           => "Refined",
+        ConversationTurnStatus.Dismissed              => "Dismissed",
+        ConversationTurnStatus.Resolved               => "Resolved",
+        _                                             => Status.ToString()
+    };
 
     /// <summary>Gets all answer versions for this turn.</summary>
     public ObservableCollection<AnswerVersionVm> AnswerVersions { get; } = [];

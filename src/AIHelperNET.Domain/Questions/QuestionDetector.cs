@@ -93,7 +93,7 @@ public sealed class QuestionDetector
         return union == 0 ? 0.0 : (double)intersection / union;
     }
 
-    private static HashSet<string> Tokenize(string text) =>
+    internal static HashSet<string> Tokenize(string text) =>
         text.ToLowerInvariant()
             .Split([' ', ',', '.', '?', '!', ';', ':', '\n', '\t'],
                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

@@ -20,6 +20,9 @@ public sealed class TranscriptItem
     /// <summary>Speech recognition confidence score (0.0–1.0).</summary>
     public float Confidence { get; }
 
+    /// <summary>The role this transcript item played in question boundary detection.</summary>
+    public BoundaryRole BoundaryRole { get; private set; }
+
     private TranscriptItem(TranscriptItemId id, Speaker speaker, string text,
         DateTimeOffset ts, float confidence)
         => (Id, Speaker, Text, Timestamp, Confidence) = (id, speaker, text, ts, confidence);
@@ -31,6 +34,10 @@ public sealed class TranscriptItem
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         return new TranscriptItem(TranscriptItemId.New(), speaker, text.Trim(), ts, confidence);
     }
+
+    /// <summary>Sets the boundary role for this transcript item.</summary>
+    /// <param name="role">The boundary role to assign.</param>
+    public void SetBoundaryRole(BoundaryRole role) => BoundaryRole = role;
 
 #pragma warning disable CS8618 // EF Core parameterless constructor — properties set by materialiser
     private TranscriptItem() { }

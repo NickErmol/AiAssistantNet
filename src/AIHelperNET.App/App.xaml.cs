@@ -71,6 +71,8 @@ public partial class App : System.Windows.Application
         // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel
         var turnCreatedSink = _host.Services.GetRequiredService<ConversationTurnSinkAdapter>();
         turnCreatedSink.SetHandler((id, question) => turnVm.AddTurn(id, question));
+        turnCreatedSink.SetStatusHandler((id, status) =>
+            turnVm.GetTurn(id)?.Status = status);
 
         try { await turnVm.LoadFontSizeAsync(); }
         catch (Exception ex) { Log.Warning(ex, "Failed to restore answer font size; using default"); }
