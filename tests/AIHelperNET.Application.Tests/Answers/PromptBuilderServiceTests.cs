@@ -144,6 +144,7 @@ public class PromptBuilderServiceTests
         prompt.User.Should().Contain("Conversation context");
         prompt.User.Should().Contain("[Q&A] Q: What is a design pattern?");
         prompt.User.Should().Contain("A design pattern is a reusable solution");
+        prompt.User.Should().Contain("[Q&A] Q: What is a design pattern?  A: A design pattern is a reusable solution");
     }
 
     [Fact]

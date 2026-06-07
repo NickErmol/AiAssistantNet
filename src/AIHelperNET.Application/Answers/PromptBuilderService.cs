@@ -10,12 +10,20 @@ public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
     /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?)"/> using <paramref name="question"/>.Text.</remarks>
+    /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
+    /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
+    /// <param name="question">The detected question whose <c>Text</c> is forwarded.</param>
+    /// <param name="screenContext">Optional OCR text captured from the screen.</param>
+    /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         DetectedQuestion question,
-        string? screenContext = null)
-        => Build(profile, settings, question.Text, screenContext);
+        string? screenContext = null,
+        IReadOnlyList<TranscriptItem>? recentTranscript = null,
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
+        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA);
 
     /// <summary>Constructs an <see cref="AnswerPrompt"/> using an explicit question text.</summary>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
