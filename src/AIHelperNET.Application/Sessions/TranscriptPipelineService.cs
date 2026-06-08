@@ -17,7 +17,8 @@ public sealed partial class TranscriptPipelineService(
     IConversationTurnSink turnSink,
     IQuestionClassifier classifier,
     ILogger<TranscriptPipelineService>? logger = null,
-    IQuestionBoundaryClassifier? boundaryClassifier = null) : IDisposable
+    IQuestionBoundaryClassifier? boundaryClassifier = null,
+    ITurnStatusFeedback? feedback = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
@@ -33,6 +34,7 @@ public sealed partial class TranscriptPipelineService(
     {
         session.AddTranscriptItem(item);
         transcriptSink.OnTranscriptItem(item);
+        DrainStatusFeedback(session);
 
         // Keep recent items for AI classifier context
         _recentItems.Add(item);
@@ -71,6 +73,32 @@ public sealed partial class TranscriptPipelineService(
 
         if (pendingCommand is not null)
             FireAndForget(pendingCommand, ct);
+    }
+
+    /// <summary>
+    /// Applies any pending turn-status transitions reported by the background answer worker to the
+    /// pipeline's authoritative in-memory <paramref name="session"/>. Events for unknown or
+    /// terminal turns are ignored. Disposes a turn's cancellation source once it reaches a
+    /// ready/terminal status (its generation has finished).
+    /// </summary>
+    private void DrainStatusFeedback(Session session)
+    {
+        if (feedback is null) return;
+        while (feedback.TryDrain(out var e))
+        {
+            var turn = session.ConversationTurns.FirstOrDefault(t => t.Id == e.TurnId);
+            if (turn is null) continue;
+            _ = turn.TransitionTo(e.Status); // no-op-safe: TransitionTo fails closed on terminal turns
+
+            if (e.Status is ConversationTurnStatus.PreliminaryReady
+                          or ConversationTurnStatus.RefinedReady
+                          or ConversationTurnStatus.Dismissed
+                          or ConversationTurnStatus.Resolved
+                && _turnCts.TryRemove(e.TurnId, out var cts))
+            {
+                cts.Dispose();
+            }
+        }
     }
 
     /// <summary>
