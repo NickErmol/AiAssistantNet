@@ -8,6 +8,11 @@ namespace AIHelperNET.Application.Sessions;
 /// A burst of fragments collapses into a single regeneration. Built on <see cref="TimeProvider"/>
 /// so it is deterministically testable with <c>FakeTimeProvider</c>.
 /// </summary>
+/// <remarks>
+/// Thread-safety: <see cref="Touch"/>/<see cref="Cancel"/> are expected to be called from a single
+/// consumer thread (the pipeline's transcript loop). The regeneration callback runs on a timer
+/// thread and must not call back into this type.
+/// </remarks>
 public sealed class RegenDebouncer(TimeProvider time) : IDisposable
 {
     private const int DebounceMs = 1000;

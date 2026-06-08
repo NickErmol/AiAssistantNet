@@ -287,9 +287,13 @@ public sealed partial class TranscriptPipelineService(
                 return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
             }
 
-            // Spec 2: an interviewer clarification on an already-answered (non-terminal) turn
-            // refines THAT turn (append + debounced regen) instead of splitting off a new card.
-            if (!IsTerminal(activeTurn.Status))
+            // Spec 2: an interviewer clarification on an already-answered (past-collecting,
+            // non-terminal) turn refines THAT turn (append + debounced regen) instead of splitting
+            // off a new card. A still-collecting turn, or a terminal one, is a new question.
+            // Regen uses Preliminary: this appended fragment refines the primary question/answer,
+            // not a structured Me/Other clarification pair (which uses RefinedAfterClarification above).
+            if (activeTurn.Status != ConversationTurnStatus.CollectingQuestion
+                && !IsTerminal(activeTurn.Status))
             {
                 activeTurn.AppendToQuestion(item.Text);
                 ScheduleRegen(session.Id, activeTurn.Id);
