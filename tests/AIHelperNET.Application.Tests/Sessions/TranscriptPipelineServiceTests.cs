@@ -679,4 +679,36 @@ public class TranscriptPipelineServiceTests
         await Task.Delay(150);
         await mediator.Received(3).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task BoundaryPath_TwoDistinctQuestions_DoNotCancelEachOther()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Capture the cancellation token each GenerateAnswerCommand was dispatched with.
+        // ConcurrentDictionary used as an ordered accumulator so token capture is thread-safe
+        // across the two fire-and-forget Task.Run callbacks.
+        var capturedTokens = new System.Collections.Concurrent.ConcurrentQueue<CancellationToken>();
+        var neverCalled = Substitute.For<IQuestionBoundaryClassifier>();
+        neverCalled.ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
+
+        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalled);
+        // Use When/Do to capture tokens as a side-effect; this runs regardless of Returns
+        // sequencing and does not interfere with the pre-configured Ok() return value.
+        mediator.When(m => m.Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>()))
+            .Do(ci => capturedTokens.Enqueue(ci.ArgAt<CancellationToken>(1)));
+
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is dependency injection?"), uow, CancellationToken.None);
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is the repository pattern?"), uow, CancellationToken.None);
+        await Task.Delay(200);
+
+        var tokens = capturedTokens.ToArray();
+        session.ConversationTurns.Should().HaveCount(2);
+        tokens.Should().HaveCount(2);
+        tokens[0].IsCancellationRequested.Should().BeFalse("a second distinct question must not cancel the first");
+    }
 }
