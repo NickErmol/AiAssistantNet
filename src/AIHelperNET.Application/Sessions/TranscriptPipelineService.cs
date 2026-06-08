@@ -19,13 +19,17 @@ public sealed partial class TranscriptPipelineService(
     ILogger<TranscriptPipelineService>? logger = null,
     IQuestionBoundaryClassifier? boundaryClassifier = null,
     ITurnStatusFeedback? feedback = null,
-    TimeProvider? timeProvider = null) : IDisposable
+    TimeProvider? timeProvider = null,
+    IBoundaryDecisionRecorder? recorder = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
     private readonly QuestionBoundaryDetector _boundaryDetector = new();
     private readonly ConcurrentDictionary<ConversationTurnId, CancellationTokenSource> _turnCts = new();
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly RegenDebouncer _regenDebouncer = new(timeProvider ?? TimeProvider.System);
+    private readonly BoundarySplitGuard _splitGuard = new();
+    private readonly ConcurrentDictionary<ConversationTurnId, DateTimeOffset> _lastActivityAt = new();
     private DateTimeOffset? _collectionStartedAt;
     private const int MaxCollectionSeconds = 8;
     private readonly List<TranscriptItem> _recentItems = [];
@@ -102,7 +106,10 @@ public sealed partial class TranscriptPipelineService(
             }
 
             if (e.Status is ConversationTurnStatus.Dismissed or ConversationTurnStatus.Resolved)
+            {
                 _regenDebouncer.Cancel(e.TurnId);
+                _lastActivityAt.TryRemove(e.TurnId, out _);
+            }
         }
     }
 
@@ -142,8 +149,23 @@ public sealed partial class TranscriptPipelineService(
         var recentTexts = session.Questions.Select(q => q.Text).ToList();
         var activeTurnStatus = activeTurn?.Status;
 
-        // Heuristic first
-        var result = _boundaryDetector.Evaluate(item.Text, item.Speaker, activeTurnStatus, recentTexts);
+        // Seed the recency stamp the first time we observe a live turn — ensures turns that were
+        // created before this pipeline instance started (e.g. pre-seeded in tests, or recovered from
+        // DB) are treated as "just active now" rather than ancient.
+        if (activeTurn is not null && !IsTerminal(activeTurn.Status))
+            _lastActivityAt.TryAdd(activeTurn.Id, _time.GetUtcNow());
+
+        // Heuristic first — kept as `heuristic` so its opinion survives any AI replacement.
+        var heuristic = _boundaryDetector.Evaluate(item.Text, item.Speaker, activeTurnStatus, recentTexts);
+        var result = heuristic;
+        BoundaryLabel? aiLabel = null;
+        double? aiConfidence = null;
+        // True only while `result` is the AI's verdict. The split guard engages for AI-sourced
+        // NewQuestion labels only: the heuristic's NewQuestion fires solely on explicit new-topic
+        // markers ("now", "next", "another question", …), so it is a reliable, deterministic split
+        // signal that must be trusted even within the recency window. The AI's NewQuestion is the
+        // probabilistic source that can mislabel a continuation, so that is what we guard.
+        var resultFromAi = false;
 
         // If ambiguous (confidence < 0.7), call AI classifier
         if (result.Confidence < 0.7)
@@ -152,6 +174,9 @@ public sealed partial class TranscriptPipelineService(
             {
                 result = await boundaryClassifier!.ClassifyAsync(
                     activeTurnStatus, _recentItems.AsReadOnly(), item, item.Speaker, ct);
+                aiLabel = result.Classification;
+                aiConfidence = result.Confidence;
+                resultFromAi = true;
             }
             catch (Exception ex)
             {
@@ -159,13 +184,7 @@ public sealed partial class TranscriptPipelineService(
                     Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
             }
 
-            // Safety net: Rule 4 forces every Speaker.Me utterance that lands during an active turn
-            // through the AI at low confidence, and the pipeline's turn status is stale (the answer
-            // handler runs in a separate DI scope). When neither the heuristic nor the AI produced a
-            // confident, actionable result — the AI threw, or returned NoQuestion/Ambiguous, or a
-            // low-confidence clarification — a clearly-formed question would be silently dropped or
-            // mis-folded. Re-check with the bias-free heuristic (no active-turn context) and, if it
-            // recognises a complete question or task, open a new turn instead of losing it.
+            // Safety net: bias-free heuristic re-check (no active-turn context). See Spec 1/2.
             if (result.Confidence < 0.7
                 && activeTurnStatus != ConversationTurnStatus.CollectingQuestion)
             {
@@ -175,21 +194,67 @@ public sealed partial class TranscriptPipelineService(
                                            or BoundaryLabel.NewQuestion)
                 {
                     result = neutral;
+                    resultFromAi = false; // a trusted heuristic verdict replaced the AI's
                 }
             }
         }
 
+        // The "other opinion" for agreement is the heuristic — only meaningful once the AI ran.
+        var otherOpinion = aiLabel is not null ? heuristic.Classification : (BoundaryLabel?)null;
+
         item.SetBoundaryRole(LabelToRole(result.Classification));
 
-        if (logger is not null)
-            Log.BoundaryRouted(logger, item.Speaker, activeTurnStatus, result.Classification,
-                result.Confidence, item.Text[..Math.Min(60, item.Text.Length)]);
+        // Guard only the destructive NewQuestion split; everything else routes unchanged.
+        var (effectiveConfidence, agreed) =
+            SplitConfidence.Resolve(result.Classification, result.Confidence, otherOpinion);
+        SplitDecision? guard = null;
+        if (result.Classification == BoundaryLabel.NewQuestion && resultFromAi)
+        {
+            var live = activeTurn is not null && !IsTerminal(activeTurn.Status);
+            var since = live ? _time.GetUtcNow() - LastActivity(activeTurn!.Id) : TimeSpan.MaxValue;
+            guard = _splitGuard.Evaluate(effectiveConfidence, live, since);
+        }
 
-        return RouteLabel(session, item, result, activeTurn);
+        var cmd = RouteLabel(session, item, result, activeTurn, guard);
+
+        // Stamp recency for whichever turn is now active (covers create/append/fragment cases).
+        if (session.ActiveTurn is { } nowActive)
+            StampActivity(nowActive.Id);
+
+        if (logger is not null)
+        {
+            var guardStr = guard.HasValue ? guard.Value.ToString() : "-";
+            Log.BoundaryRouted(logger, item.Speaker, activeTurnStatus,
+                heuristic.Classification, heuristic.Confidence, aiLabel, aiConfidence,
+                agreed, effectiveConfidence, guardStr,
+                result.Classification, result.Confidence,
+                item.Text[..Math.Min(60, item.Text.Length)]);
+        }
+
+        recorder?.Record(new BoundaryDecisionRecord(
+            Timestamp: _time.GetUtcNow(),
+            SessionId: session.Id.Value,
+            // Pre-routing turn so TurnId and StaleTurnStatus always describe the same turn (the
+            // decision's context), not a turn a split may have just created.
+            TurnId: activeTurn?.Id.Value,
+            Speaker: item.Speaker,
+            StaleTurnStatus: activeTurnStatus,
+            HeuristicLabel: heuristic.Classification,
+            HeuristicConfidence: heuristic.Confidence,
+            AiLabel: aiLabel,
+            AiConfidence: aiConfidence,
+            Agreed: agreed,
+            EffectiveConfidence: effectiveConfidence,
+            Route: guard?.ToString() ?? result.Classification.ToString(),
+            FinalLabel: result.Classification,
+            TextClip: item.Text[..Math.Min(120, item.Text.Length)]));
+
+        return cmd;
     }
 
     private GenerateAnswerCommand? RouteLabel(
-        Session session, TranscriptItem item, BoundaryClassificationResult result, ConversationTurn? activeTurn)
+        Session session, TranscriptItem item, BoundaryClassificationResult result,
+        ConversationTurn? activeTurn, SplitDecision? splitGuard)
     {
         switch (result.Classification)
         {
@@ -218,6 +283,8 @@ public sealed partial class TranscriptPipelineService(
                 return HandleClarification(session, item, activeTurn);
 
             case BoundaryLabel.NewQuestion:
+                if (splitGuard == SplitDecision.AppendToActiveTurn)
+                    return AppendGuardedSplit(session, item, activeTurn);
                 if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
                     activeTurn.Dismiss();
                 return HandleNewQuestion(session, item.Text, item.Timestamp);
@@ -338,6 +405,12 @@ public sealed partial class TranscriptPipelineService(
     private static bool IsTerminal(ConversationTurnStatus status)
         => status is ConversationTurnStatus.Dismissed or ConversationTurnStatus.Resolved;
 
+    /// <summary>Returns the last-stamped activity time for a turn, or <see cref="DateTimeOffset.MinValue"/> if unseen.</summary>
+    private DateTimeOffset LastActivity(ConversationTurnId id) =>
+        _lastActivityAt.TryGetValue(id, out var t) ? t : DateTimeOffset.MinValue;
+
+    private void StampActivity(ConversationTurnId id) => _lastActivityAt[id] = _time.GetUtcNow();
+
     /// <summary>
     /// A continuation/clarification fragment for an existing, non-terminal turn: append it to the
     /// turn's question and schedule a coalesced regeneration. With no live turn (or a terminal one)
@@ -347,6 +420,27 @@ public sealed partial class TranscriptPipelineService(
     {
         if (activeTurn is null || IsTerminal(activeTurn.Status))
             return HandleNewQuestion(session, item.Text, item.Timestamp);
+
+        activeTurn.AppendToQuestion(item.Text);
+        ScheduleRegen(session.Id, activeTurn.Id);
+        return null;
+    }
+
+    /// <summary>
+    /// A <c>NewQuestion</c> the guard demoted to a continuation of the live turn. Mirrors
+    /// <see cref="BoundaryLabel.QuestionContinued"/> handling: add a fragment while still collecting,
+    /// otherwise append to the question and schedule a coalesced regeneration.
+    /// </summary>
+    private GenerateAnswerCommand? AppendGuardedSplit(Session session, TranscriptItem item, ConversationTurn? activeTurn)
+    {
+        if (activeTurn is null || IsTerminal(activeTurn.Status))
+            return HandleNewQuestion(session, item.Text, item.Timestamp);
+
+        if (activeTurn.Status == ConversationTurnStatus.CollectingQuestion)
+        {
+            activeTurn.AddFragment(item.Text);
+            return null;
+        }
 
         activeTurn.AppendToQuestion(item.Text);
         ScheduleRegen(session.Id, activeTurn.Id);
@@ -493,9 +587,13 @@ public sealed partial class TranscriptPipelineService(
         internal static partial void BoundaryClassifierFailed(ILogger logger, Exception ex, string text);
 
         [LoggerMessage(Level = LogLevel.Information,
-            Message = "BoundaryRoute: speaker={Speaker} staleStatus={Status} -> {Label} ({Confidence:F2}) text='{Text}'")]
+            Message = "BoundaryRoute: speaker={Speaker} staleStatus={Status} " +
+                      "heuristic={Heuristic}({HeuristicConf:F2}) ai={AiLabel}({AiConf}) " +
+                      "agreed={Agreed} eff={Effective:F2} guard={Guard} -> {Label} ({Confidence:F2}) text='{Text}'")]
         internal static partial void BoundaryRouted(
-            ILogger logger, Speaker speaker, ConversationTurnStatus? status, BoundaryLabel label,
-            double confidence, string text);
+            ILogger logger, Speaker speaker, ConversationTurnStatus? status,
+            BoundaryLabel heuristic, double heuristicConf, BoundaryLabel? aiLabel, double? aiConf,
+            bool agreed, double effective, string guard,
+            BoundaryLabel label, double confidence, string text);
     }
 }

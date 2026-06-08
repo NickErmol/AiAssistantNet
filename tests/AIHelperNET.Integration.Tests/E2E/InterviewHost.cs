@@ -68,6 +68,8 @@ public sealed class InterviewHost : IAsyncDisposable
         services.AddSingleton<IAnswerStreamSink>(sink);
         services.AddSingleton<ITranscriptSink>(Substitute.For<ITranscriptSink>());
         services.AddSingleton<IConversationTurnSink>(Substitute.For<IConversationTurnSink>());
+        // Override the file-writing recorder so the E2E never touches the real data root.
+        services.AddSingleton<IBoundaryDecisionRecorder>(Substitute.For<IBoundaryDecisionRecorder>());
 
         var provider = services.BuildServiceProvider();
 
