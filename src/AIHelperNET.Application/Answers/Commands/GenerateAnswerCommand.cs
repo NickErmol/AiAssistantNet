@@ -24,7 +24,8 @@ public sealed class GenerateAnswerHandler(
     ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : IRequestHandler<GenerateAnswerCommand, Result>
+    TimeProvider clock,
+    ITurnStatusFeedback feedback) : IRequestHandler<GenerateAnswerCommand, Result>
 {
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(GenerateAnswerCommand cmd, CancellationToken cancellationToken)
@@ -75,6 +76,7 @@ public sealed class GenerateAnswerHandler(
             ? ConversationTurnStatus.GeneratingPreliminary
             : ConversationTurnStatus.GeneratingRefined;
         turn.TransitionTo(genStatus);
+        feedback.Publish(new TurnStatusEvent(cmd.TurnId, genStatus));
 
         var start = session.StartAnswer(turn.InitialQuestionId, clock.GetUtcNow());
         if (start.IsFailed) return Result.Fail(start.Error);
@@ -104,22 +106,28 @@ public sealed class GenerateAnswerHandler(
                 ? ConversationTurnStatus.PreliminaryReady
                 : ConversationTurnStatus.RefinedReady;
             turn.TransitionTo(readyStatus);
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, readyStatus));
 
             await streamSink.OnCompleteAsync(cmd.TurnId, cmd.VersionType, cancellationToken);
         }
         catch (OperationCanceledException)
         {
             answer.Cancel(clock.GetUtcNow());
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
         }
 #pragma warning disable CA1031
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
             await streamSink.OnErrorAsync(cmd.TurnId, ex.Message, cancellationToken);
         }
 #pragma warning restore CA1031
 
-        repository.Update(session);
+        // No repository.Update(session): rely on EF change-tracking so only the entities this
+        // handler actually modified (turn Status, the new AnswerVersion, the GeneratedAnswer) are
+        // written. A full-graph Update would mark pipeline-owned columns (clarification IDs,
+        // pre-answer status) Modified and clobber them. See Spec 1 §5.5.
         return await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }
