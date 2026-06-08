@@ -35,6 +35,8 @@ App           — WPF, ViewModels, sink wiring, MS Generic Host
 
 **Data root**: `D:\AIHelperNET\` when D: is ready, else `%LocalAppData%\AIHelperNET\`. Models, SQLite DB, settings JSON, and logs all live there.
 
+**Database migrations**: schema is managed by EF Core migrations in `src/AIHelperNET.Infrastructure/Persistence/Migrations/`, applied at startup via `MigrateAsync()` (`App.xaml.cs`) — NOT `EnsureCreated`. Any EF entity change must ship a migration (`dotnet ef migrations add <Name> --project src/AIHelperNET.Infrastructure --startup-project src/AIHelperNET.App --output-dir Persistence/Migrations`) committed alongside the change; the `MigrationTests` parity guard fails the build otherwise. A design-time factory (`AppDbContextFactory`) lets the tooling run against the WPF startup project (which also needs its own `Microsoft.EntityFrameworkCore.Design` reference — `PrivateAssets=all` blocks the transitive one). Adopting migrations required a one-time delete of pre-existing `sessions.db` files (created before `__EFMigrationsHistory` existed). Workflow lives in the `add-ef-migration` skill.
+
 **Sink wiring**: `TranscriptSink` and `AnswerStreamSink` are registered as singletons. Their handlers are set in `App.OnStartup` via `sink.SetHandler(...)` *after* the DI host starts but *before* `overlay.Show()`. The handler uses `Dispatcher.BeginInvoke` to marshal to the UI thread.
 
 **WPF binding**: never bind `ItemsSource` through a non-`INotifyPropertyChanged` intermediate. Use `DataContext="{Binding Transcript}"` on the sub-element so the ItemsControl can bind `{Binding Items}` as a single hop on a proper `ObservableObject`. A two-hop path through a plain class silently drops `CollectionChanged` subscriptions.
