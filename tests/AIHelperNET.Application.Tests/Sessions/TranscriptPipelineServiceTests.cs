@@ -747,6 +747,33 @@ public class TranscriptPipelineServiceTests
     }
 
     [Fact]
+    public async Task BoundaryPath_Me_AllTurnsTerminal_Holds_NoAttach_NoGenerate()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        turn.Resolve(); // terminal — ActiveTurn is now null, only LastTurn remains (terminal)
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var me = MakeItem(Speaker.Me, "Wait, what did they mean?");
+        await svc.ProcessAsync(session, me, uow, CancellationToken.None);
+
+        // A Me utterance must NOT resurrect a dismissed/resolved turn: no attach, no status change.
+        turn.ClarificationQuestionIds.Should().BeEmpty("a Me utterance must not attach to a terminal turn");
+        turn.Status.Should().Be(ConversationTurnStatus.Resolved);
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BoundaryPath_FeedbackPreliminaryReady_UnlocksAdditionalRequirementRefine()
     {
         var session = MakeSession();

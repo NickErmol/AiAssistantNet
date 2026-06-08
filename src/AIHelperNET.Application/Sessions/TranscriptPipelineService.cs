@@ -292,16 +292,18 @@ public sealed partial class TranscriptPipelineService(
     /// <summary>
     /// Deterministically routes a candidate (<see cref="Speaker.Me"/>) utterance. Per the
     /// conversation model, <see cref="Speaker.Me"/> never opens a turn and never triggers generation;
-    /// it only attaches context to the current turn. Target = the most recent non-terminal turn if
-    /// one exists, else the most recent turn overall. With no turns, it holds.
+    /// it only attaches context to the current turn. Target = the most recent non-terminal turn
+    /// (<see cref="Session.ActiveTurn"/>). With no live turn — none yet, or every turn already
+    /// dismissed/resolved — it holds: a <see cref="Speaker.Me"/> utterance never resurrects a
+    /// terminal turn (whose clarification could never be consumed).
     /// </summary>
     private static GenerateAnswerCommand? HandleMeUtterance(Session session, TranscriptItem item)
     {
         item.SetBoundaryRole(BoundaryRole.Clarification);
 
-        var target = session.ActiveTurn ?? session.LastTurn;
+        var target = session.ActiveTurn;
         if (target is null)
-            return null; // no turns yet — hold
+            return null; // no live (non-terminal) turn — hold
 
         // Record the candidate's utterance as clarification/context on the target turn.
         target.AttachClarificationQuestion(item.Id);
