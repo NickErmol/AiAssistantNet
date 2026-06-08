@@ -29,8 +29,9 @@ public sealed class BoundarySplitGuard
     /// <param name="effectiveConfidence">Confidence after any agreement demotion (see SplitConfidence, added in Task 2).</param>
     /// <param name="hasLiveTurn">Whether a non-terminal active turn exists to protect.</param>
     /// <param name="sinceLastActivity">Elapsed time since that turn was last active.</param>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Instance semantics preserved for future state in subsequent tasks.")]
+#pragma warning disable CA1822 // instance method intentional — callers hold a BoundarySplitGuard reference
     public SplitDecision Evaluate(double effectiveConfidence, bool hasLiveTurn, TimeSpan sinceLastActivity)
+#pragma warning restore CA1822
     {
         if (!hasLiveTurn)
             return SplitDecision.Split;
