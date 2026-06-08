@@ -121,6 +121,10 @@ public sealed partial class TranscriptPipelineService(
     private async Task<GenerateAnswerCommand?> BuildCommandWithBoundaryAsync(
         Session session, TranscriptItem item, CancellationToken ct)
     {
+        // Me utterances are routed deterministically: no AI, never open a turn, never generate.
+        if (item.Speaker == Speaker.Me)
+            return HandleMeUtterance(session, item);
+
         // Force-complete if collecting for too long
         var activeTurn = session.ActiveTurn;
         if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion &&
@@ -283,6 +287,35 @@ public sealed partial class TranscriptPipelineService(
                 activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
             return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
         }
+    }
+
+    /// <summary>
+    /// Deterministically routes a candidate (<see cref="Speaker.Me"/>) utterance. Per the
+    /// conversation model, <see cref="Speaker.Me"/> never opens a turn and never triggers generation;
+    /// it only attaches context to the current turn. Target = the most recent non-terminal turn if
+    /// one exists, else the most recent turn overall. With no turns, it holds.
+    /// </summary>
+    private static GenerateAnswerCommand? HandleMeUtterance(Session session, TranscriptItem item)
+    {
+        item.SetBoundaryRole(BoundaryRole.Clarification);
+
+        var target = session.ActiveTurn ?? session.LastTurn;
+        if (target is null)
+            return null; // no turns yet — hold
+
+        // Record the candidate's utterance as clarification/context on the target turn.
+        target.AttachClarificationQuestion(item.Id);
+
+        // Only an unanswered, not-generating turn flips to AwaitingClarification (the next Other
+        // response will regenerate incorporating this). An answered or in-flight turn records the
+        // context only — no status change, no auto-regenerate (avoids racing the live answer).
+        if (target.Status is ConversationTurnStatus.Detected
+                          or ConversationTurnStatus.CollectingQuestion)
+        {
+            _ = target.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+        }
+
+        return null; // Me never generates
     }
 
     private GenerateAnswerCommand? ForceCompleteCollection(Session session, ConversationTurn activeTurn)
