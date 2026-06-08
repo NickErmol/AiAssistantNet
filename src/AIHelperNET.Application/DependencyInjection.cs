@@ -1,3 +1,4 @@
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
 using AIHelperNET.Application.Common.Behaviors;
 using AIHelperNET.Application.Sessions;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddSingleton<SessionMapper>();
         services.AddSingleton<PromptBuilderService>();
         services.AddSingleton<TranscriptPipelineService>();
+        services.AddSingleton<ITurnStatusFeedback, TurnStatusFeedback>();
 
         return services;
     }
