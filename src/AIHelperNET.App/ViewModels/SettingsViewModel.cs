@@ -11,9 +11,15 @@ using Mediator;
 
 namespace AIHelperNET.App.ViewModels;
 
-/// <summary>Backing ViewModel for all four tabs of SettingsWindow.</summary>
+/// <summary>Backing ViewModel for the tabs of SettingsWindow.</summary>
 public sealed partial class SettingsViewModel(IMediator mediator) : ObservableObject
 {
+    // ── Shortcuts tab ─────────────────────────────────────────────
+    /// <summary>The read-only list of global keyboard shortcuts shown in the Shortcuts tab.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
+        Justification = "Bound via WPF {Binding}; must be an instance member of the DataContext.")]
+    public IReadOnlyList<HotkeyBinding> Hotkeys => HotkeyDefaults.All;
+
     // ── API Key tab ───────────────────────────────────────────────
     [ObservableProperty] private string _apiKeyInput = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;

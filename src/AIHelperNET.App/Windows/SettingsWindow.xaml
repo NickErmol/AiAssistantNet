@@ -177,6 +177,42 @@
                                FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>
                 </StackPanel>
             </TabItem>
+
+            <!-- ═══ Shortcuts ═══ -->
+            <TabItem Header="Shortcuts">
+                <StackPanel Margin="8">
+                    <TextBlock Text="KEYBOARD SHORTCUTS" Style="{StaticResource SectionLabel}" Margin="0,0,0,4"/>
+                    <TextBlock Text="Global shortcuts work even when the overlay isn't focused."
+                               Foreground="{DynamicResource Brush.Foreground.Muted}"
+                               FontSize="{DynamicResource Font.XS}" Margin="0,0,0,10"
+                               TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding Hotkeys}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Description}"
+                                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                               FontSize="{DynamicResource Font.SM}"
+                                               VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1"
+                                            Background="{DynamicResource Brush.Background.Panel}"
+                                            BorderBrush="{DynamicResource Brush.Border}"
+                                            BorderThickness="1" CornerRadius="3" Padding="6,2">
+                                        <TextBlock Text="{Binding Gesture}"
+                                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="{DynamicResource Font.SM}"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

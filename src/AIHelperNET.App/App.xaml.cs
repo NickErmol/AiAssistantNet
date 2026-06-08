@@ -160,11 +160,9 @@ public partial class App : System.Windows.Application
         var hwnd = new WindowInteropHelper(overlay).Handle;
         hotkeys.Initialize(hwnd);
 
-        hotkeys.Register(HotkeyId.ToggleSession,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Space);
-        hotkeys.Register(HotkeyId.CaptureScreen,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.S);
-        hotkeys.Register(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Q);
-        hotkeys.Register(HotkeyId.CopyAnswer,     ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.C);
-        hotkeys.Register(HotkeyId.ToggleOverlay,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.H);
+        // Register from the single source of truth so the Settings shortcut list can never drift.
+        foreach (var binding in HotkeyDefaults.All)
+            hotkeys.Register(binding.Id, binding.Modifiers, binding.Key);
 
         var sessionVm = _host.Services.GetRequiredService<SessionControlViewModel>();
         var turnVm2   = _host.Services.GetRequiredService<ConversationTurnViewModel>();
