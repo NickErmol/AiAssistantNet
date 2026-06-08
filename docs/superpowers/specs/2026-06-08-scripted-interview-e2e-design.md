@@ -7,7 +7,9 @@
 
 ## 1. Problem
 
-CLAUDE.md requires an E2E pass before merging a feature because "unit tests don't catch pipeline wiring or runtime DB schema errors." For Conversation Core (PR #15) that gate is a **manual, live, system-audio interview** — it cannot be scripted, is non-deterministic, can't run in CI, and needs a human plus a microphone and loopback audio. We need an automated substitute that exercises the same wiring (real DI graph, real Mediator handler discovery, real EF/SQLite migrations, the real feedback channel and per-turn cancellation) deterministically.
+CLAUDE.md requires an E2E pass before merging a feature because "unit tests don't catch pipeline wiring or runtime DB schema errors." For Conversation Core (PR #15) that gate is a **manual, live, system-audio interview** — it cannot be scripted, is non-deterministic, can't run in CI, and needs a human plus a microphone and loopback audio. We need an automated substitute that exercises the same wiring (real DI graph, real Mediator handler discovery, real EF/SQLite persistence, the real feedback channel and per-turn cancellation) deterministically.
+
+> **DB schema note (verified against `develop`):** the project has **no EF migrations**; the app creates its schema with `EnsureCreatedAsync()` (`App.xaml.cs:36`), not `MigrateAsync()` — despite CLAUDE.md/memory claiming otherwise. This E2E uses `EnsureCreatedAsync()` to match production. It therefore covers DI-wiring + persistence round-trip + model→schema mapping, **not** migration drift (there are none). If the app adopts migrations later, switch the fixture to `MigrateAsync()` for drift coverage.
 
 The conversation-core logic PR #15 changed lives entirely in `TranscriptPipelineService` (orchestration, `Me` routing, feedback drain, per-turn CTS) and `GenerateAnswerHandler` (status publishing, persistence partition, clarification-in-prompt). The two clean injection seams are the speaker-tagged ports `IAudioCaptureService` and `ITranscriptionService`; above them sits `TranscriptPipelineService.ProcessAsync(session, TranscriptItem, uow, ct)`, which consumes `(Speaker, text)` directly.
 
@@ -15,7 +17,7 @@ The conversation-core logic PR #15 changed lives entirely in `TranscriptPipeline
 
 **Goals**
 - Deterministically reproduce the two PR #15 acceptance scenarios (parallel answered cards; clarification-incorporated regeneration) in an automated test.
-- Exercise the **real** DI registrations, Mediator handler, EF/SQLite `MigrateAsync`, `ITurnStatusFeedback`, and per-turn cancellation — catching wiring/schema regressions.
+- Exercise the **real** DI registrations, Mediator handler, EF/SQLite persistence (`EnsureCreatedAsync`), `ITurnStatusFeedback`, and per-turn cancellation — catching wiring/persistence regressions.
 - No network, no API cost, no audio hardware; runs in CI under `dotnet test` in seconds.
 
 **Non-goals**
@@ -51,7 +53,7 @@ All new code lives in `tests/AIHelperNET.Integration.Tests/E2E/`.
   - `IQuestionBoundaryClassifier` → `FakeQuestionBoundaryClassifier` (see 4.3),
   - `ISettingsStore` → a stub returning deterministic settings (active backend, default `AnswerSettings`/`CodeProfile`) so no settings file/secret store is required,
   - `IAnswerStreamSink` → `CapturingAnswerStreamSink` (see 4.4).
-- Uses a **single shared open** `SqliteConnection("Data Source=...;Mode=Memory;Cache=Shared")` (or an explicitly-opened `:memory:` connection kept alive for the fixture lifetime) so every DI scope's `AppDbContext` sees the same schema/data; runs `await db.Database.MigrateAsync()` once at init.
+- Uses a **single shared open** `SqliteConnection("Data Source=...;Mode=Memory;Cache=Shared")` kept alive for the fixture lifetime so every DI scope's `AppDbContext` sees the same schema/data; runs `await db.Database.EnsureCreatedAsync()` once at init (matching the app; the project has no migrations).
 - Exposes the resolved `IMediator`, `TranscriptPipelineService`, `ISessionRepository`, `IUnitOfWork`, `ITurnStatusFeedback`, `FakeQuestionBoundaryClassifier`, and `CapturingAnswerStreamSink`.
 - `DisposeAsync` disposes the provider and closes the SQLite connection.
 
@@ -110,7 +112,7 @@ Assert: the turn now has **≥2** answer versions; the **latest** captured answe
 
 - Each completion await is bounded (e.g. 10 s); on timeout the test fails with the `(turnId, version)` that never completed.
 - A `FakeAnswerProvider` or handler exception surfaces via `CapturingAnswerStreamSink.OnErrorAsync`, which faults the completion task → the awaiting driver step fails with the message.
-- The fixture fails fast if `MigrateAsync` throws (the exact runtime-schema class of bug this E2E is meant to catch).
+- The fixture fails fast if `EnsureCreatedAsync` throws (a schema/model misconfiguration surfacing at startup).
 
 ## 8. Testing strategy
 
