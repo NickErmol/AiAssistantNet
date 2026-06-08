@@ -159,4 +159,29 @@ public class SessionTests
         turn.Dismiss();
         session.ActiveTurn.Should().BeNull();
     }
+
+    [Fact]
+    public void LastTurn_ReturnsMostRecentTurn_EvenWhenTerminal()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, DateTimeOffset.UnixEpoch).Value;
+        var q1 = DetectedQuestion.Create("Q1", QuestionSource.Audio, DateTimeOffset.UnixEpoch);
+        var q2 = DetectedQuestion.Create("Q2", QuestionSource.Audio, DateTimeOffset.UnixEpoch);
+        session.AddDetectedQuestion(q1);
+        session.AddDetectedQuestion(q2);
+        var t1 = session.AddConversationTurn(q1.Id, "Q1", DateTimeOffset.UnixEpoch).Value;
+        var t2 = session.AddConversationTurn(q2.Id, "Q2", DateTimeOffset.UnixEpoch).Value;
+
+        t1.Resolve();
+        t2.Resolve(); // both terminal → ActiveTurn is null
+
+        session.ActiveTurn.Should().BeNull();
+        session.LastTurn.Should().Be(t2);
+    }
+
+    [Fact]
+    public void LastTurn_ReturnsNull_WhenNoTurns()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, DateTimeOffset.UnixEpoch).Value;
+        session.LastTurn.Should().BeNull();
+    }
 }

@@ -54,6 +54,9 @@ public sealed class Session
             t.Status is not ConversationTurnStatus.Dismissed
                      and not ConversationTurnStatus.Resolved);
 
+    /// <summary>The most recent conversation turn overall (including terminal turns), or <see langword="null"/> if none.</summary>
+    public ConversationTurn? LastTurn => _turns.Count == 0 ? null : _turns[^1];
+
     private Session(SessionId id, DateTimeOffset startedAt,
         AnswerSettings answerSettings, CodeProfile codeProfile)
     {
