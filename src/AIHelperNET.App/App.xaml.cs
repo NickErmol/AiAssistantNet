@@ -4,6 +4,7 @@ using AIHelperNET.App.Streaming;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Infrastructure.Common;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
@@ -33,7 +34,24 @@ public partial class App : System.Windows.Application
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.MigrateAsync();
+            try
+            {
+                await db.Database.MigrateAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Database migration failed at startup");
+                MessageBox.Show(
+                    $"The database could not be upgraded:\n\n{ex.Message}\n\n" +
+                    "This usually means an older database file predates migrations. " +
+                    "Back up and delete it (plus its -wal/-shm siblings), then restart:\n\n" +
+                    AppPaths.DatabaseFile,
+                    "AIHelperNET — database upgrade failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown(1);
+                return;
+            }
         }
 
         await _host.StartAsync();

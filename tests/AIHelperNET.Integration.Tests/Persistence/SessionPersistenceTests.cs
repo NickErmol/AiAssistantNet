@@ -18,8 +18,8 @@ public class SessionPersistenceTests : IAsyncLifetime
             .UseSqlite("Data Source=:memory:")
             .Options;
         _db = new AppDbContext(opts);
-        await _db.Database.OpenConnectionAsync();
-        await _db.Database.EnsureCreatedAsync();
+        await _db.Database.OpenConnectionAsync();   // keep :memory: alive for the context lifetime
+        await _db.Database.MigrateAsync();
         _repo = new SessionRepository(_db);
     }
 
