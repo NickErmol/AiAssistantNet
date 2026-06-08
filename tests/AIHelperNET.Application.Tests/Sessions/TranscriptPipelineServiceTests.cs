@@ -423,29 +423,19 @@ public class TranscriptPipelineServiceTests
         var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
         turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
 
-        // Rule 4 confidence is 0.50 for answered turns → AI classifier is called.
-        // Classifier correctly identifies "Should it cover all error types?" as clarification.
+        // Me utterances bypass the AI classifier entirely — deterministic routing attaches them
+        // as context to the current turn. The classifier setup below is intentionally absent;
+        // the DidNotReceive assertion below proves it is never reached.
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new BoundaryClassificationResult(
-                BoundaryLabel.ClarificationOfCurrentQuestion, 0.85,
-                ShouldGenerateAnswer: false,
-                ShouldRefineExistingAnswer: false,
-                ShouldCreateNewTurn: false,
-                NormalizedQuestionText: "Should it cover all error types?",
-                Reason: "clarification")));
 
         var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         var clarification = MakeItem(Speaker.Me, "Should it cover all error types?");
         await svc.ProcessAsync(session, clarification, uow, CancellationToken.None);
 
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
         await Task.Delay(100);
         await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
         turn.ClarificationQuestionIds.Should().HaveCount(1);
@@ -574,7 +564,7 @@ public class TranscriptPipelineServiceTests
     }
 
     [Fact]
-    public async Task BoundaryPath_MeSpeaker_AIReturnsNoQuestion_NonQuestionNoise_DoesNotCreateTurn()
+    public async Task BoundaryPath_Me_NonQuestionNoise_AttachesAsContext_NoNewTurn()
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
@@ -583,24 +573,21 @@ public class TranscriptPipelineServiceTests
         session.AddDetectedQuestion(q);
         session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
 
+        // Me utterances bypass the AI classifier entirely — HandleMeUtterance attaches the
+        // utterance as context to the existing turn. No new turn is opened regardless of whether
+        // the text looks like a question, because Me never opens a turn.
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("yeah I think so as well")));
 
         var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
-        // Ambiguous chatter that the bias-free heuristic also does NOT see as a question.
         var item = MakeItem(Speaker.Me, "yeah I think so as well", T0.AddSeconds(60));
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
         session.ConversationTurns.Should().HaveCount(1,
-            "non-question chatter must still be dropped — the safety net only rescues clear questions");
+            "Me never opens a turn — it attaches as context to the existing turn");
         await Task.Delay(150);
         await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
