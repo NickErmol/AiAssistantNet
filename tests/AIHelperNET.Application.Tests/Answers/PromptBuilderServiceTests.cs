@@ -171,9 +171,9 @@ public class PromptBuilderServiceTests
     }
 
     [Fact]
-    public void Build_QAAnswerLongerThan200Chars_IsTruncated()
+    public void Build_QAAnswerLongerThan400Chars_IsTruncated()
     {
-        var longAnswer = new string('A', 250);
+        var longAnswer = new string('A', 450);
         var qa = new List<(string Question, string Answer)>
         {
             ("Short question?", longAnswer),
@@ -184,9 +184,9 @@ public class PromptBuilderServiceTests
             "What is the pattern?",
             recentQA: qa);
 
-        // The answer in the prompt should be capped at 200 chars + ellipsis
-        prompt.User.Should().NotContain(longAnswer);       // full 250-char string absent
-        prompt.User.Should().Contain(new string('A', 200)); // first 200 chars present
+        // The answer in the prompt should be capped at 400 chars + ellipsis
+        prompt.User.Should().NotContain(longAnswer);       // full 450-char string absent
+        prompt.User.Should().Contain(new string('A', 400)); // first 400 chars present
     }
 
     [Fact]
@@ -206,5 +206,21 @@ public class PromptBuilderServiceTests
         prompt.User.Should().Contain("[Transcript] Interviewer: Explain this code");
         prompt.User.Should().Contain("void Main()");
         prompt.User.Should().Contain("Question: What does this do?");
+    }
+
+    [Fact]
+    public void Build_ClipsPriorAnswerContextAt400Chars()
+    {
+        var longAnswer = new string('A', 500);
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty,
+            AnswerSettings.Default,
+            "What is DI?",
+            screenContext: null,
+            recentTranscript: null,
+            recentQA: new List<(string, string)> { ("Earlier question?", longAnswer) });
+
+        prompt.User.Should().Contain(new string('A', 400) + "…");
+        prompt.User.Should().NotContain(new string('A', 401));
     }
 }

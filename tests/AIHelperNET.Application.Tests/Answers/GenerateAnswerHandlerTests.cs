@@ -144,4 +144,62 @@ public class GenerateAnswerHandlerTests
         captured.Should().NotBeNull();
         captured!.User.Should().Contain("constructor injection specifically");
     }
+
+    [Fact]
+    public async Task Handle_IncludesLastThreeAnsweredTurnsAsContext()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, T0).Value;
+
+        // Three prior ANSWERED turns (oldest → newest).
+        foreach (var (qText, aText, i) in new[]
+                 {
+                     ("Oldest prior question?", "old answer", 1),
+                     ("Middle prior question?", "mid answer", 2),
+                     ("Newest prior question?", "new answer", 3),
+                 })
+        {
+            var pq = DetectedQuestion.Create(qText, QuestionSource.Audio, T0.AddSeconds(i));
+            session.AddDetectedQuestion(pq);
+            var pt = session.AddConversationTurn(pq.Id, qText, T0.AddSeconds(i)).Value;
+            pt.TransitionTo(ConversationTurnStatus.GeneratingPreliminary);
+            pt.AddAnswerVersion(AnswerVersion.Create(AnswerVersionType.Preliminary, aText, T0.AddSeconds(i)));
+            pt.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+        }
+
+        // Current turn being answered.
+        var q = DetectedQuestion.Create("Current question?", QuestionSource.Audio, T0.AddSeconds(10));
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Current question?", T0.AddSeconds(10)).Value;
+
+        var repo = Substitute.For<ISessionRepository>();
+        repo.GetAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result.Ok(session)));
+
+        AnswerPrompt? captured = null;
+        var provider = Substitute.For<IAnswerProvider>();
+        provider.StreamAnswerAsync(Arg.Any<AnswerPrompt>(), Arg.Any<CancellationToken>())
+            .Returns(ci => { captured = ci.ArgAt<AnswerPrompt>(0); return Stream("ok"); });
+        var resolver = Substitute.For<IAnswerProviderResolver>();
+        resolver.Resolve(Arg.Any<AiBackend>()).Returns(provider);
+
+        var settings = Substitute.For<ISettingsStore>();
+        settings.LoadAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AppSettingsDto(
+                AiBackend.Claude, WhisperModelSize.Base, AnswerSettings.Default, CodeProfile.Empty,
+                MicDeviceId: null, LoopbackDeviceId: null)));
+        var streamSink = Substitute.For<IAnswerStreamSink>();
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+
+        var handler = new GenerateAnswerHandler(
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback());
+
+        await handler.Handle(
+            new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary),
+            CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.User.Should().Contain("Oldest prior question?",
+            "recentQA now includes the last 3 answered turns, so the oldest of three is present");
+    }
 }

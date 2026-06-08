@@ -15,7 +15,7 @@ public sealed class PromptBuilderService
     /// <param name="question">The detected question whose <c>Text</c> is forwarded.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
-    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
@@ -31,7 +31,7 @@ public sealed class PromptBuilderService
     /// <param name="questionText">The full question text to answer.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
-    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
@@ -90,7 +90,7 @@ public sealed class PromptBuilderService
             {
                 foreach (var (q, a) in recentQA!)
                 {
-                    var cappedAnswer = a.Length > 200 ? a[..200] + "…" : a;
+                    var cappedAnswer = a.Length > 400 ? a[..400] + "…" : a;
                     user.AppendLine(CultureInfo.InvariantCulture,
                         $"[Q&A] Q: {q}  A: {cappedAnswer}");
                 }

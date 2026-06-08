@@ -69,14 +69,14 @@ public sealed class GenerateAnswerHandler(
             .OrderBy(t => t.Timestamp)
             .ToList();
 
-        // Collect last 2 completed turns (excluding the current one) with at least one answer version.
+        // Collect last 3 completed turns (excluding the current one) with at least one answer version.
         var recentQA = session.ConversationTurns
             .Where(t => t.Id != cmd.TurnId
                      && t.AnswerVersions.Count > 0
                      && (t.Status == ConversationTurnStatus.PreliminaryReady
                          || t.Status == ConversationTurnStatus.RefinedReady
                          || t.Status == ConversationTurnStatus.Resolved))
-            .TakeLast(2)
+            .TakeLast(3)
             .Select(t =>
             {
                 var ans = t.AnswerVersions[^1].Text;

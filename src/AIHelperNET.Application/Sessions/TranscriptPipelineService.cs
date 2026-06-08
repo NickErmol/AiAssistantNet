@@ -18,12 +18,14 @@ public sealed partial class TranscriptPipelineService(
     IQuestionClassifier classifier,
     ILogger<TranscriptPipelineService>? logger = null,
     IQuestionBoundaryClassifier? boundaryClassifier = null,
-    ITurnStatusFeedback? feedback = null) : IDisposable
+    ITurnStatusFeedback? feedback = null,
+    TimeProvider? timeProvider = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
     private readonly QuestionBoundaryDetector _boundaryDetector = new();
     private readonly ConcurrentDictionary<ConversationTurnId, CancellationTokenSource> _turnCts = new();
+    private readonly RegenDebouncer _regenDebouncer = new(timeProvider ?? TimeProvider.System);
     private DateTimeOffset? _collectionStartedAt;
     private const int MaxCollectionSeconds = 8;
     private readonly List<TranscriptItem> _recentItems = [];
@@ -98,6 +100,9 @@ public sealed partial class TranscriptPipelineService(
             {
                 cts.Dispose();
             }
+
+            if (e.Status is ConversationTurnStatus.Dismissed or ConversationTurnStatus.Resolved)
+                _regenDebouncer.Cancel(e.TurnId);
         }
     }
 
@@ -192,16 +197,15 @@ public sealed partial class TranscriptPipelineService(
                 return HandleQuestionStarted(session, item);
 
             case BoundaryLabel.QuestionContinued:
-                // Only a turn that is still being collected can absorb a continuation fragment.
-                // Once a question is complete (the in-memory turn is stuck at Detected because the
-                // answer handler runs in a separate scope), a "continuation" is really a new
-                // question — otherwise AddFragment fails and the segment is silently dropped.
+                // While still collecting, a continuation is just another fragment.
                 if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
                 {
                     activeTurn.AddFragment(item.Text);
                     return null;
                 }
-                return HandleNewQuestion(session, item.Text, item.Timestamp);
+                // After the first answer has fired, a continuation refines the SAME turn
+                // (append + debounced regen) — it does not open a new turn. See Spec 2.
+                return AppendContinuation(session, item, activeTurn);
 
             case BoundaryLabel.QuestionComplete:
             case BoundaryLabel.TaskComplete:
@@ -252,11 +256,12 @@ public sealed partial class TranscriptPipelineService(
         return HandleNewQuestion(session, item.Text, item.Timestamp);
     }
 
-    private static GenerateAnswerCommand? HandleAdditionalRequirement(Session session, TranscriptItem item, ConversationTurn? activeTurn)
+    private GenerateAnswerCommand? HandleAdditionalRequirement(Session session, TranscriptItem item, ConversationTurn? activeTurn)
     {
-        if (activeTurn is null) return null;
+        if (activeTurn is null || IsTerminal(activeTurn.Status)) return null;
         activeTurn.AppendToQuestion(item.Text);
-        return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
+        ScheduleRegen(session.Id, activeTurn.Id);
+        return null;
     }
 
     private GenerateAnswerCommand? HandleClarification(Session session, TranscriptItem item, ConversationTurn? activeTurn)
@@ -272,20 +277,30 @@ public sealed partial class TranscriptPipelineService(
         }
         else
         {
-            // An interviewer "clarification" only makes sense while we are actually waiting on
-            // one. If the turn is already complete (Detected/answered), this is a new question —
-            // not a clarification response — so open a fresh turn instead of refining the old one.
-            if (activeTurn.Status is not (ConversationTurnStatus.AwaitingClarification
-                                          or ConversationTurnStatus.ClarificationReceived))
+            // An interviewer "clarification" while we are actually waiting on one → refine now.
+            if (activeTurn.Status is ConversationTurnStatus.AwaitingClarification
+                                  or ConversationTurnStatus.ClarificationReceived)
             {
-                return HandleNewQuestion(session, item.Text, item.Timestamp);
+                activeTurn.AttachClarificationResponse(item.Id);
+                if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
+                    activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
+                return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
             }
 
-            // Other speaker adds clarification context
-            activeTurn.AttachClarificationResponse(item.Id);
-            if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
-                activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
-            return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
+            // Spec 2: an interviewer clarification on an already-answered (past-collecting,
+            // non-terminal) turn refines THAT turn (append + debounced regen) instead of splitting
+            // off a new card. A still-collecting turn, or a terminal one, is a new question.
+            // Regen uses Preliminary: this appended fragment refines the primary question/answer,
+            // not a structured Me/Other clarification pair (which uses RefinedAfterClarification above).
+            if (activeTurn.Status != ConversationTurnStatus.CollectingQuestion
+                && !IsTerminal(activeTurn.Status))
+            {
+                activeTurn.AppendToQuestion(item.Text);
+                ScheduleRegen(session.Id, activeTurn.Id);
+                return null;
+            }
+
+            return HandleNewQuestion(session, item.Text, item.Timestamp);
         }
     }
 
@@ -319,6 +334,30 @@ public sealed partial class TranscriptPipelineService(
 
         return null; // Me never generates
     }
+
+    private static bool IsTerminal(ConversationTurnStatus status)
+        => status is ConversationTurnStatus.Dismissed or ConversationTurnStatus.Resolved;
+
+    /// <summary>
+    /// A continuation/clarification fragment for an existing, non-terminal turn: append it to the
+    /// turn's question and schedule a coalesced regeneration. With no live turn (or a terminal one)
+    /// the fragment is a genuinely new question.
+    /// </summary>
+    private GenerateAnswerCommand? AppendContinuation(Session session, TranscriptItem item, ConversationTurn? activeTurn)
+    {
+        if (activeTurn is null || IsTerminal(activeTurn.Status))
+            return HandleNewQuestion(session, item.Text, item.Timestamp);
+
+        activeTurn.AppendToQuestion(item.Text);
+        ScheduleRegen(session.Id, activeTurn.Id);
+        return null;
+    }
+
+    private void ScheduleRegen(SessionId sessionId, ConversationTurnId turnId)
+        => _regenDebouncer.Touch(turnId, () =>
+            FireAndForget(
+                new GenerateAnswerCommand(sessionId, turnId, AnswerVersionType.Preliminary),
+                CancellationToken.None));
 
     private GenerateAnswerCommand? ForceCompleteCollection(Session session, ConversationTurn activeTurn)
     {
@@ -419,6 +458,7 @@ public sealed partial class TranscriptPipelineService(
             cts.Dispose();
         }
         _turnCts.Clear();
+        _regenDebouncer.Dispose();
     }
 
     private void FireAndForget(GenerateAnswerCommand command, CancellationToken sessionCt)
