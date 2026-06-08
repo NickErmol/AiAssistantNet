@@ -18,7 +18,7 @@ public sealed class TurnStatusFeedback : ITurnStatusFeedback
         });
 
     /// <inheritdoc/>
-    public void Publish(TurnStatusEvent statusEvent) => _channel.Writer.TryWrite(statusEvent);
+    public void Publish(TurnStatusEvent statusEvent) => _ = _channel.Writer.TryWrite(statusEvent);
 
     /// <inheritdoc/>
     public bool TryDrain(out TurnStatusEvent statusEvent) => _channel.Reader.TryRead(out statusEvent);

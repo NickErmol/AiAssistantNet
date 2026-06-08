@@ -45,6 +45,7 @@ public class TurnStatusFeedbackTests
         a.TurnId.Should().Be(t1);
         a.Status.Should().Be(ConversationTurnStatus.GeneratingPreliminary);
         b.TurnId.Should().Be(t2);
+        b.Status.Should().Be(ConversationTurnStatus.GeneratingPreliminary);
         c.TurnId.Should().Be(t1);
         c.Status.Should().Be(ConversationTurnStatus.PreliminaryReady);
     }
