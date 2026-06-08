@@ -33,7 +33,7 @@ public partial class App : System.Windows.Application
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
         }
 
         await _host.StartAsync();

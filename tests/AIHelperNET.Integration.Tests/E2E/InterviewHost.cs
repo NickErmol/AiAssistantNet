@@ -12,7 +12,7 @@ namespace AIHelperNET.Integration.Tests.E2E;
 
 /// <summary>
 /// A headless DI host that boots the real Application + Infrastructure registrations over an
-/// in-memory SQLite database (schema created via EnsureCreatedAsync, matching the app), overriding
+/// in-memory SQLite database (schema created via migrations, matching the app), overriding
 /// only the AI ports, the settings store, and the sinks. One host per test keeps the singleton
 /// pipeline state isolated.
 /// </summary>
@@ -39,7 +39,7 @@ public sealed class InterviewHost : IAsyncDisposable
         Classifier = classifier;
     }
 
-    /// <summary>Builds the host, opens the shared in-memory DB, and creates the schema.</summary>
+    /// <summary>Builds the host, opens the shared in-memory DB, and applies migrations.</summary>
     public static async Task<InterviewHost> CreateAsync()
     {
         var dbName = "interview-e2e-" + Guid.NewGuid().ToString("N");
@@ -74,7 +74,7 @@ public sealed class InterviewHost : IAsyncDisposable
         await using (var scope = provider.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
         }
 
         return new InterviewHost(provider, keepAlive, sink, classifier);
