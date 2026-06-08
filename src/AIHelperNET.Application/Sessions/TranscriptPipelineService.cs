@@ -160,6 +160,12 @@ public sealed partial class TranscriptPipelineService(
         var result = heuristic;
         BoundaryLabel? aiLabel = null;
         double? aiConfidence = null;
+        // True only while `result` is the AI's verdict. The split guard engages for AI-sourced
+        // NewQuestion labels only: the heuristic's NewQuestion fires solely on explicit new-topic
+        // markers ("now", "next", "another question", …), so it is a reliable, deterministic split
+        // signal that must be trusted even within the recency window. The AI's NewQuestion is the
+        // probabilistic source that can mislabel a continuation, so that is what we guard.
+        var resultFromAi = false;
 
         // If ambiguous (confidence < 0.7), call AI classifier
         if (result.Confidence < 0.7)
@@ -170,6 +176,7 @@ public sealed partial class TranscriptPipelineService(
                     activeTurnStatus, _recentItems.AsReadOnly(), item, item.Speaker, ct);
                 aiLabel = result.Classification;
                 aiConfidence = result.Confidence;
+                resultFromAi = true;
             }
             catch (Exception ex)
             {
@@ -187,6 +194,7 @@ public sealed partial class TranscriptPipelineService(
                                            or BoundaryLabel.NewQuestion)
                 {
                     result = neutral;
+                    resultFromAi = false; // a trusted heuristic verdict replaced the AI's
                 }
             }
         }
@@ -200,7 +208,7 @@ public sealed partial class TranscriptPipelineService(
         var (effectiveConfidence, agreed) =
             SplitConfidence.Resolve(result.Classification, result.Confidence, otherOpinion);
         SplitDecision? guard = null;
-        if (result.Classification == BoundaryLabel.NewQuestion)
+        if (result.Classification == BoundaryLabel.NewQuestion && resultFromAi)
         {
             var live = activeTurn is not null && !IsTerminal(activeTurn.Status);
             var since = live ? _time.GetUtcNow() - LastActivity(activeTurn!.Id) : TimeSpan.MaxValue;

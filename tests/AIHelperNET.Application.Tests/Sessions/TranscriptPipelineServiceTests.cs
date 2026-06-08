@@ -1095,4 +1095,34 @@ public class TranscriptPipelineServiceTests
         recorder.Received(1).Record(Arg.Is<BoundaryDecisionRecord>(r =>
             r.FinalLabel == BoundaryLabel.NewQuestion && r.SessionId == session.Id.Value));
     }
+
+    [Fact]
+    public async Task Guard_HeuristicSourcedNewQuestion_RecentLiveTurn_StillSplits()
+    {
+        // Regression: the guard must protect against AI mislabels only. The heuristic emits
+        // NewQuestion (0.85, below the 0.90 split bar) solely on explicit new-topic markers
+        // ("Now …?"), so it is a reliable split signal and must NOT be demoted to an append even
+        // when a turn was active moments ago. (Previously this merged two distinct questions.)
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("What is dependency injection?", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "What is dependency injection?", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady); // answered, live, recent
+
+        // Classifier must NOT be consulted — the heuristic is confident (0.85 ≥ 0.7).
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var time = new FakeTimeProvider(T0);
+        var (svc, _, _, uow, _, _) = MakeSvcWithBoundary(transcriptSink, classifier, time);
+
+        var item = MakeItem(Speaker.Other, "Now explain CQRS in one sentence?", T0.AddSeconds(1));
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(2,
+            "a heuristic NewQuestion on an explicit new-topic marker splits even within the recency window");
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
+    }
 }
