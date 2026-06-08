@@ -226,7 +226,9 @@ public sealed partial class TranscriptPipelineService(
         recorder?.Record(new BoundaryDecisionRecord(
             Timestamp: _time.GetUtcNow(),
             SessionId: session.Id.Value,
-            TurnId: session.ActiveTurn?.Id.Value,
+            // Pre-routing turn so TurnId and StaleTurnStatus always describe the same turn (the
+            // decision's context), not a turn a split may have just created.
+            TurnId: activeTurn?.Id.Value,
             Speaker: item.Speaker,
             StaleTurnStatus: activeTurnStatus,
             HeuristicLabel: heuristic.Classification,
