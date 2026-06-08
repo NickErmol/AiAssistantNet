@@ -25,7 +25,7 @@ public class TranscriptPipelineServiceTests
     private static TranscriptItem MakeItem(Speaker speaker, string text, DateTimeOffset? at = null)
         => TranscriptItem.Create(speaker, text, at ?? T0, 0.9f);
 
-    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow)
+    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow, ITurnStatusFeedback feedback)
         MakeSvc(ITranscriptSink sink, IQuestionClassifier? classifier = null)
     {
         // Default classifier: NewQuestion for any text that passes pre-filter
@@ -56,7 +56,9 @@ public class TranscriptPipelineServiceTests
         var uow = Substitute.For<IUnitOfWork>();
         uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
 
-        return (new TranscriptPipelineService(factory, sink, turnSink, classifier), mediator, turnSink, uow);
+        var feedback = new TurnStatusFeedback();
+        return (new TranscriptPipelineService(factory, sink, turnSink, classifier, feedback: feedback),
+            mediator, turnSink, uow, feedback);
     }
 
     // Helper: process a segment, then flush the accumulator (simulates the 3s gap firing)
@@ -72,7 +74,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, mediator, _, uow) = MakeSvc(transcriptSink);
+        var (svc, mediator, _, uow, _) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -91,7 +93,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _, uow) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -107,7 +109,7 @@ public class TranscriptPipelineServiceTests
         var classifier = Substitute.For<IQuestionClassifier>();
         classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(ClassificationResult.NotAQuestion));
-        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink, classifier);
 
         var item = MakeItem(Speaker.Other, "How do you approach this problem?");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -128,7 +130,7 @@ public class TranscriptPipelineServiceTests
             .Returns(
                 Task.FromResult(ClassificationResult.NewQuestion),
                 Task.FromResult(ClassificationResult.Continuation));
-        var (svc, mediator, _, uow) = MakeSvc(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvc(transcriptSink, classifier);
 
         // First segment creates a turn
         var first = MakeItem(Speaker.Other, "Can we use observables and what is");
@@ -158,7 +160,7 @@ public class TranscriptPipelineServiceTests
         var classifier = Substitute.For<IQuestionClassifier>();
         classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(ClassificationResult.Continuation));
-        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink, classifier);
 
         var item = MakeItem(Speaker.Other, "How do you approach this kind of problem?");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -175,7 +177,7 @@ public class TranscriptPipelineServiceTests
         var classifier = Substitute.For<IQuestionClassifier>();
         classifier.ClassifyAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns<Task<ClassificationResult>>(_ => throw new HttpRequestException("network error"));
-        var (svc, mediator, _, uow) = MakeSvc(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvc(transcriptSink, classifier);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -196,7 +198,7 @@ public class TranscriptPipelineServiceTests
         classifier.ClassifyAsync(Arg.Do<string>(t => capturedText = t),
                 Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(ClassificationResult.NewQuestion));
-        var (svc, _, _, uow) = MakeSvc(transcriptSink, classifier);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink, classifier);
 
         // Two segments 1s apart — accumulator should combine them
         await svc.ProcessAsync(session, MakeItem(Speaker.Other, "Can we use them", T0), uow, CancellationToken.None);
@@ -211,7 +213,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _, uow) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink);
 
         var q = DetectedQuestion.Create("Original Q?", QuestionSource.Audio, T0);
         session.AddDetectedQuestion(q);
@@ -230,7 +232,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, _, uow) = MakeSvc(transcriptSink);
+        var (svc, _, _, uow, _) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Me, "Hello there friend");
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
@@ -243,7 +245,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
+        var (svc, _, turnSink, uow, _) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "How do you handle dependency injection?");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -257,7 +259,7 @@ public class TranscriptPipelineServiceTests
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
-        var (svc, _, turnSink, uow) = MakeSvc(transcriptSink);
+        var (svc, _, turnSink, uow, _) = MakeSvc(transcriptSink);
 
         var item = MakeItem(Speaker.Other, "Great, thanks.");
         await ProcessAndFlushAsync(svc, session, item, uow);
@@ -267,7 +269,7 @@ public class TranscriptPipelineServiceTests
 
     // ── Boundary-detection path (boundaryClassifier != null) ────────────────
 
-    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow)
+    private static (TranscriptPipelineService svc, IMediator mediator, IConversationTurnSink turnSink, IUnitOfWork uow, ITurnStatusFeedback feedback)
         MakeSvcWithBoundary(ITranscriptSink sink, IQuestionBoundaryClassifier boundaryClassifier)
     {
         var mediator = Substitute.For<IMediator>();
@@ -290,9 +292,10 @@ public class TranscriptPipelineServiceTests
         var uow = Substitute.For<IUnitOfWork>();
         uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
 
+        var feedback = new TurnStatusFeedback();
         return (new TranscriptPipelineService(factory, sink, turnSink,
-            Substitute.For<IQuestionClassifier>(), null, boundaryClassifier),
-            mediator, turnSink, uow);
+            Substitute.For<IQuestionClassifier>(), null, boundaryClassifier, feedback),
+            mediator, turnSink, uow, feedback);
     }
 
     [Fact]
@@ -317,7 +320,7 @@ public class TranscriptPipelineServiceTests
                 NormalizedQuestionText: "Let's say we have a payment service.",
                 Reason: "test")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, boundaryClassifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, boundaryClassifier);
 
         var item = MakeItem(Speaker.Other, "Let's say we have a payment service.");
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
@@ -353,7 +356,7 @@ public class TranscriptPipelineServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
 
         // First item: scenario setup → QuestionStarted
         var first = MakeItem(Speaker.Other, "Let's say we have a payment service.");
@@ -397,7 +400,7 @@ public class TranscriptPipelineServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, neverCalledClassifier);
 
         var item = MakeItem(Speaker.Other, "Also assume validation errors should not be retried.");
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
@@ -420,29 +423,19 @@ public class TranscriptPipelineServiceTests
         var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
         turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
 
-        // Rule 4 confidence is 0.50 for answered turns → AI classifier is called.
-        // Classifier correctly identifies "Should it cover all error types?" as clarification.
+        // Me utterances bypass the AI classifier entirely — deterministic routing attaches them
+        // as context to the current turn. The classifier setup below is intentionally absent;
+        // the DidNotReceive assertion below proves it is never reached.
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new BoundaryClassificationResult(
-                BoundaryLabel.ClarificationOfCurrentQuestion, 0.85,
-                ShouldGenerateAnswer: false,
-                ShouldRefineExistingAnswer: false,
-                ShouldCreateNewTurn: false,
-                NormalizedQuestionText: "Should it cover all error types?",
-                Reason: "clarification")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         var clarification = MakeItem(Speaker.Me, "Should it cover all error types?");
         await svc.ProcessAsync(session, clarification, uow, CancellationToken.None);
 
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
         await Task.Delay(100);
         await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
         turn.ClarificationQuestionIds.Should().HaveCount(1);
@@ -487,7 +480,7 @@ public class TranscriptPipelineServiceTests
                 NormalizedQuestionText: "the system handles concurrent requests efficiently",
                 Reason: "stale-context misclassification")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         // New interviewer question (no '?', not imperative) → heuristic is low-confidence → AI called.
         var item = MakeItem(Speaker.Other, "the system handles concurrent requests efficiently", T0.AddSeconds(60));
@@ -525,7 +518,7 @@ public class TranscriptPipelineServiceTests
                 NormalizedQuestionText: "the system handles concurrent requests efficiently",
                 Reason: "stale-context misclassification")));
 
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         var item = MakeItem(Speaker.Other, "the system handles concurrent requests efficiently", T0.AddSeconds(60));
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
@@ -536,135 +529,79 @@ public class TranscriptPipelineServiceTests
         await mediator.Received(1).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
 
-    // ── Regression: AI classifier returns NoQuestion/Ambiguous for a clear Me-question ──
-    // Live repro: every Speaker.Me utterance during an active turn is forced through the AI at
-    // low confidence (Rule 4). When the AI returns NoQuestion (genuinely or via the Ambiguous
-    // fallback on a parse/HTTP failure), a clearly-formed question was silently dropped — only
-    // the first card ever appeared. A bias-free heuristic safety net must rescue it.
+    // ── Me utterances are deterministic (new model): no AI, never open a turn, never generate ──
+    // Under the new conversation routing model, Speaker.Me utterances bypass the AI classifier
+    // entirely and are routed by HandleMeUtterance. They attach context to the target turn only.
+    // Me never opens a turn regardless of how question-like the text appears.
 
     [Fact]
-    public async Task BoundaryPath_MeSpeaker_AIReturnsNoQuestion_ClearQuestion_CreatesNewTurn()
+    public async Task BoundaryPath_MeSpeaker_ClearQuestion_AttachesToExistingTurn_NoNewTurn_NoGenerate()
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
 
-        // Prior completed turn so an active turn exists (Detected = the stuck in-memory status).
+        // Prior completed turn — Detected is the stuck in-memory status after an answer.
         var q = DetectedQuestion.Create("What is dependency injection in .NET?", QuestionSource.Audio, T0);
         session.AddDetectedQuestion(q);
-        session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
+        var turn = session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0).Value;
 
-        // AI classifier returns NoQuestion (Ambiguous fallback) for a clear question.
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("What are EF Core proxies?")));
-
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         var item = MakeItem(Speaker.Me, "What are EF Core proxies?", T0.AddSeconds(60));
         await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
-        session.ConversationTurns.Should().HaveCount(2,
-            "a clearly-formed question must not be dropped when the AI classifier returns NoQuestion");
-        await Task.Delay(150);
-        await mediator.Received(1).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task BoundaryPath_MeSpeaker_AIReturnsNoQuestion_NonQuestionNoise_DoesNotCreateTurn()
-    {
-        var session = MakeSession();
-        var transcriptSink = Substitute.For<ITranscriptSink>();
-
-        var q = DetectedQuestion.Create("What is dependency injection in .NET?", QuestionSource.Audio, T0);
-        session.AddDetectedQuestion(q);
-        session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
-
-        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("yeah I think so as well")));
-
-        var (svc, mediator, _, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
-
-        // Ambiguous chatter that the bias-free heuristic also does NOT see as a question.
-        var item = MakeItem(Speaker.Me, "yeah I think so as well", T0.AddSeconds(60));
-        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
-
         session.ConversationTurns.Should().HaveCount(1,
-            "non-question chatter must still be dropped — the safety net only rescues clear questions");
+            "Me never opens a turn — it attaches to the existing turn instead");
+        turn.Status.Should().Be(ConversationTurnStatus.AwaitingClarification,
+            "Detected turn flips to AwaitingClarification when Me speaks");
+        turn.ClarificationQuestionIds.Should().Contain(item.Id);
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
         await Task.Delay(150);
         await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task BoundaryPath_MultipleMe_Questions_EachCreatesOwnTurn_WhenAIClassifierAvailable()
+    public async Task BoundaryPath_Me_NonQuestionNoise_AttachesAsContext_NoNewTurn()
     {
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
 
-        // AI classifier always returns NewQuestion (simulates correctly identifying each question)
+        var q = DetectedQuestion.Create("What is dependency injection in .NET?", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        session.AddConversationTurn(q.Id, "What is dependency injection in .NET?", T0);
+
+        // Me utterances bypass the AI classifier entirely — HandleMeUtterance attaches the
+        // utterance as context to the existing turn. No new turn is opened regardless of whether
+        // the text looks like a question, because Me never opens a turn.
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new BoundaryClassificationResult(
-                BoundaryLabel.NewQuestion, 0.90,
-                ShouldGenerateAnswer: true,
-                ShouldRefineExistingAnswer: false,
-                ShouldCreateNewTurn: true,
-                NormalizedQuestionText: "question",
-                Reason: "new question")));
 
-        var (svc, mediator, turnSink, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
-        var q1 = MakeItem(Speaker.Me, "What's the difference between class and interface in .NET?", T0);
-        var q2 = MakeItem(Speaker.Me, "What are the proxies in EF?", T0.AddSeconds(60));
-        var q3 = MakeItem(Speaker.Me, "Tell me the difference between static constructor and private constructor.", T0.AddSeconds(120));
+        var item = MakeItem(Speaker.Me, "yeah I think so as well", T0.AddSeconds(60));
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
 
-        await svc.ProcessAsync(session, q1, uow, CancellationToken.None);
-        await svc.ProcessAsync(session, q2, uow, CancellationToken.None);
-        await svc.ProcessAsync(session, q3, uow, CancellationToken.None);
-
-        // All three questions must create independent turn cards
-        session.ConversationTurns.Should().HaveCount(3, "each distinct question must open its own turn");
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
+        session.ConversationTurns.Should().HaveCount(1,
+            "Me never opens a turn — it attaches as context to the existing turn");
         await Task.Delay(150);
-        await mediator.Received(3).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task BoundaryPath_MultipleMe_Questions_EachCreatesOwnTurn_WhenAIClassifierFails()
+    public async Task BoundaryPath_MultipleMe_NoTurns_AllHold_NoneCreatesATurn()
     {
+        // New model: Me never opens a turn. With no prior turns (no Other questions yet),
+        // multiple Me utterances all hold — none creates a turn, none generates.
         var session = MakeSession();
         var transcriptSink = Substitute.For<ITranscriptSink>();
 
-        // AI classifier always throws (simulates 401 / API unavailable)
         var classifier = Substitute.For<IQuestionBoundaryClassifier>();
-        classifier
-            .ClassifyAsync(
-                Arg.Any<ConversationTurnStatus?>(),
-                Arg.Any<IReadOnlyList<TranscriptItem>>(),
-                Arg.Any<TranscriptItem>(),
-                Arg.Any<Speaker>(),
-                Arg.Any<CancellationToken>())
-            .Returns<Task<BoundaryClassificationResult>>(_ => Task.FromException<BoundaryClassificationResult>(
-                new HttpRequestException("401 Unauthorized")));
-
-        var (svc, mediator, turnSink, uow) = MakeSvcWithBoundary(transcriptSink, classifier);
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
 
         var q1 = MakeItem(Speaker.Me, "What's the difference between class and interface in .NET?", T0);
         var q2 = MakeItem(Speaker.Me, "What are the proxies in EF?", T0.AddSeconds(60));
@@ -674,9 +611,205 @@ public class TranscriptPipelineServiceTests
         await svc.ProcessAsync(session, q2, uow, CancellationToken.None);
         await svc.ProcessAsync(session, q3, uow, CancellationToken.None);
 
-        // Even with AI down, the fallback re-classification must open independent turns
-        session.ConversationTurns.Should().HaveCount(3, "each distinct question must open its own turn even when AI classifier is unavailable");
+        session.ConversationTurns.Should().BeEmpty("Me never opens a turn");
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
         await Task.Delay(150);
-        await mediator.Received(3).Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_MultipleMe_WithExistingTurn_AllAttachAsContext_NoNewTurns()
+    {
+        // New model: Me never opens a turn. With an existing Other-created turn (Detected),
+        // the first Me flips it to AwaitingClarification; subsequent Me utterances continue to
+        // attach context but do not open new turns and do not generate.
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain dependency injection.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain dependency injection.", T0).Value;
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var q1 = MakeItem(Speaker.Me, "What's the difference between class and interface in .NET?", T0);
+        var q2 = MakeItem(Speaker.Me, "What are the proxies in EF?", T0.AddSeconds(60));
+        var q3 = MakeItem(Speaker.Me, "Tell me the difference between static constructor and private constructor.", T0.AddSeconds(120));
+
+        await svc.ProcessAsync(session, q1, uow, CancellationToken.None);
+        await svc.ProcessAsync(session, q2, uow, CancellationToken.None);
+        await svc.ProcessAsync(session, q3, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(1, "Me never opens a new turn");
+        turn.ClarificationQuestionIds.Should().HaveCount(3, "all three Me items attach as context");
+        await Task.Delay(150);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_TwoDistinctQuestions_DoNotCancelEachOther()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Capture the cancellation token each GenerateAnswerCommand was dispatched with.
+        // ConcurrentDictionary used as an ordered accumulator so token capture is thread-safe
+        // across the two fire-and-forget Task.Run callbacks.
+        var capturedTokens = new System.Collections.Concurrent.ConcurrentQueue<CancellationToken>();
+        var neverCalled = Substitute.For<IQuestionBoundaryClassifier>();
+        neverCalled.ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(BoundaryClassificationResult.Ambiguous("fallback")));
+
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, neverCalled);
+        // Use When/Do to capture tokens as a side-effect; this runs regardless of Returns
+        // sequencing and does not interfere with the pre-configured Ok() return value.
+        mediator.When(m => m.Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>()))
+            .Do(ci => capturedTokens.Enqueue(ci.ArgAt<CancellationToken>(1)));
+
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is dependency injection?"), uow, CancellationToken.None);
+        await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is the repository pattern?"), uow, CancellationToken.None);
+        await Task.Delay(200);
+
+        var tokens = capturedTokens.ToArray();
+        session.ConversationTurns.Should().HaveCount(2);
+        tokens.Should().HaveCount(2);
+        tokens[0].IsCancellationRequested.Should().BeFalse("a second distinct question must not cancel the first");
+    }
+
+    [Fact]
+    public async Task BoundaryPath_Me_UnansweredTurn_AttachesClarificationAndAwaits_NoAi_NoGenerate()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value; // status Detected (unanswered)
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var me = MakeItem(Speaker.Me, "Do they mean constructor injection specifically?");
+        await svc.ProcessAsync(session, me, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().HaveCount(1, "Me must never open a turn");
+        turn.Status.Should().Be(ConversationTurnStatus.AwaitingClarification);
+        turn.ClarificationQuestionIds.Should().Contain(me.Id);
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_Me_AnsweredTurn_RecordsContextOnly_NoStatusChange_NoGenerate()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady); // already answered
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var me = MakeItem(Speaker.Me, "Actually also cover keyed services.");
+        await svc.ProcessAsync(session, me, uow, CancellationToken.None);
+
+        turn.Status.Should().Be(ConversationTurnStatus.PreliminaryReady, "answered-turn follow-up does not change status");
+        turn.ClarificationQuestionIds.Should().Contain(me.Id);
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_Me_NoTurns_Holds_NoTurnCreated_NoGenerate()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var me = MakeItem(Speaker.Me, "Wait, what do they mean?");
+        await svc.ProcessAsync(session, me, uow, CancellationToken.None);
+
+        session.ConversationTurns.Should().BeEmpty();
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_Me_AllTurnsTerminal_Holds_NoAttach_NoGenerate()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        turn.Resolve(); // terminal — ActiveTurn is now null, only LastTurn remains (terminal)
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        var (svc, mediator, _, uow, _) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var me = MakeItem(Speaker.Me, "Wait, what did they mean?");
+        await svc.ProcessAsync(session, me, uow, CancellationToken.None);
+
+        // A Me utterance must NOT resurrect a dismissed/resolved turn: no attach, no status change.
+        turn.ClarificationQuestionIds.Should().BeEmpty("a Me utterance must not attach to a terminal turn");
+        turn.Status.Should().Be(ConversationTurnStatus.Resolved);
+        await classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+            Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>());
+        await Task.Delay(100);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BoundaryPath_FeedbackPreliminaryReady_UnlocksAdditionalRequirementRefine()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        // Seed a turn that the pipeline created and that the (separate-scope) answer handler has
+        // since advanced to PreliminaryReady — delivered via the feedback channel, NOT a direct mutation.
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+        // turn is still Detected in the pipeline's in-memory copy.
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        classifier.ClassifyAsync(
+                Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BoundaryClassificationResult(
+                BoundaryLabel.AdditionalRequirement, 0.95,
+                ShouldGenerateAnswer: true, ShouldRefineExistingAnswer: true,
+                ShouldCreateNewTurn: false,
+                NormalizedQuestionText: "Also assume it's a web app.", Reason: "test")));
+
+        var (svc, mediator, _, uow, feedback) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        // The answer worker reports the turn reached PreliminaryReady.
+        feedback.Publish(new TurnStatusEvent(turn.Id, ConversationTurnStatus.PreliminaryReady));
+
+        var item = MakeItem(Speaker.Other, "Also assume it's a web app.");
+        await svc.ProcessAsync(session, item, uow, CancellationToken.None);
+
+        // Drain was applied → in-memory status is now PreliminaryReady, so Rule 8 regenerates.
+        turn.Status.Should().Be(ConversationTurnStatus.PreliminaryReady);
+        await Task.Delay(200);
+        await mediator.Received(1).Send(
+            Arg.Is<GenerateAnswerCommand>(c => c.TurnId == turn.Id
+                && c.VersionType == AnswerVersionType.Preliminary),
+            Arg.Any<CancellationToken>());
     }
 }

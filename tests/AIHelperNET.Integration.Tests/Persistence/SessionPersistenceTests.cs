@@ -69,5 +69,39 @@ public class SessionPersistenceTests : IAsyncLifetime
         history.Should().HaveCount(3);
     }
 
+    [Fact]
+    public async Task HandlerSave_AfterPipelineWroteClarificationIds_DoesNotClobberThem()
+    {
+        // Pipeline context: create a turn and attach a clarification id, then persist.
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, DateTimeOffset.UtcNow).Value;
+        var item = TranscriptItem.Create(Speaker.Me, "Constructor injection?", DateTimeOffset.UtcNow, 0.9f);
+        session.AddTranscriptItem(item);
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, DateTimeOffset.UtcNow);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", DateTimeOffset.UtcNow).Value;
+        turn.AttachClarificationQuestion(item.Id);
+        turn.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+
+        await _repo.AddAsync(session, default);
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        // Answer-handler context (separate load): advance status + add an answer version, save WITHOUT Update().
+        var reload = (await _repo.GetAsync(session.Id, default)).Value;
+        var t2 = reload.ConversationTurns.Single();
+        t2.TransitionTo(ConversationTurnStatus.GeneratingPreliminary);
+        t2.AddAnswerVersion(AnswerVersion.Create(AnswerVersionType.Preliminary, "DI is...", DateTimeOffset.UtcNow));
+        t2.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+        await _db.SaveChangesAsync(); // EF change-tracking only — no repository.Update
+        _db.ChangeTracker.Clear();
+
+        // Verify: status advanced AND the clarification id the pipeline wrote is still present.
+        var final = (await _repo.GetAsync(session.Id, default)).Value;
+        var ft = final.ConversationTurns.Single();
+        ft.Status.Should().Be(ConversationTurnStatus.PreliminaryReady);
+        ft.AnswerVersions.Should().HaveCount(1);
+        ft.ClarificationQuestionIds.Should().Contain(item.Id);
+    }
+
     public async Task DisposeAsync() => await _db.DisposeAsync();
 }

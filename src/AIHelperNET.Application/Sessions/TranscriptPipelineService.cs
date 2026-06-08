@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers.Commands;
+using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Domain.Sessions;
 using Mediator;
@@ -15,12 +17,13 @@ public sealed partial class TranscriptPipelineService(
     IConversationTurnSink turnSink,
     IQuestionClassifier classifier,
     ILogger<TranscriptPipelineService>? logger = null,
-    IQuestionBoundaryClassifier? boundaryClassifier = null) : IDisposable
+    IQuestionBoundaryClassifier? boundaryClassifier = null,
+    ITurnStatusFeedback? feedback = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
     private readonly QuestionBoundaryDetector _boundaryDetector = new();
-    private CancellationTokenSource? _currentAnswerCts;
+    private readonly ConcurrentDictionary<ConversationTurnId, CancellationTokenSource> _turnCts = new();
     private DateTimeOffset? _collectionStartedAt;
     private const int MaxCollectionSeconds = 8;
     private readonly List<TranscriptItem> _recentItems = [];
@@ -31,6 +34,7 @@ public sealed partial class TranscriptPipelineService(
     {
         session.AddTranscriptItem(item);
         transcriptSink.OnTranscriptItem(item);
+        DrainStatusFeedback(session);
 
         // Keep recent items for AI classifier context
         _recentItems.Add(item);
@@ -72,6 +76,32 @@ public sealed partial class TranscriptPipelineService(
     }
 
     /// <summary>
+    /// Applies any pending turn-status transitions reported by the background answer worker to the
+    /// pipeline's authoritative in-memory <paramref name="session"/>. Events for unknown or
+    /// terminal turns are ignored. Disposes a turn's cancellation source once it reaches a
+    /// ready/terminal status (its generation has finished).
+    /// </summary>
+    private void DrainStatusFeedback(Session session)
+    {
+        if (feedback is null) return;
+        while (feedback.TryDrain(out var e))
+        {
+            var turn = session.ConversationTurns.FirstOrDefault(t => t.Id == e.TurnId);
+            if (turn is null) continue;
+            _ = turn.TransitionTo(e.Status); // no-op-safe: TransitionTo fails closed on terminal turns
+
+            if (e.Status is ConversationTurnStatus.PreliminaryReady
+                          or ConversationTurnStatus.RefinedReady
+                          or ConversationTurnStatus.Dismissed
+                          or ConversationTurnStatus.Resolved
+                && _turnCts.TryRemove(e.TurnId, out var cts))
+            {
+                cts.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
     /// Drains the accumulator buffer for the legacy 3-state path — call on session stop to process any
     /// remaining buffered segments. When <see cref="IQuestionBoundaryClassifier"/> is configured (the
     /// production default), the accumulator is not used and this method is a no-op.
@@ -91,6 +121,10 @@ public sealed partial class TranscriptPipelineService(
     private async Task<GenerateAnswerCommand?> BuildCommandWithBoundaryAsync(
         Session session, TranscriptItem item, CancellationToken ct)
     {
+        // Me utterances are routed deterministically: no AI, never open a turn, never generate.
+        if (item.Speaker == Speaker.Me)
+            return HandleMeUtterance(session, item);
+
         // Force-complete if collecting for too long
         var activeTurn = session.ActiveTurn;
         if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion &&
@@ -204,10 +238,6 @@ public sealed partial class TranscriptPipelineService(
     private GenerateAnswerCommand? HandleQuestionComplete(Session session, TranscriptItem item, ConversationTurn? activeTurn)
     {
         _collectionStartedAt = null;
-        var old = _currentAnswerCts;
-        _currentAnswerCts = new CancellationTokenSource();
-        old?.Cancel();
-        old?.Dispose();
 
         if (activeTurn?.Status == ConversationTurnStatus.CollectingQuestion)
         {
@@ -222,13 +252,9 @@ public sealed partial class TranscriptPipelineService(
         return HandleNewQuestion(session, item.Text, item.Timestamp);
     }
 
-    private GenerateAnswerCommand? HandleAdditionalRequirement(Session session, TranscriptItem item, ConversationTurn? activeTurn)
+    private static GenerateAnswerCommand? HandleAdditionalRequirement(Session session, TranscriptItem item, ConversationTurn? activeTurn)
     {
         if (activeTurn is null) return null;
-        var old = _currentAnswerCts;
-        _currentAnswerCts = new CancellationTokenSource();
-        old?.Cancel();
-        old?.Dispose();
         activeTurn.AppendToQuestion(item.Text);
         return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
     }
@@ -259,21 +285,44 @@ public sealed partial class TranscriptPipelineService(
             activeTurn.AttachClarificationResponse(item.Id);
             if (activeTurn.Status == ConversationTurnStatus.AwaitingClarification)
                 activeTurn.TransitionTo(ConversationTurnStatus.ClarificationReceived);
-            var old = _currentAnswerCts;
-            _currentAnswerCts = new CancellationTokenSource();
-            old?.Cancel();
-            old?.Dispose();
             return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.RefinedAfterClarification);
         }
+    }
+
+    /// <summary>
+    /// Deterministically routes a candidate (<see cref="Speaker.Me"/>) utterance. Per the
+    /// conversation model, <see cref="Speaker.Me"/> never opens a turn and never triggers generation;
+    /// it only attaches context to the current turn. Target = the most recent non-terminal turn
+    /// (<see cref="Session.ActiveTurn"/>). With no live turn — none yet, or every turn already
+    /// dismissed/resolved — it holds: a <see cref="Speaker.Me"/> utterance never resurrects a
+    /// terminal turn (whose clarification could never be consumed).
+    /// </summary>
+    private static GenerateAnswerCommand? HandleMeUtterance(Session session, TranscriptItem item)
+    {
+        item.SetBoundaryRole(BoundaryRole.Clarification);
+
+        var target = session.ActiveTurn;
+        if (target is null)
+            return null; // no live (non-terminal) turn — hold
+
+        // Record the candidate's utterance as clarification/context on the target turn.
+        target.AttachClarificationQuestion(item.Id);
+
+        // Only an unanswered, not-generating turn flips to AwaitingClarification (the next Other
+        // response will regenerate incorporating this). An answered or in-flight turn records the
+        // context only — no status change, no auto-regenerate (avoids racing the live answer).
+        if (target.Status is ConversationTurnStatus.Detected
+                          or ConversationTurnStatus.CollectingQuestion)
+        {
+            _ = target.TransitionTo(ConversationTurnStatus.AwaitingClarification);
+        }
+
+        return null; // Me never generates
     }
 
     private GenerateAnswerCommand? ForceCompleteCollection(Session session, ConversationTurn activeTurn)
     {
         _collectionStartedAt = null;
-        var old = _currentAnswerCts;
-        _currentAnswerCts = new CancellationTokenSource();
-        old?.Cancel();
-        old?.Dispose();
         activeTurn.CompleteQuestion();
         turnSink.OnTurnStatusChanged(activeTurn.Id, ConversationTurnStatus.Detected);
         return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
@@ -364,18 +413,30 @@ public sealed partial class TranscriptPipelineService(
     /// <summary>Releases resources owned by this service.</summary>
     public void Dispose()
     {
-        _currentAnswerCts?.Cancel();
-        _currentAnswerCts?.Dispose();
+        foreach (var cts in _turnCts.Values)
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+        _turnCts.Clear();
     }
 
     private void FireAndForget(GenerateAnswerCommand command, CancellationToken sessionCt)
     {
-        var requestCt = _currentAnswerCts?.Token ?? CancellationToken.None;
+        // Each turn owns its own CTS. Re-firing a turn cancels that turn's prior in-flight
+        // generation (same-turn regeneration); distinct turns are independent and never cancel
+        // each other.
+        var cts = _turnCts.AddOrUpdate(
+            command.TurnId,
+            _ => new CancellationTokenSource(),
+            (_, old) => { old.Cancel(); old.Dispose(); return new CancellationTokenSource(); });
+        var requestCt = cts.Token;
+
         _ = Task.Run(async () =>
         {
-            using var scope  = scopeFactory.CreateScope();
-            var mediator     = scope.ServiceProvider.GetRequiredService<IMediator>();
-            // Use the per-request token so new context cancels this generation.
+            using var scope = scopeFactory.CreateScope();
+            var mediator    = scope.ServiceProvider.GetRequiredService<IMediator>();
+            // Use the per-turn token so a regeneration of THIS turn cancels this generation.
             // Session stop is ignored here intentionally (fire-and-forget completes on its own).
             await mediator.Send(command, requestCt);
         }, CancellationToken.None);
