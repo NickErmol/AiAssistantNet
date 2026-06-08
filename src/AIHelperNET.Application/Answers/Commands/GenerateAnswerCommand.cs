@@ -50,10 +50,23 @@ public sealed class GenerateAnswerHandler(
             ? question.Text
             : turn.InitialQuestionText;
 
-        // Collect last 5 transcript items up to (and including) when this turn was created.
-        var recentTranscript = session.Transcript
+        // Last 5 transcript items up to (and including) when this turn was created…
+        var preTurn = session.Transcript
             .Where(t => t.Timestamp <= turn.CreatedAt)
-            .TakeLast(5)
+            .TakeLast(5);
+
+        // …plus any clarification items recorded on this turn AFTER it was created (e.g. a Me
+        // clarification). These post-creation items are what makes a regenerated answer actually
+        // incorporate the clarification. See Spec 1 §3.
+        var clarificationIds = turn.ClarificationQuestionIds
+            .Concat(turn.ClarificationResponseIds)
+            .ToHashSet();
+        var clarifications = session.Transcript.Where(t => clarificationIds.Contains(t.Id));
+
+        var recentTranscript = preTurn
+            .Concat(clarifications)
+            .DistinctBy(t => t.Id)
+            .OrderBy(t => t.Timestamp)
             .ToList();
 
         // Collect last 2 completed turns (excluding the current one) with at least one answer version.
