@@ -77,7 +77,7 @@ public sealed class RegenerateAnswerWithScreenHandler(
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
-            await streamSink.OnErrorAsync(request.TurnId, ex.Message, cancellationToken);
+            await streamSink.OnErrorAsync(request.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 
