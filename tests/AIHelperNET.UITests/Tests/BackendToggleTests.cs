@@ -84,35 +84,43 @@ public sealed class BackendToggleTests(AppFixture fixture)
         GetRadio(settingsWindow, "Backend_Claude").IsChecked.Should().BeTrue(
             "Claude should be the default backend on first open");
 
-        // ── Step 2: select Ollama via UIA pattern (not mouse click) ──────────
-        SelectRadio(settingsWindow, "Backend_Ollama");
+        Window? settingsWindow2 = null;
+        try
+        {
+            // ── Step 2: select Ollama via UIA pattern (not mouse click) ──────────
+            SelectRadio(settingsWindow, "Backend_Ollama");
 
-        GetRadio(settingsWindow, "Backend_Ollama").IsChecked.Should().BeTrue(
-            "Ollama radio should be checked after SelectionItemPattern.Select()");
+            GetRadio(settingsWindow, "Backend_Ollama").IsChecked.Should().BeTrue(
+                "Ollama radio should be checked after SelectionItemPattern.Select()");
 
-        // ── Step 3: save and allow the async command to complete ──────────────
-        GetSaveButton(settingsWindow).AsButton().Click();
-        Thread.Sleep(1000); // allow async SaveSettingsCommand / JSON write to complete
+            // ── Step 3: save and allow the async command to complete ──────────────
+            GetSaveButton(settingsWindow).Click();
+            Thread.Sleep(1000); // wait for async SaveSettingsCommand / JSON write to complete
 
-        settingsWindow.Close(); // SettingsWindow.OnClosing cancels and calls Hide() (singleton)
-        Thread.Sleep(600);
+            settingsWindow.Close(); // SettingsWindow.OnClosing cancels and calls Hide() (singleton)
+            Thread.Sleep(600);
 
-        // ── Step 4: re-open Settings and assert persistence ───────────────────
-        // The SettingsWindow is a singleton (DI AddSingleton). If Window_Loaded re-fires on
-        // Show(), LoadAsync reloads from the saved JSON; otherwise the ViewModel retains its
-        // state. Either way, Backend_Ollama must be checked.
-        var settingsWindow2 = OpenSettingsAndWait();
+            // ── Step 4: re-open Settings and assert persistence ───────────────────
+            // The SettingsWindow is a singleton (DI AddSingleton). If Window_Loaded re-fires on
+            // Show(), LoadAsync reloads from the saved JSON; otherwise the ViewModel retains its
+            // state. Either way, Backend_Ollama must be checked.
+            settingsWindow2 = OpenSettingsAndWait();
 
-        GetRadio(settingsWindow2, "Backend_Ollama").IsChecked.Should().BeTrue(
-            "Ollama backend selection should persist after closing and reopening Settings");
+            GetRadio(settingsWindow2, "Backend_Ollama").IsChecked.Should().BeTrue(
+                "Ollama backend selection should persist after closing and reopening Settings");
+        }
+        finally
+        {
+            // ── Step 5: restore default (Claude) and save ─────────────────────────
+            // Always runs — prevents settings-state pollution when an assertion above fails.
+            var restoreWindow = settingsWindow2 ?? OpenSettingsAndWait();
+            SelectRadio(restoreWindow, "Backend_Claude");
 
-        // ── Step 5: restore default (Claude) and save ─────────────────────────
-        SelectRadio(settingsWindow2, "Backend_Claude");
+            GetSaveButton(restoreWindow).Click();
+            Thread.Sleep(1000); // wait for async SaveSettingsCommand / JSON write to complete
 
-        GetSaveButton(settingsWindow2).Click();
-        Thread.Sleep(1000);
-
-        settingsWindow2.Close();
-        Thread.Sleep(400);
+            restoreWindow.Close();
+            Thread.Sleep(400);
+        }
     }
 }
