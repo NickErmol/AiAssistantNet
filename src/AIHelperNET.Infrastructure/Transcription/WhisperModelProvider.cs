@@ -4,6 +4,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Common;
 using Whisper.net;
 using Whisper.net.Ggml;
+using Whisper.net.LibraryLoader;
 
 namespace AIHelperNET.Infrastructure.Transcription;
 
@@ -13,8 +14,18 @@ public sealed class WhisperModelProvider : IAsyncDisposable
     private readonly Dictionary<WhisperModelSize, WhisperFactory> _factories = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    // Use CPU runtime exclusively. The Vulkan backend loads on machines where vulkan-1.dll is
+    // present but may fail at CreateBuilder() time if no supported GPU is available, and
+    // Whisper.net does not fall back automatically. CPU is reliable across all environments
+    // (dev, CI, test runners). Add RuntimeLibrary.Vulkan at the front if GPU acceleration is
+    // needed AND Vulkan drivers are confirmed working on the target machine.
+    private static readonly List<RuntimeLibrary> RuntimeOrder = [RuntimeLibrary.Cpu];
+
     public WhisperModelProvider(IHttpClientFactory httpClientFactory)
-        => _httpClientFactory = httpClientFactory;
+    {
+        _httpClientFactory = httpClientFactory;
+        RuntimeOptions.RuntimeLibraryOrder = RuntimeOrder;
+    }
 
     public async Task<WhisperFactory> GetFactoryAsync(WhisperModelSize size, CancellationToken ct)
     {
