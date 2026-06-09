@@ -12,6 +12,7 @@
                 Content="Save"
                 HorizontalAlignment="Right"
                 Width="80" Margin="0,8,0,0"
+                AutomationProperties.AutomationId="Btn_SaveSettings"
                 Command="{Binding SaveSettingsCommand}"/>
 
         <TabControl>
@@ -40,6 +41,7 @@
                         </Border>
                     </DockPanel>
                     <TextBlock Text="{Binding StatusMessage}"
+                               AutomationProperties.AutomationId="Settings_StatusMessage"
                                Foreground="{DynamicResource Brush.Semantic.Active}"
                                Margin="0,8,0,0"
                                FontSize="{DynamicResource Font.SM}"/>
