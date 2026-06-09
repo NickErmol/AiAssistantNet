@@ -13,7 +13,8 @@ public sealed class SessionRunner(
     IServiceScopeFactory scopeFactory,
     IAudioCaptureService audioCapture,
     ITranscriptionService transcription,
-    TranscriptPipelineService pipeline)
+    TranscriptPipelineService pipeline,
+    int segmentMergeWindowMs = 300)
 {
     private CancellationTokenSource? _cts;
     private Task? _pipelineTask;
@@ -66,6 +67,13 @@ public sealed class SessionRunner(
         _cts          = null;
         _pipelineTask = null;
     }
+
+    /// <summary>
+    /// Awaits the natural completion of the capture → transcription → pipeline loop without
+    /// cancelling it. Intended as a test seam for driving a finite scripted session to a fully
+    /// drained state before asserting; returns immediately if no session is running.
+    /// </summary>
+    public Task WaitForCompletionAsync() => _pipelineTask ?? Task.CompletedTask;
 
     private async Task RunAsync(
         Session session,
@@ -151,10 +159,8 @@ public sealed class SessionRunner(
         // Sequential consumer: pipeline.ProcessAsync must not be called concurrently.
         // Segments from a single Whisper window arrive back-to-back within milliseconds; segments
         // from different windows are separated by at least the VAD silence gap (~600 ms). Waiting
-        // SegmentMergeWindowMs after the first segment lets us greedily merge consecutive
+        // segmentMergeWindowMs after the first segment lets us greedily merge consecutive
         // same-speaker fragments into one transcript item before question detection fires.
-        const int SegmentMergeWindowMs = 300;
-
         var consumerTask = Task.Run(async () =>
         {
             TranscriptSegment? pending = null;
@@ -185,7 +191,7 @@ public sealed class SessionRunner(
                     {
                         // Have a buffered segment — wait briefly for a follow-on from the same speaker.
                         using var window = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
-                        window.CancelAfter(SegmentMergeWindowMs);
+                        window.CancelAfter(segmentMergeWindowMs);
                         try
                         {
                             next = await mergeChannel.Reader.ReadAsync(window.Token);
