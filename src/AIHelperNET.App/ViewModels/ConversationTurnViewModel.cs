@@ -47,6 +47,30 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
         get => _isLatest;
         set => SetProperty(ref _isLatest, value);
     }
+
+    private bool _isError;
+    /// <summary>Gets or sets a value indicating whether this version holds an error message
+    /// rather than a normal answer (drives distinct error styling).</summary>
+    public bool IsError
+    {
+        get => _isError;
+        set => SetProperty(ref _isError, value);
+    }
+}
+
+/// <summary>Coarse status grouping that drives the answer card's status color.</summary>
+public enum TurnStatusKind
+{
+    /// <summary>An AI call is in flight (generating or refining).</summary>
+    Busy,
+    /// <summary>Waiting on the candidate's clarification before refining.</summary>
+    Awaiting,
+    /// <summary>An answer is available (preliminary, refined, or clarification received).</summary>
+    Ready,
+    /// <summary>The turn is finished (dismissed or resolved).</summary>
+    Terminal,
+    /// <summary>Detected but not yet generating or answered.</summary>
+    Neutral
 }
 
 /// <summary>Represents a single conversation turn (question + answers) in the UI.</summary>
@@ -67,9 +91,36 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
         set
         {
             if (SetProperty(ref _status, value))
+            {
                 OnPropertyChanged(nameof(StatusLabel));
+                OnPropertyChanged(nameof(StatusKind));
+                OnPropertyChanged(nameof(IsBusy));
+            }
         }
     }
+
+    /// <summary>Gets the coarse status grouping used to color the status line.</summary>
+    public TurnStatusKind StatusKind => Status switch
+    {
+        ConversationTurnStatus.CollectingQuestion     or
+        ConversationTurnStatus.GeneratingPreliminary  or
+        ConversationTurnStatus.UpdatedContextReceived or
+        ConversationTurnStatus.GeneratingRefined      => TurnStatusKind.Busy,
+
+        ConversationTurnStatus.AwaitingClarification  => TurnStatusKind.Awaiting,
+
+        ConversationTurnStatus.PreliminaryReady       or
+        ConversationTurnStatus.ClarificationReceived  or
+        ConversationTurnStatus.RefinedReady           => TurnStatusKind.Ready,
+
+        ConversationTurnStatus.Dismissed              or
+        ConversationTurnStatus.Resolved               => TurnStatusKind.Terminal,
+
+        _                                             => TurnStatusKind.Neutral
+    };
+
+    /// <summary>Gets a value indicating whether an AI call is in flight (drives the busy indicator).</summary>
+    public bool IsBusy => StatusKind == TurnStatusKind.Busy;
 
     /// <summary>Gets the human-readable status label for display.</summary>
     public string StatusLabel => Status switch
@@ -172,15 +223,15 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
         var turn = Turns.FirstOrDefault(t => t.Id == turnId);
         if (turn is null) return;
         CreateNewVersion(turn, AnswerVersionId.New(), AnswerVersionType.Preliminary,
-            $"[Error: {errorMessage}]");
+            $"[Error: {errorMessage}]", isError: true);
     }
 
     private static AnswerVersionVm CreateNewVersion(
-        TurnVm turn, AnswerVersionId id, AnswerVersionType type, string text = "")
+        TurnVm turn, AnswerVersionId id, AnswerVersionType type, string text = "", bool isError = false)
     {
         foreach (var v in turn.AnswerVersions) v.IsLatest = false;
         var version = new AnswerVersionVm(id, type, DateTimeOffset.UtcNow)
-            { Text = text, IsLatest = true };
+            { Text = text, IsLatest = true, IsError = isError };
         turn.AnswerVersions.Insert(0, version);
         turn.LatestVersion = version;
         return version;

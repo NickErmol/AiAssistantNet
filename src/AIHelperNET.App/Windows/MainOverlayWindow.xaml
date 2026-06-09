@@ -363,17 +363,77 @@
                                                                FontWeight="SemiBold"
                                                                TextWrapping="Wrap"/>
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding StatusLabel}"
+                                                <!-- Status line: color-coded by StatusKind + busy indicator -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <TextBlock Text="{Binding StatusLabel}"
+                                                               FontSize="{DynamicResource Font.XS}"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground"
+                                                                        Value="{DynamicResource Brush.Foreground.Muted}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding StatusKind}" Value="Busy">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource Brush.Semantic.Busy}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding StatusKind}" Value="Awaiting">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource Brush.Semantic.Question}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding StatusKind}" Value="Ready">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource Brush.Semantic.Active}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <ProgressBar IsIndeterminate="True"
+                                                                 AutomationProperties.AutomationId="TurnCard_BusyIndicator"
+                                                                 Width="36" Height="3"
+                                                                 Margin="6,0,0,0"
+                                                                 VerticalAlignment="Center"
+                                                                 Background="Transparent"
+                                                                 BorderThickness="0"
+                                                                 Foreground="{DynamicResource Brush.Semantic.Busy}"
+                                                                 Visibility="{Binding IsBusy,
+                                                                     Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                </StackPanel>
+                                                <!-- Refining-vs-new affordance: which version is showing + when -->
+                                                <TextBlock FontSize="{DynamicResource Font.XS}"
                                                            Foreground="{DynamicResource Brush.Foreground.Muted}"
-                                                           FontSize="{DynamicResource Font.XS}"
-                                                           Margin="0,0,0,4"/>
+                                                           Margin="0,0,0,4">
+                                                    <Run Text="{Binding LatestVersion.VersionLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding LatestVersion.TimeLabel, Mode=OneWay}"/>
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding LatestVersion}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <TextBlock Text="{Binding LatestVersion.Text}"
-                                                           Foreground="{DynamicResource Brush.Foreground.Primary}"
                                                            FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
                                                                               RelativeSource={RelativeSource AncestorType=Window}}"
                                                            TextWrapping="Wrap"
                                                            FontFamily="Cascadia Mono, Consolas"
-                                                           Margin="0,0,0,4"/>
+                                                           Margin="0,0,0,4">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding LatestVersion.IsError}" Value="True">
+                                                                    <Setter Property="Foreground"
+                                                                            Value="{DynamicResource Brush.Semantic.Error}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <StackPanel Orientation="Horizontal">
                                                     <Button Content="Copy"
                                                             Command="{Binding DataContext.ConversationTurn.CopyLatestCommand,
