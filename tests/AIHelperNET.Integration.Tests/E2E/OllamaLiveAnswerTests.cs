@@ -1,7 +1,9 @@
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
+using AIHelperNET.Infrastructure.AI;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Net.Http;
 using System.Text.Json;
 using Xunit;
@@ -11,8 +13,8 @@ namespace AIHelperNET.Integration.Tests.E2E;
 
 /// <summary>
 /// Gated live smoke: runs the REAL Ollama answer provider end to end and asserts a non-empty,
-/// well-formed answer comes back. Skips (logs + returns) when Ollama is unreachable or no model
-/// is pulled, so CI and offline runs stay green without a new test dependency.
+/// well-formed answer comes back. Skips (logs + returns) when Ollama is unreachable, or when
+/// the model configured in OllamaOptions is not pulled, so CI and offline runs stay green.
 /// LiveLlm-tagged → excluded from fast runs.
 /// </summary>
 [Trait("Category", "LiveLlm")]
@@ -21,50 +23,77 @@ public class OllamaLiveAnswerTests(ITestOutputHelper output)
     private const string OllamaBaseUrl = "http://localhost:11434";
 
     /// <summary>
-    /// Returns (reachable, firstModelName) — reachable is true only when the endpoint responds
-    /// AND at least one model is available via GET /api/tags. When false, firstModelName is null.
+    /// Returns true when GET / at the Ollama root endpoint responds with 200.
+    /// Any failure (connection refused, timeout, non-2xx) returns false.
     /// </summary>
-    private static async Task<(bool reachable, string? firstModel)> ProbeOllamaAsync()
+    private static async Task<bool> IsOllamaReachableAsync()
     {
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-
-            // 1. Basic connectivity check.
-            var ping = await http.GetAsync(OllamaBaseUrl);
-            if (!ping.IsSuccessStatusCode)
-                return (false, null);
-
-            // 2. Model-availability check — only proceed when at least one model is pulled.
-            var tagsJson = await http.GetStringAsync($"{OllamaBaseUrl}/api/tags");
-            using var doc = JsonDocument.Parse(tagsJson);
-            var models = doc.RootElement.GetProperty("models");
-            if (models.GetArrayLength() == 0)
-                return (false, null);
-
-            var firstName = models[0].GetProperty("name").GetString();
-            return (true, firstName);
+            var response = await http.GetAsync(OllamaBaseUrl);
+            return response.IsSuccessStatusCode;
         }
         catch
         {
-            return (false, null);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="modelName"/> appears in GET /api/tags.
+    /// Comparison is case-insensitive on the full name (including :tag suffix).
+    /// Any failure parsing the response returns false (never throws).
+    /// </summary>
+    private static async Task<bool> IsModelPulledAsync(string modelName)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var tagsJson = await http.GetStringAsync($"{OllamaBaseUrl}/api/tags");
+            using var doc = JsonDocument.Parse(tagsJson);
+            var models = doc.RootElement.GetProperty("models");
+            for (int i = 0; i < models.GetArrayLength(); i++)
+            {
+                var name = models[i].GetProperty("name").GetString();
+                if (string.Equals(name, modelName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
         }
     }
 
     [Fact]
     public async Task RealOllama_AnswersQuestion_WithNonEmptyCard()
     {
-        var (reachable, modelName) = await ProbeOllamaAsync();
-        if (!reachable)
+        // 1. Cheap endpoint-reachability probe — skip immediately when Ollama is down.
+        if (!await IsOllamaReachableAsync())
         {
-            output.WriteLine(
-                $"OllamaLiveAnswerTests skipped: {OllamaBaseUrl} unreachable or no models pulled.");
-            return; // gated skip — no Ollama available
+            output.WriteLine($"OllamaLiveAnswerTests skipped: {OllamaBaseUrl} unreachable.");
+            return;
         }
 
-        output.WriteLine($"Ollama reachable. First available model: {modelName}. Running live assertion.");
-
+        // 2. Build the host so we can read the *actually configured* model name.
         await using var host = await InterviewHost.CreateAsync(useRealAnswerProvider: true);
+        var configuredModel = host.Services
+            .GetRequiredService<IOptions<OllamaOptions>>()
+            .Value.Model;
+
+        // 3. Confirm the configured model is pulled — skip with a clear reason if not.
+        if (!await IsModelPulledAsync(configuredModel))
+        {
+            output.WriteLine(
+                $"OllamaLiveAnswerTests skipped: Ollama up but configured model '{configuredModel}' not pulled.");
+            return;
+        }
+
+        output.WriteLine($"Ollama reachable and model '{configuredModel}' is available. Running live assertion.");
+
+        // 4. Stream a real answer and assert structure.
         var resolver = host.Services.GetRequiredService<IAnswerProviderResolver>();
         var provider = resolver.Resolve(AiBackend.Ollama);
 
