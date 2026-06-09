@@ -44,3 +44,9 @@ App           — WPF, ViewModels, sink wiring, MS Generic Host
 **WhisperModelProvider**: guarded by `SemaphoreSlim(1)` only during initial load/download. Once a `WhisperFactory` is cached, two processors built from the same factory can run in parallel (`factory.CreateBuilder().Build()` is independent per call).
 
 **Gitflow**: `feature/*` → `develop` → `release/*` → `master`. Never commit directly to `master`.
+
+## Standing rules
+
+Always-loaded project rules (import — keep these in mind on every change):
+
+@.claude/rules/security.md
