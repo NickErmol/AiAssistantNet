@@ -57,6 +57,16 @@ public sealed class RegenDebouncer(TimeProvider time) : IDisposable
         }
     }
 
+    /// <summary>Cancels all pending debounce timers without disposing the debouncer itself.</summary>
+    public void Reset()
+    {
+        lock (_gate)
+        {
+            foreach (var t in _timers.Values) t.Dispose();
+            _timers.Clear();
+        }
+    }
+
     /// <summary>Cancels all pending timers.</summary>
     public void Dispose()
     {
