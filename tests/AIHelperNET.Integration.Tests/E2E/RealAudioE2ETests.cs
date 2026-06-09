@@ -194,6 +194,35 @@ public class RealAudioE2ETests : IAsyncLifetime
         _host.Sink.Errors.Should().BeEmpty();
     }
 
+    /// <remarks>
+    /// Two same-speaker fragments with a 200 ms gap (well within MergeWindowMs=2500) should arrive
+    /// as one merged transcript item and produce a single card. This is the most timing-sensitive
+    /// scenario: if both Whisper transcriptions are delayed past the merge window independently,
+    /// the segments may arrive as two separate items and produce two turns. The two-fragment approach
+    /// is used here (not the single-WAV fallback) since the 200 ms gap is far below the 2500 ms merge
+    /// window; if this proves flaky, replace with a single other_di_chunked.wav fixture via
+    /// tools/generate-audio-fixtures.ps1 and use a single WavUtterance.
+    /// </remarks>
+    [Fact]
+    public async Task Scenario2_ChunkedOtherQuestion_ProducesOneCard()
+    {
+        var session = await PersistNewSessionAsync();
+        _host.Classifier.Enqueue(NewQuestion("What is dependency injection?"));
+        var runner = NewRunner(new[]
+        {
+            new WavUtterance(Speaker.Other, "other_di_part1.wav", GapMsBefore: 0),
+            new WavUtterance(Speaker.Other, "other_di_part2.wav", GapMsBefore: 200),
+        });
+        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both);
+        await runner.WaitForCompletionAsync();
+        await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 1, AnswerTimeout);
+        await runner.StopAsync();
+        var reloaded = await ReloadAsync(session.Id);
+        reloaded.ConversationTurns.Should().ContainSingle(
+            "two same-speaker fragments within the merge window form one transcript item -> one card");
+        _host.Sink.Errors.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Scenario1_SingleOtherQuestion_ProducesTranscriptAndOneCard()
     {
