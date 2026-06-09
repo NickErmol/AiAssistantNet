@@ -30,17 +30,22 @@ public sealed class InterviewHost : IAsyncDisposable
     /// <summary>The scripted boundary classifier (singleton) to enqueue per-Other-step results.</summary>
     public FakeQuestionBoundaryClassifier Classifier { get; }
 
+    /// <summary>The capturing transcript sink (singleton) for asserting per-speaker transcripts.</summary>
+    public CapturingTranscriptSink Transcripts { get; }
+
     private InterviewHost(ServiceProvider provider, SqliteConnection keepAlive,
-        CapturingAnswerStreamSink sink, FakeQuestionBoundaryClassifier classifier)
+        CapturingAnswerStreamSink sink, FakeQuestionBoundaryClassifier classifier,
+        CapturingTranscriptSink transcripts)
     {
         _provider = provider;
         _keepAlive = keepAlive;
         Sink = sink;
         Classifier = classifier;
+        Transcripts = transcripts;
     }
 
     /// <summary>Builds the host, opens the shared in-memory DB, and applies migrations.</summary>
-    public static async Task<InterviewHost> CreateAsync()
+    public static async Task<InterviewHost> CreateAsync(bool useRealAnswerProvider = false)
     {
         var dbName = "interview-e2e-" + Guid.NewGuid().ToString("N");
         var connString = $"Data Source={dbName};Mode=Memory;Cache=Shared";
@@ -59,14 +64,16 @@ public sealed class InterviewHost : IAsyncDisposable
         services.AddDbContext<AppDbContext>(o => o.UseSqlite(connString));
 
         var fakeProvider = new FakeAnswerProvider();
-        services.AddSingleton<IAnswerProviderResolver>(new FakeAnswerProviderResolver(fakeProvider));
+        if (!useRealAnswerProvider)
+            services.AddSingleton<IAnswerProviderResolver>(new FakeAnswerProviderResolver(fakeProvider));
         var classifier = new FakeQuestionBoundaryClassifier();
         services.AddSingleton<IQuestionBoundaryClassifier>(classifier);
         services.AddSingleton<ISettingsStore, StubSettingsStore>();
 
         var sink = new CapturingAnswerStreamSink();
         services.AddSingleton<IAnswerStreamSink>(sink);
-        services.AddSingleton<ITranscriptSink>(Substitute.For<ITranscriptSink>());
+        var transcripts = new CapturingTranscriptSink();
+        services.AddSingleton<ITranscriptSink>(transcripts);
         services.AddSingleton<IConversationTurnSink>(Substitute.For<IConversationTurnSink>());
         // Override the file-writing recorder so the E2E never touches the real data root.
         services.AddSingleton<IBoundaryDecisionRecorder>(Substitute.For<IBoundaryDecisionRecorder>());
@@ -79,7 +86,7 @@ public sealed class InterviewHost : IAsyncDisposable
             await db.Database.MigrateAsync();
         }
 
-        return new InterviewHost(provider, keepAlive, sink, classifier);
+        return new InterviewHost(provider, keepAlive, sink, classifier, transcripts);
     }
 
     private static void RemoveDbContext(ServiceCollection services)

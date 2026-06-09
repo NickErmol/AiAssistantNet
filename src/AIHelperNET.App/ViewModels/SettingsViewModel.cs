@@ -24,6 +24,9 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
     [ObservableProperty] private string _apiKeyInput = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
+    // ── AI Backend (API Key tab) ──────────────────────────────────
+    [ObservableProperty] private AiBackend _activeBackend = AiBackend.Claude;
+
     // ── Audio tab ─────────────────────────────────────────────────
     [ObservableProperty] private string? _selectedMicDeviceId;
     [ObservableProperty] private string? _selectedLoopbackDeviceId;
@@ -77,6 +80,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
+        ActiveBackend            = s.ActiveBackend;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
         BackendFramework    = s.CodeProfile.BackendFramework    ?? string.Empty;
@@ -129,7 +133,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         var current  = existing.IsSuccess ? existing.Value : null;
 
         var dto = new AppSettingsDto(
-            current?.ActiveBackend  ?? AiBackend.Claude,
+            ActiveBackend,
             WhisperModel,
             new AnswerSettings(AnswerLength, AnswerComplexity, AnswerStyle, AnswerTone, AnswerFormat, OutputLanguage),
             new CodeProfile(NullIfEmpty(ProgrammingLanguage), NullIfEmpty(BackendFramework),

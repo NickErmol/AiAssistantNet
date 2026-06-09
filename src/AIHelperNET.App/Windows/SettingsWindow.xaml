@@ -12,6 +12,7 @@
                 Content="Save"
                 HorizontalAlignment="Right"
                 Width="80" Margin="0,8,0,0"
+                AutomationProperties.AutomationId="Btn_SaveSettings"
                 Command="{Binding SaveSettingsCommand}"/>
 
         <TabControl>
@@ -43,6 +44,20 @@
                                Foreground="{DynamicResource Brush.Semantic.Active}"
                                Margin="0,8,0,0"
                                FontSize="{DynamicResource Font.SM}"/>
+                    <TextBlock Text="AI Backend" FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                               Margin="0,16,0,6"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Claude" GroupName="Backend"
+                                 AutomationProperties.AutomationId="Backend_Claude"
+                                 IsChecked="{Binding ActiveBackend,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Claude}"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Ollama (local)" GroupName="Backend"
+                                 AutomationProperties.AutomationId="Backend_Ollama"
+                                 IsChecked="{Binding ActiveBackend,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Ollama}"/>
                 </StackPanel>
             </TabItem>
 
