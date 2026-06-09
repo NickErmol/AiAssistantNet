@@ -18,12 +18,10 @@ namespace AIHelperNET.Integration.Tests.E2E;
 /// Uses the deterministic FakeAnswerProvider; only routing/structure is asserted.
 /// </summary>
 /// <remarks>
-/// Model selection: Whisper Small is used instead of Medium because the ggml-medium.bin file
-/// on this machine is incompatible with Whisper.net 1.9.1's CreateBuilder() (returns
-/// WhisperModelLoadException). Base and Small both produce identical perfect transcription
-/// ("What is dependency injection?") for the other_di.wav fixture. Small is the most accurate
-/// model confirmed-working here. The Medium file likely needs a fresh re-download to fix the
-/// format incompatibility; update the constant once verified.
+/// Model selection: Whisper Small is used for E2E fixture tests. Base/Small/Medium/LargeTurbo
+/// all load and produce correct transcription for other_di.wav. Small is a good balance of
+/// speed and accuracy for this suite; switch to Medium or LargeTurbo if higher accuracy is
+/// needed (at the cost of slower first-run load time).
 /// </remarks>
 [Trait("Category", "RealAudio")]
 public class RealAudioE2ETests : IAsyncLifetime
@@ -42,8 +40,7 @@ public class RealAudioE2ETests : IAsyncLifetime
 
     private static readonly AudioDeviceSelection Devices = new("mic", "loopback");
 
-    // Whisper Small: confirmed-working on this machine; Medium fails with WhisperModelLoadException
-    // (incompatible ggml-medium.bin — needs re-download). Switch back to Medium once model is refreshed.
+    // Whisper Small: good accuracy for fixture-based tests; all four models (Base/Small/Medium/LargeTurbo) load.
     private const WhisperModelSize Model = WhisperModelSize.Small;
 
     private static BoundaryClassificationResult NewQuestion(string text) =>
