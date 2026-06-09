@@ -1,0 +1,12 @@
+{
+  "trailingSilenceMs": 800,
+  "lines": [
+    { "file": "other_di.wav",        "text": "What is dependency injection?" },
+    { "file": "other_di_part1.wav",  "text": "What is dependency" },
+    { "file": "other_di_part2.wav",  "text": "injection in one sentence?" },
+    { "file": "me_clarify.wav",      "text": "do you mean constructor injection specifically?" },
+    { "file": "other_shorter.wav",   "text": "also keep it short please" },
+    { "file": "other_cqrs.wav",      "text": "now explain the C Q R S pattern" },
+    { "file": "me_chitchat.wav",     "text": "I am just thinking out loud here" }
+  ]
+}
