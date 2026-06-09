@@ -47,15 +47,12 @@
                                FontSize="{DynamicResource Font.SM}"
                                Foreground="{DynamicResource Brush.Foreground.Primary}"
                                Margin="0,16,0,6"/>
-                    <RadioButton Content="Claude" GroupName="Backend"
-                                 Foreground="{DynamicResource Brush.Foreground.Primary}"
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Claude" GroupName="Backend"
                                  AutomationProperties.AutomationId="Backend_Claude"
                                  IsChecked="{Binding ActiveBackend,
                                      Converter={StaticResource EnumToBoolConverter},
                                      ConverterParameter=Claude}"/>
-                    <RadioButton Content="Ollama (local)" GroupName="Backend"
-                                 Margin="0,4,0,0"
-                                 Foreground="{DynamicResource Brush.Foreground.Primary}"
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Ollama (local)" GroupName="Backend"
                                  AutomationProperties.AutomationId="Backend_Ollama"
                                  IsChecked="{Binding ActiveBackend,
                                      Converter={StaticResource EnumToBoolConverter},
