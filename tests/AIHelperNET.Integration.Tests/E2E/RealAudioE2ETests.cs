@@ -113,6 +113,43 @@ public class RealAudioE2ETests : IAsyncLifetime
         _host.Sink.Errors.Should().BeEmpty();
     }
 
+    /// <remarks>
+    /// Me utterances are deterministically routed by the pipeline: they never trigger generation,
+    /// they only attach clarification context to the active turn and transition it to
+    /// AwaitingClarification. A second answer version is produced only when a subsequent Other
+    /// utterance arrives while the turn is in that state. This scenario verifies the Me path alone:
+    /// one turn with one answer version, the Me text transcribed and attached as clarification,
+    /// turn status AwaitingClarification recorded in the session.
+    /// </remarks>
+    [Fact]
+    public async Task Scenario3_MeClarification_AttachesClarificationAndAwaitsFurtherInput()
+    {
+        var session = await PersistNewSessionAsync();
+        _host.Classifier.Enqueue(NewQuestion("What is dependency injection?"));
+        var runner = NewRunner(new[]
+        {
+            new WavUtterance(Speaker.Other, "other_di.wav",   GapMsBefore: 0),
+            new WavUtterance(Speaker.Me,    "me_clarify.wav", GapMsBefore: 3000),
+        });
+        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both);
+        await runner.WaitForCompletionAsync();
+        // Wait for the initial answer (first Other utterance) to land before stopping.
+        await PollUntilAsync(session.Id,
+            s => s.ConversationTurns.Count == 1 && s.ConversationTurns[0].AnswerVersions.Count >= 1,
+            AnswerTimeout);
+        await runner.StopAsync();
+        // Me transcript must be present and mention "constructor"
+        _host.Transcripts.TextFor(Speaker.Me).Should()
+            .ContainSingle().Which.ToLowerInvariant().Should().Contain("constructor");
+        // Exactly one turn, one answer version — Me never generates a second card
+        var reloaded = await ReloadAsync(session.Id);
+        reloaded.ConversationTurns.Should().ContainSingle();
+        reloaded.ConversationTurns[0].AnswerVersions.Count.Should().Be(1);
+        // The Me transcript item must be attached as a clarification question on the turn
+        reloaded.ConversationTurns[0].ClarificationQuestionIds.Should().NotBeEmpty();
+        _host.Sink.Errors.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Scenario1_SingleOtherQuestion_ProducesTranscriptAndOneCard()
     {
