@@ -1,52 +1,88 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository. Treat it as an **index** — point to
+skills and `docs/` for detail rather than restating it here.
+
+## Tech stack
+
+- **.NET 10**, C# `latest`, nullable enabled. `Domain`/`Application` target `net10.0`
+  (platform-neutral); `App`/`Infrastructure` target `net10.0-windows`.
+- **UI:** WPF + CommunityToolkit.Mvvm; MS Generic Host (`Microsoft.Extensions.Hosting`) for DI/lifetime.
+- **CQRS:** [Mediator](https://github.com/martinothamar/Mediator) 3.x (source generator).
+- **Validation:** FluentValidation · **Mapping:** Riok.Mapperly (source-gen) · **Results:** FluentResults.
+- **Persistence:** EF Core 10 + SQLite (migrations).
+- **Audio/AI:** NAudio (capture) · Whisper.net (transcription, +Vulkan GPU runtime) · ONNX Runtime
+  (Silero VAD) · OllamaSharp + a custom Claude HTTP/SSE client (answers).
+- **Secrets:** AdysTech.CredentialManager (Windows Credential Manager). **Logging:** Serilog (file sink).
+- **Tests:** xUnit · FluentAssertions · NSubstitute · FlaUI/UIA3 (UI automation) · NetArchTest (layering guards).
 
 ## Commands
 
 ```bash
-dotnet build                                              # full solution
-dotnet build src/AIHelperNET.App/AIHelperNET.App.csproj  # WPF app only
-dotnet test                                               # all tests
-dotnet test tests/AIHelperNET.Domain.Tests                # single project
+dotnet build                                               # full solution
+dotnet build src/AIHelperNET.App/AIHelperNET.App.csproj   # WPF app only
+dotnet test                                                # all tests
+dotnet test tests/AIHelperNET.Domain.Tests                 # single project
 dotnet test --filter "FullyQualifiedName~QuestionDetector" # single test
 ```
 
-`Directory.Build.props`: `TreatWarningsAsErrors`, nullable, latest C#, XML docs on all projects.
+`Directory.Build.props` enforces `TreatWarningsAsErrors`, nullable, latest C#, and XML docs on all projects.
 
 ## Architecture
 
-Clean/Hexagonal + DDD + CQRS (source-gen [Mediator](https://github.com/martinothamar/Mediator) library).
+Clean/Hexagonal + DDD + CQRS. Dependencies point **inward** toward `Domain`
+(diagram: `docs/architecture/project-dependencies.md`).
 
 ```
-Domain        — Session aggregate, value objects, DomainResult<T>, strongly-typed ID wrappers
-Application   — CQRS handlers, port interfaces (Abstractions/), TranscriptPipelineService
-Infrastructure — EF Core/SQLite, NAudio, Whisper.NET, Claude/Ollama HTTP, Windows APIs
-App           — WPF, ViewModels, sink wiring, MS Generic Host
+Domain         — Session aggregate, value objects, DomainResult<T>, strongly-typed ID wrappers
+Application    — CQRS handlers, port interfaces (Abstractions/), TranscriptPipelineService
+Infrastructure — EF Core/SQLite, NAudio, Whisper.net, Claude/Ollama HTTP, Windows APIs
+App            — WPF, ViewModels, sink wiring, MS Generic Host (composition root)
 ```
 
-**Adding a handler**: implement `ICommandHandler<TCommand>` or `IQueryHandler<TQuery, TResult>` — Mediator's source generator registers it automatically. FluentValidation validators are auto-discovered from the Application assembly.
+**Port interfaces** (`Application/Abstractions/`, implemented in `Infrastructure`):
+`ITranscriptSink`, `IAnswerStreamSink`, `IAudioCaptureService`, `ITranscriptionService`,
+`IAnswerProvider`, `ISessionRepository`, `IUnitOfWork`, `ISettingsStore`, `ISecretStore`.
 
-**Port interfaces** (`Application/Abstractions/`): `ITranscriptSink`, `IAnswerStreamSink`, `IAudioCaptureService`, `ITranscriptionService`, `IAnswerProvider`, `ISessionRepository`, `IUnitOfWork`, `ISettingsStore`, `ISecretStore`.
+## Conventions
 
-**Domain operations** never throw — they return `DomainResult<T>`. All entity IDs are strongly-typed `Guid` wrappers (`SessionId`, `ConversationTurnId`, etc.).
+- **Add a handler:** implement `ICommandHandler<TCommand>` / `IQueryHandler<TQuery, TResult>` —
+  Mediator's source generator registers it automatically. FluentValidation validators are
+  auto-discovered from the Application assembly.
+- **Domain operations never throw** — they return `DomainResult<T>`. Entity IDs are strongly-typed
+  `Guid` wrappers (`SessionId`, `ConversationTurnId`, …).
+- **Object mapping** uses Riok.Mapperly source-gen (`[Mapper]` partials) — don't hand-roll mappers.
+- **EF entity change ⇒ ship a migration in the same commit** (the `MigrationTests` parity guard fails
+  the build otherwise). Use the `add-ef-migration` skill.
+- **Gitflow:** `feature/*` → `develop` → `release/*` → `master`. Never commit directly to `master`.
+- Layering is enforced by **NetArchTest** rules in the integration tests — don't add a reference that
+  points a layer outward.
 
-## Key non-obvious facts
+## Key non-obvious facts (gotchas)
 
-**Data root**: `D:\AIHelperNET\` when D: is ready, else `%LocalAppData%\AIHelperNET\`. Models, SQLite DB, settings JSON, and logs all live there.
+**Data root:** `D:\AIHelperNET\` when D: is ready, else `%LocalAppData%\AIHelperNET\`. Models, SQLite
+DB, settings JSON, and logs all live there. Transcripts are sensitive — see the standing security rule.
 
-**Database migrations**: schema is managed by EF Core migrations in `src/AIHelperNET.Infrastructure/Persistence/Migrations/`, applied at startup via `MigrateAsync()` (`App.xaml.cs`) — NOT `EnsureCreated`. Any EF entity change must ship a migration (`dotnet ef migrations add <Name> --project src/AIHelperNET.Infrastructure --startup-project src/AIHelperNET.App --output-dir Persistence/Migrations`) committed alongside the change; the `MigrationTests` parity guard fails the build otherwise. A design-time factory (`AppDbContextFactory`) lets the tooling run against the WPF startup project (which also needs its own `Microsoft.EntityFrameworkCore.Design` reference — `PrivateAssets=all` blocks the transitive one). Adopting migrations required a one-time delete of pre-existing `sessions.db` files (created before `__EFMigrationsHistory` existed) — this affects only real runs against the data root; tests/CI are unaffected because they use in-memory SQLite DBs. If `MigrateAsync` fails at startup the app shows a dialog and exits cleanly. Workflow lives in the `add-ef-migration` skill.
+**Migrations apply at startup** via `MigrateAsync()` in `App.xaml.cs` (NOT `EnsureCreated`). A
+design-time factory (`AppDbContextFactory`) lets the EF tooling run against the WPF startup project;
+on failure the app shows a dialog and exits cleanly. Tests/CI use in-memory SQLite so they're
+unaffected. Full workflow lives in the `add-ef-migration` skill.
 
-**Sink wiring**: `TranscriptSink` and `AnswerStreamSink` are registered as singletons. Their handlers are set in `App.OnStartup` via `sink.SetHandler(...)` *after* the DI host starts but *before* `overlay.Show()`. The handler uses `Dispatcher.BeginInvoke` to marshal to the UI thread.
+**Sink wiring:** `TranscriptSink`/`AnswerStreamSink` are singletons; handlers are set in
+`App.OnStartup` via `sink.SetHandler(...)` *after* the host starts but *before* `overlay.Show()`,
+and marshal to the UI thread with `Dispatcher.BeginInvoke`.
 
-**WPF binding**: never bind `ItemsSource` through a non-`INotifyPropertyChanged` intermediate. Use `DataContext="{Binding Transcript}"` on the sub-element so the ItemsControl can bind `{Binding Items}` as a single hop on a proper `ObservableObject`. A two-hop path through a plain class silently drops `CollectionChanged` subscriptions.
+**WPF binding:** never bind `ItemsSource` through a non-`INotifyPropertyChanged` intermediate. Bind
+`DataContext="{Binding Transcript}"` on the sub-element so the ItemsControl binds `{Binding Items}` in
+a single hop on a proper `ObservableObject`. A two-hop path through a plain class silently drops
+`CollectionChanged` subscriptions.
 
-**WhisperModelProvider**: guarded by `SemaphoreSlim(1)` only during initial load/download. Once a `WhisperFactory` is cached, two processors built from the same factory can run in parallel (`factory.CreateBuilder().Build()` is independent per call).
-
-**Gitflow**: `feature/*` → `develop` → `release/*` → `master`. Never commit directly to `master`.
+**WhisperModelProvider:** `SemaphoreSlim(1)` guards only the initial load/download. Once a
+`WhisperFactory` is cached, processors built from it run in parallel (`factory.CreateBuilder().Build()`
+is independent per call).
 
 ## Standing rules
 
-Always-loaded project rules (import — keep these in mind on every change):
+Always-loaded project rules (keep in mind on every change):
 
 @.claude/rules/security.md
