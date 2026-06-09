@@ -114,12 +114,14 @@ public class RealAudioE2ETests : IAsyncLifetime
     }
 
     /// <remarks>
-    /// Me utterances are deterministically routed by the pipeline: they never trigger generation,
-    /// they only attach clarification context to the active turn and transition it to
-    /// AwaitingClarification. A second answer version is produced only when a subsequent Other
-    /// utterance arrives while the turn is in that state. This scenario verifies the Me path alone:
-    /// one turn with one answer version, the Me text transcribed and attached as clarification,
-    /// turn status AwaitingClarification recorded in the session.
+    /// Verifies the Me-clarification path: a Me utterance arriving ~3 s after the Other question
+    /// (gap 3000 ms) is attached to the active turn via <c>ClarificationQuestionIds</c> without
+    /// triggering answer regeneration. By the time the Me utterance is processed the turn is already
+    /// in <c>PreliminaryReady</c> (answer generation has completed), so the pipeline records the
+    /// clarification but does NOT flip the turn to <c>AwaitingClarification</c> — that transition
+    /// only occurs when the turn is still in <c>Detected</c>/<c>CollectingQuestion</c>. The test
+    /// therefore asserts: one turn, one answer version (Me never generates), and
+    /// <c>ClarificationQuestionIds</c> non-empty.
     /// </remarks>
     [Fact]
     public async Task Scenario3_MeClarification_AttachesClarificationAndAwaitsFurtherInput()
