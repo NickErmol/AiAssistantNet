@@ -1,0 +1,17 @@
+graph TD
+    App["AIHelperNET.App<br/><i>WPF · ViewModels · DI composition root</i>"]
+    Infra["AIHelperNET.Infrastructure<br/><i>EF Core · NAudio · Whisper · Claude/Ollama HTTP</i>"]
+    Appl["AIHelperNET.Application<br/><i>CQRS handlers · port interfaces</i>"]
+    Dom["AIHelperNET.Domain<br/><i>Session aggregate · DomainResult · typed IDs</i>"]
+
+    App --> Appl
+    App --> Infra
+    App --> Dom
+    Infra --> Appl
+    Infra --> Dom
+    Appl --> Dom
+
+    classDef core fill:#2d4a2d,stroke:#7cbf7c,color:#fff;
+    classDef edge fill:#3a3a5a,stroke:#8888cc,color:#fff;
+    class Dom core;
+    class App,Infra,Appl edge;
