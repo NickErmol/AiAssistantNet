@@ -151,6 +151,29 @@ public class RealAudioE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Scenario4_OtherAdditionalRequirement_RefinesSameCard()
+    {
+        var session = await PersistNewSessionAsync();
+        _host.Classifier.Enqueue(NewQuestion("What is dependency injection?"));
+        _host.Classifier.Enqueue(AdditionalRequirement("also keep it short please"));
+        var runner = NewRunner(new[]
+        {
+            new WavUtterance(Speaker.Other, "other_di.wav",      GapMsBefore: 0),
+            new WavUtterance(Speaker.Other, "other_shorter.wav", GapMsBefore: 3000),
+        });
+        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both);
+        await runner.WaitForCompletionAsync();
+        await PollUntilAsync(session.Id,
+            s => s.ConversationTurns.Count == 1 && s.ConversationTurns[0].AnswerVersions.Count >= 2,
+            AnswerTimeout);
+        await runner.StopAsync();
+        var reloaded = await ReloadAsync(session.Id);
+        reloaded.ConversationTurns.Should().ContainSingle();
+        reloaded.ConversationTurns[0].AnswerVersions.Count.Should().BeGreaterThanOrEqualTo(2);
+        _host.Sink.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Scenario1_SingleOtherQuestion_ProducesTranscriptAndOneCard()
     {
         var session = await PersistNewSessionAsync();
