@@ -20,7 +20,8 @@ public class BoundaryHeuristicEvalTests(ITestOutputHelper output)
 
         foreach (var entry in corpus)
         {
-            // recentQuestions mirrors the pipeline: prior Other-speaker texts.
+            // recentQuestions approximates the pipeline's duplicate-detection input (prior
+            // detected-question texts); here we use the corpus's Other-speaker recent texts.
             var recentQuestions = entry.RecentItems
                 .Where(i => i.Speaker == Speaker.Other)
                 .Select(i => i.Text)
