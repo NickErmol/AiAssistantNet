@@ -48,6 +48,11 @@ public class RealAudioE2ETests : IAsyncLifetime
             ShouldRefineExistingAnswer: false, ShouldCreateNewTurn: true,
             NormalizedQuestionText: text, Reason: "scripted");
 
+    private static BoundaryClassificationResult AdditionalRequirement(string text) =>
+        new(BoundaryLabel.AdditionalRequirement, 0.95, ShouldGenerateAnswer: true,
+            ShouldRefineExistingAnswer: true, ShouldCreateNewTurn: false,
+            NormalizedQuestionText: text, Reason: "scripted");
+
     private async Task<Session> PersistNewSessionAsync()
     {
         var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, DateTimeOffset.UnixEpoch).Value;
@@ -93,6 +98,19 @@ public class RealAudioE2ETests : IAsyncLifetime
                 throw new TimeoutException($"Session {id} did not reach the expected DB state in {timeout}.");
             await Task.Delay(100);
         }
+    }
+
+    [Fact]
+    public async Task Scenario6_MeWithNoPriorQuestion_ProducesNoCard()
+    {
+        var session = await PersistNewSessionAsync();
+        var runner = NewRunner(new[] { new WavUtterance(Speaker.Me, "me_chitchat.wav", GapMsBefore: 0) });
+        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both);
+        await runner.WaitForCompletionAsync();
+        await runner.StopAsync();
+        var reloaded = await ReloadAsync(session.Id);
+        reloaded.ConversationTurns.Should().BeEmpty();
+        _host.Sink.Errors.Should().BeEmpty();
     }
 
     [Fact]
