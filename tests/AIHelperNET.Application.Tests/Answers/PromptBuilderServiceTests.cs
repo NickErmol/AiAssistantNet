@@ -243,4 +243,66 @@ public class PromptBuilderServiceTests
             CodeProfile.Empty, AnswerSettings.Default, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
         prompt.System.Should().Contain("do not pad");
     }
+
+    [Fact]
+    public void Build_SystemDescribesFourPartStructure()
+    {
+        var q = DetectedQuestion.Create("What is resilience?", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("definition");
+        prompt.System.Should().Contain("bullets");
+        prompt.System.Should().Contain("principle");
+    }
+
+    [Fact]
+    public void Build_StillBansHeaders()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("NO headers");
+    }
+
+    [Fact]
+    public void Build_StillHasCodeOnlyRule()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("include code ONLY");
+    }
+
+    [Fact]
+    public void Build_ShortLength_OmitsGroupingAndExample()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var settings = AnswerSettings.Default with { Length = AnswerLength.ShortLength };
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, q);
+        prompt.System.Should().Contain("Do NOT group");
+        prompt.System.Should().NotContain("concrete example");
+    }
+
+    [Fact]
+    public void Build_DeepDive_IncludesGroupingAndExample()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var settings = AnswerSettings.Default with { Length = AnswerLength.DeepDive };
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, q);
+        prompt.System.Should().Contain("sub-labels");
+        prompt.System.Should().Contain("concrete example");
+    }
+
+    [Fact]
+    public void BuildFollowUp_IncludesMarkdownFormattingRule()
+    {
+        var prompt = PromptBuilderService.BuildFollowUp(CodeProfile.Empty, AnswerSettings.Default, "q", "a", "f");
+        prompt.System.Should().Contain("fenced");
+    }
+
+    [Fact]
+    public void BuildWithScreenMode_IncludesMarkdownFormattingRule()
+    {
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, AnswerSettings.Default, "code on screen",
+            SingleInterviewerLine, ScreenAnalysisMode.ExplainCode);
+        prompt.System.Should().Contain("fenced");
+    }
 }
