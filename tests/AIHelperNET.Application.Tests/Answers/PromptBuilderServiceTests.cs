@@ -9,6 +9,7 @@ namespace AIHelperNET.Application.Tests.Answers;
 public class PromptBuilderServiceTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UnixEpoch;
+    private static readonly string[] SingleInterviewerLine = ["line"];
 
     [Fact]
     public void Build_IncludesCodeProfileInSystem()
@@ -222,5 +223,25 @@ public class PromptBuilderServiceTests
 
         prompt.User.Should().Contain(new string('A', 400) + "…");
         prompt.User.Should().NotContain(new string('A', 401));
+    }
+
+    [Theory]
+    [InlineData(AnswerLength.VeryShort)]
+    [InlineData(AnswerLength.ShortLength)]
+    public void BuildWithScreenMode_AppliesThousandTokenFloor(AnswerLength length)
+    {
+        var settings = AnswerSettings.Default with { Length = length };
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.MaxTokens.Should().Be(1000);
+    }
+
+    [Fact]
+    public void BuildWithScreenMode_DeepDive_KeepsHigherMapping()
+    {
+        var settings = AnswerSettings.Default with { Length = AnswerLength.DeepDive };
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.MaxTokens.Should().Be(2000);
     }
 }

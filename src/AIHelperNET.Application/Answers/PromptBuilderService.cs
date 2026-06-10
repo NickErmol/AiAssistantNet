@@ -164,7 +164,7 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 500));
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 1000));
     }
 
     private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
