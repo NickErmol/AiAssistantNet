@@ -33,15 +33,19 @@ public sealed class InterviewHost : IAsyncDisposable
     /// <summary>The capturing transcript sink (singleton) for asserting per-speaker transcripts.</summary>
     public CapturingTranscriptSink Transcripts { get; }
 
+    /// <summary>The capturing turn sink (singleton) recording created cards in order.</summary>
+    public CapturingTurnSink Cards { get; }
+
     private InterviewHost(ServiceProvider provider, SqliteConnection keepAlive,
         CapturingAnswerStreamSink sink, FakeQuestionBoundaryClassifier classifier,
-        CapturingTranscriptSink transcripts)
+        CapturingTranscriptSink transcripts, CapturingTurnSink cards)
     {
         _provider = provider;
         _keepAlive = keepAlive;
         Sink = sink;
         Classifier = classifier;
         Transcripts = transcripts;
+        Cards = cards;
     }
 
     /// <summary>Builds the host, opens the shared in-memory DB, and applies migrations.</summary>
@@ -74,7 +78,8 @@ public sealed class InterviewHost : IAsyncDisposable
         services.AddSingleton<IAnswerStreamSink>(sink);
         var transcripts = new CapturingTranscriptSink();
         services.AddSingleton<ITranscriptSink>(transcripts);
-        services.AddSingleton<IConversationTurnSink>(Substitute.For<IConversationTurnSink>());
+        var cards = new CapturingTurnSink();
+        services.AddSingleton<IConversationTurnSink>(cards);
         // Override the file-writing recorder so the E2E never touches the real data root.
         services.AddSingleton<IBoundaryDecisionRecorder>(Substitute.For<IBoundaryDecisionRecorder>());
 
@@ -86,7 +91,7 @@ public sealed class InterviewHost : IAsyncDisposable
             await db.Database.MigrateAsync();
         }
 
-        return new InterviewHost(provider, keepAlive, sink, classifier, transcripts);
+        return new InterviewHost(provider, keepAlive, sink, classifier, transcripts, cards);
     }
 
     private static void RemoveDbContext(ServiceCollection services)
