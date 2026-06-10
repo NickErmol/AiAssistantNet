@@ -275,9 +275,10 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     [RelayCommand]
     private async Task DismissAsync(TurnVm? turn)
     {
-        if (turn is null || ActiveSessionId is not { } sid) return;
-        await mediator.Send(new DismissTurnCommand(sid, turn.Id));
+        if (turn is null) return;
         if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
+        if (ActiveSessionId is { } sid)
+            await mediator.Send(new DismissTurnCommand(sid, turn.Id));
         Turns.Remove(turn);
     }
 
@@ -285,9 +286,10 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     [RelayCommand]
     private async Task ResolveAsync(TurnVm? turn)
     {
-        if (turn is null || ActiveSessionId is not { } sid) return;
-        await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
+        if (turn is null) return;
         if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
+        if (ActiveSessionId is { } sid)
+            await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
         Turns.Remove(turn);
     }
 
@@ -314,7 +316,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     /// <summary>Captures the screen and (re)generates one answer over the accumulated captures of the
     /// current task. Captures less than <see cref="ScreenCaptureGroupGap"/> apart refine the same card;
     /// a longer gap starts a new card. Each capture cancels any in-flight screen generation.</summary>
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
         if (ActiveSessionId is not { } sid) return;
