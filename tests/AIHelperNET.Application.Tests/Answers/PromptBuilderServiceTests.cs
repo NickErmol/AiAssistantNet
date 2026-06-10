@@ -9,6 +9,7 @@ namespace AIHelperNET.Application.Tests.Answers;
 public class PromptBuilderServiceTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UnixEpoch;
+    private static readonly string[] SingleInterviewerLine = ["line"];
 
     [Fact]
     public void Build_IncludesCodeProfileInSystem()
@@ -224,6 +225,25 @@ public class PromptBuilderServiceTests
         prompt.User.Should().NotContain(new string('A', 401));
     }
 
+    [Theory]
+    [InlineData(AnswerLength.VeryShort)]
+    [InlineData(AnswerLength.ShortLength)]
+    public void BuildWithScreenMode_AppliesMinimumTokenFloor(AnswerLength length)
+    {
+        var settings = AnswerSettings.Default with { Length = length };
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.MaxTokens.Should().Be(2000);
+    }
+
+    [Fact]
+    public void BuildWithScreenMode_InstructsModelNotToPad()
+    {
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, AnswerSettings.Default, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.System.Should().Contain("do not pad");
+    }
+
     [Fact]
     public void Build_SystemDescribesFourPartStructure()
     {
@@ -280,10 +300,9 @@ public class PromptBuilderServiceTests
     [Fact]
     public void BuildWithScreenMode_IncludesMarkdownFormattingRule()
     {
-        string[] interviewerLines = ["line"];
         var prompt = PromptBuilderService.BuildWithScreenMode(
             CodeProfile.Empty, AnswerSettings.Default, "code on screen",
-            interviewerLines, ScreenAnalysisMode.ExplainCode);
+            SingleInterviewerLine, ScreenAnalysisMode.ExplainCode);
         prompt.System.Should().Contain("fenced");
     }
 }

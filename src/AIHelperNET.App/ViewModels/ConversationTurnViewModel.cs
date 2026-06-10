@@ -100,8 +100,13 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
     /// <summary>Gets the turn identifier.</summary>
     public ConversationTurnId Id                              => id;
 
-    /// <summary>Gets the text of the initial question.</summary>
-    public string InitialQuestion                             => initialQuestion;
+    private string _initialQuestion = initialQuestion;
+    /// <summary>Gets or sets the text of the initial question (updated to show the screen-capture count).</summary>
+    public string InitialQuestion
+    {
+        get => _initialQuestion;
+        set => SetProperty(ref _initialQuestion, value);
+    }
 
     private ConversationTurnStatus _status = ConversationTurnStatus.Detected;
     /// <summary>Gets or sets the current turn status.</summary>
@@ -180,12 +185,18 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
-public sealed partial class ConversationTurnViewModel(IMediator mediator) : ObservableObject
+public sealed partial class ConversationTurnViewModel(IMediator mediator, TimeProvider clock) : ObservableObject
 {
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
     [ObservableProperty] private int _answerFontSize = 12;
     [ObservableProperty] private bool _isFollowUpEnabled;
+
+    private static readonly TimeSpan ScreenCaptureGroupGap = TimeSpan.FromSeconds(8);
+    private readonly ScreenCaptureAccumulator _screenAccumulator = new(ScreenCaptureGroupGap);
+    private ConversationTurnId? _screenGroupTurnId;
+    private CancellationTokenSource? _screenGenCts;
+    private int _screenGenInFlight;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
@@ -265,8 +276,17 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     public void AddTurn(ConversationTurnId id, string question)
         => Turns.Insert(0, new TurnVm(id, question));
 
-    /// <summary>Clears all turns and resets the active session.</summary>
-    public void Clear() { Turns.Clear(); ActiveSessionId = null; }
+    /// <summary>Clears all turns and resets the active session and any in-progress screen-capture group.</summary>
+    public void Clear()
+    {
+        _screenGenCts?.Cancel();
+        _screenGenCts?.Dispose();
+        _screenGenCts = null;
+        _screenGroupTurnId = null;
+        _screenAccumulator.Reset();
+        Turns.Clear();
+        ActiveSessionId = null;
+    }
 
     /// <summary>Regenerates the answer for the given turn, optionally with screen context.</summary>
     [RelayCommand]
@@ -280,8 +300,10 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     [RelayCommand]
     private async Task DismissAsync(TurnVm? turn)
     {
-        if (turn is null || ActiveSessionId is not { } sid) return;
-        await mediator.Send(new DismissTurnCommand(sid, turn.Id));
+        if (turn is null) return;
+        if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
+        if (ActiveSessionId is { } sid)
+            await mediator.Send(new DismissTurnCommand(sid, turn.Id));
         Turns.Remove(turn);
     }
 
@@ -289,8 +311,10 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     [RelayCommand]
     private async Task ResolveAsync(TurnVm? turn)
     {
-        if (turn is null || ActiveSessionId is not { } sid) return;
-        await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
+        if (turn is null) return;
+        if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
+        if (ActiveSessionId is { } sid)
+            await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
         Turns.Remove(turn);
     }
 
@@ -314,8 +338,11 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             System.Windows.Clipboard.SetText(text);
     }
 
-    /// <summary>Captures the current screen and either creates a new turn (if none exist) or updates the most recent one.</summary>
-    [RelayCommand]
+    /// <summary>Captures the screen and (re)generates one answer over the accumulated captures of the
+    /// current task. Captures taken while a generation is in flight, or within
+    /// <see cref="ScreenCaptureGroupGap"/> of the previous generation finishing, refine the same card;
+    /// a longer idle gap starts a new card. Each capture cancels any in-flight screen generation.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
         if (ActiveSessionId is not { } sid) return;
@@ -328,17 +355,65 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             ? _lastInterviewerLines
             : [];
 
-        var activeTurn = Turns.FirstOrDefault();
-        if (activeTurn is null)
-        {
-            await mediator.Send(new StartScreenTurnCommand(
-                sid, ocrResult.Value, sessionControl.ScreenAnalysisMode, interviewerLines));
-            return;
-        }
+        var now = clock.GetUtcNow();
+        // A capture taken while a generation is still streaming belongs to the same task regardless of
+        // how long the answer takes, so re-anchor the gap to "now" before deciding.
+        if (_screenGenInFlight > 0)
+            _screenAccumulator.Touch(now);
 
-        await mediator.Send(new RegenerateAnswerWithScreenCommand(
-            sid, activeTurn.Id, ocrResult.Value,
-            sessionControl.ScreenAnalysisMode, interviewerLines));
+        var add = _screenAccumulator.Add(ocrResult.Value, now);
+
+        // Supersede any in-flight screen generation for this group.
+        _screenGenCts?.Cancel();
+        _screenGenCts?.Dispose();
+        _screenGenCts = new CancellationTokenSource();
+        var token = _screenGenCts.Token;
+
+        if (add.IsNewGroup)
+            _screenGroupTurnId = null;
+
+        _screenGenInFlight++;
+        try
+        {
+            if (_screenGroupTurnId is null)
+            {
+                var created = await mediator.Send(new CreateScreenTurnCommand(sid), token);
+                if (created.IsFailed) return;
+                _screenGroupTurnId = created.Value;
+            }
+
+            var turnId = _screenGroupTurnId.Value;
+            var turn = Turns.FirstOrDefault(t => t.Id == turnId);
+            if (turn is not null)
+            {
+                turn.InitialQuestion = add.Count > 1
+                    ? $"[Screen capture · {add.Count} screens]"
+                    : "[Screen capture]";
+
+                // Reset the displayed answer before this (re)generation streams. Chunks append to the
+                // latest version, so without this a superseded partial answer would be concatenated
+                // with the new one (the card shows two glued answers).
+                var latest = turn.AnswerVersions.FirstOrDefault(v => v.IsLatest);
+                if (latest is not null)
+                    latest.Text = string.Empty;
+            }
+
+            await mediator.Send(new RegenerateAnswerWithScreenCommand(
+                sid, turnId, add.CombinedOcr, sessionControl.ScreenAnalysisMode, interviewerLines), token);
+
+            // Generation finished normally — restart the idle window from the completion moment so a
+            // capture taken after reading a slow answer still joins this card.
+            _screenAccumulator.Touch(clock.GetUtcNow());
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer capture (its CTS was cancelled). The winning capture takes over,
+            // so this generation does not re-anchor the window.
+        }
+        finally
+        {
+            _screenGenInFlight--;
+        }
     }
 
     private string[] _lastInterviewerLines = [];
