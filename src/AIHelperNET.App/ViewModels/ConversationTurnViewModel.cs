@@ -80,8 +80,13 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
     /// <summary>Gets the turn identifier.</summary>
     public ConversationTurnId Id                              => id;
 
-    /// <summary>Gets the text of the initial question.</summary>
-    public string InitialQuestion                             => initialQuestion;
+    private string _initialQuestion = initialQuestion;
+    /// <summary>Gets or sets the text of the initial question (updated to show the screen-capture count).</summary>
+    public string InitialQuestion
+    {
+        get => _initialQuestion;
+        set => SetProperty(ref _initialQuestion, value);
+    }
 
     private ConversationTurnStatus _status = ConversationTurnStatus.Detected;
     /// <summary>Gets or sets the current turn status.</summary>
@@ -160,12 +165,17 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
-public sealed partial class ConversationTurnViewModel(IMediator mediator) : ObservableObject
+public sealed partial class ConversationTurnViewModel(IMediator mediator, TimeProvider clock) : ObservableObject
 {
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
     [ObservableProperty] private int _answerFontSize = 12;
     [ObservableProperty] private bool _isFollowUpEnabled;
+
+    private static readonly TimeSpan ScreenCaptureGroupGap = TimeSpan.FromSeconds(8);
+    private readonly ScreenCaptureAccumulator _screenAccumulator = new(ScreenCaptureGroupGap);
+    private ConversationTurnId? _screenGroupTurnId;
+    private CancellationTokenSource? _screenGenCts;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
@@ -258,6 +268,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     {
         if (turn is null || ActiveSessionId is not { } sid) return;
         await mediator.Send(new DismissTurnCommand(sid, turn.Id));
+        if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
         Turns.Remove(turn);
     }
 
@@ -267,6 +278,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     {
         if (turn is null || ActiveSessionId is not { } sid) return;
         await mediator.Send(new ResolveTurnCommand(sid, turn.Id));
+        if (_screenGroupTurnId == turn.Id) { _screenAccumulator.Reset(); _screenGroupTurnId = null; }
         Turns.Remove(turn);
     }
 
@@ -290,7 +302,9 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             System.Windows.Clipboard.SetText(text);
     }
 
-    /// <summary>Captures the current screen and either creates a new turn (if none exist) or updates the most recent one.</summary>
+    /// <summary>Captures the screen and (re)generates one answer over the accumulated captures of the
+    /// current task. Captures less than <see cref="ScreenCaptureGroupGap"/> apart refine the same card;
+    /// a longer gap starts a new card. Each capture cancels any in-flight screen generation.</summary>
     [RelayCommand]
     private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
@@ -304,17 +318,40 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
             ? _lastInterviewerLines
             : [];
 
-        var activeTurn = Turns.FirstOrDefault();
-        if (activeTurn is null)
-        {
-            await mediator.Send(new StartScreenTurnCommand(
-                sid, ocrResult.Value, sessionControl.ScreenAnalysisMode, interviewerLines));
-            return;
-        }
+        var add = _screenAccumulator.Add(ocrResult.Value, clock.GetUtcNow());
 
-        await mediator.Send(new RegenerateAnswerWithScreenCommand(
-            sid, activeTurn.Id, ocrResult.Value,
-            sessionControl.ScreenAnalysisMode, interviewerLines));
+        // Supersede any in-flight screen generation for this group.
+        _screenGenCts?.Cancel();
+        _screenGenCts?.Dispose();
+        _screenGenCts = new CancellationTokenSource();
+        var token = _screenGenCts.Token;
+
+        if (add.IsNewGroup)
+            _screenGroupTurnId = null;
+
+        try
+        {
+            if (_screenGroupTurnId is null)
+            {
+                var created = await mediator.Send(new CreateScreenTurnCommand(sid), token);
+                if (created.IsFailed) return;
+                _screenGroupTurnId = created.Value;
+            }
+
+            var turnId = _screenGroupTurnId.Value;
+            var turn = Turns.FirstOrDefault(t => t.Id == turnId);
+            if (turn is not null)
+                turn.InitialQuestion = add.Count > 1
+                    ? $"[Screen capture · {add.Count} screens]"
+                    : "[Screen capture]";
+
+            await mediator.Send(new RegenerateAnswerWithScreenCommand(
+                sid, turnId, add.CombinedOcr, sessionControl.ScreenAnalysisMode, interviewerLines), token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer capture — the next capture's generation takes over.
+        }
     }
 
     private string[] _lastInterviewerLines = [];
