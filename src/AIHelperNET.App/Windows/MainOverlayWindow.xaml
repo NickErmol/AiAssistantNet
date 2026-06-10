@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctrl="clr-namespace:AIHelperNET.App.Windows.Controls"
+        xmlns:controls="clr-namespace:AIHelperNET.App.Controls"
         Title="AIHelper"
         Width="600" Height="640"
         MinWidth="320" MinHeight="320"
@@ -415,25 +416,61 @@
                                                         </Style>
                                                     </TextBlock.Style>
                                                 </TextBlock>
-                                                <TextBlock Text="{Binding LatestVersion.Text}"
-                                                           FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
-                                                                              RelativeSource={RelativeSource AncestorType=Window}}"
-                                                           TextWrapping="Wrap"
-                                                           FontFamily="Cascadia Mono, Consolas"
-                                                           Margin="0,0,0,4">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground"
-                                                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding LatestVersion.IsError}" Value="True">
-                                                                    <Setter Property="Foreground"
-                                                                            Value="{DynamicResource Brush.Semantic.Error}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
+                                                <Grid Margin="0,0,0,4">
+                                                    <!-- Streaming: live raw mono text -->
+                                                    <TextBlock Text="{Binding LatestVersion.Text}"
+                                                               FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                                               TextWrapping="Wrap"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               Foreground="{DynamicResource Brush.Foreground.Primary}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding LatestVersion.IsComplete}" Value="False"/>
+                                                                            <Condition Binding="{Binding LatestVersion.IsError}" Value="False"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <!-- Complete: rendered markdown -->
+                                                    <controls:MarkdownPresenter
+                                                        Markdown="{Binding LatestVersion.RenderedMarkdown}"
+                                                        BaseFontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                                               RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <controls:MarkdownPresenter.Style>
+                                                            <Style TargetType="controls:MarkdownPresenter">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding LatestVersion.IsComplete}" Value="True"/>
+                                                                            <Condition Binding="{Binding LatestVersion.IsError}" Value="False"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </controls:MarkdownPresenter.Style>
+                                                    </controls:MarkdownPresenter>
+
+                                                    <!-- Error: distinct error styling -->
+                                                    <TextBlock Text="{Binding LatestVersion.Text}"
+                                                               FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                                               TextWrapping="Wrap"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               Foreground="{DynamicResource Brush.Semantic.Error}"
+                                                               Visibility="{Binding LatestVersion.IsError,
+                                                                   Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                </Grid>
                                                 <StackPanel Orientation="Horizontal">
                                                     <Button Content="Copy"
                                                             Command="{Binding DataContext.ConversationTurn.CopyLatestCommand,
