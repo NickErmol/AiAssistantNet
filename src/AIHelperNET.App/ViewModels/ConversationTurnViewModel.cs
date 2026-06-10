@@ -176,6 +176,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     private readonly ScreenCaptureAccumulator _screenAccumulator = new(ScreenCaptureGroupGap);
     private ConversationTurnId? _screenGroupTurnId;
     private CancellationTokenSource? _screenGenCts;
+    private int _screenGenInFlight;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
@@ -314,8 +315,9 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     }
 
     /// <summary>Captures the screen and (re)generates one answer over the accumulated captures of the
-    /// current task. Captures less than <see cref="ScreenCaptureGroupGap"/> apart refine the same card;
-    /// a longer gap starts a new card. Each capture cancels any in-flight screen generation.</summary>
+    /// current task. Captures taken while a generation is in flight, or within
+    /// <see cref="ScreenCaptureGroupGap"/> of the previous generation finishing, refine the same card;
+    /// a longer idle gap starts a new card. Each capture cancels any in-flight screen generation.</summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task CaptureScreenAsync(SessionControlViewModel? sessionControl)
     {
@@ -329,7 +331,13 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
             ? _lastInterviewerLines
             : [];
 
-        var add = _screenAccumulator.Add(ocrResult.Value, clock.GetUtcNow());
+        var now = clock.GetUtcNow();
+        // A capture taken while a generation is still streaming belongs to the same task regardless of
+        // how long the answer takes, so re-anchor the gap to "now" before deciding.
+        if (_screenGenInFlight > 0)
+            _screenAccumulator.Touch(now);
+
+        var add = _screenAccumulator.Add(ocrResult.Value, now);
 
         // Supersede any in-flight screen generation for this group.
         _screenGenCts?.Cancel();
@@ -340,6 +348,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
         if (add.IsNewGroup)
             _screenGroupTurnId = null;
 
+        _screenGenInFlight++;
         try
         {
             if (_screenGroupTurnId is null)
@@ -358,11 +367,19 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
 
             await mediator.Send(new RegenerateAnswerWithScreenCommand(
                 sid, turnId, add.CombinedOcr, sessionControl.ScreenAnalysisMode, interviewerLines), token);
+
+            // Generation finished normally — restart the idle window from the completion moment so a
+            // capture taken after reading a slow answer still joins this card.
+            _screenAccumulator.Touch(clock.GetUtcNow());
         }
         catch (OperationCanceledException)
         {
-            // Either CreateScreenTurnCommand or RegenerateAnswerWithScreenCommand was superseded by a
-            // newer capture (its CTS was cancelled). The winning capture's generation takes over.
+            // Superseded by a newer capture (its CTS was cancelled). The winning capture takes over,
+            // so this generation does not re-anchor the window.
+        }
+        finally
+        {
+            _screenGenInFlight--;
         }
     }
 

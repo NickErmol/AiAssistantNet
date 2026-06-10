@@ -41,6 +41,12 @@ public sealed class ScreenCaptureAccumulator(TimeSpan gap)
         _hasGroup = false;
     }
 
+    /// <summary>Updates the activity timestamp without adding a capture — used to anchor the gap to
+    /// the moment the last generation finished (or to keep the group alive while one is in flight),
+    /// so a slow answer does not cause the next capture to start a new group. Has no effect on the
+    /// buffer or on whether a group is active.</summary>
+    public void Touch(DateTimeOffset now) => _lastCaptureAt = now;
+
     private static string Combine(List<string> captures)
     {
         if (captures.Count == 1)

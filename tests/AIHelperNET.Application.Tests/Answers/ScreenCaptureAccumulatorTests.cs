@@ -88,4 +88,25 @@ public class ScreenCaptureAccumulatorTests
         second.Count.Should().Be(2);
         second.CombinedOcr.Should().Be("--- Screen 1 ---\n\n\n--- Screen 2 ---\nreal");
     }
+
+    [Fact]
+    public void Touch_ExtendsTheGroupWindow()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("first", T0);                          // group active, last activity = T0
+        acc.Touch(T0.AddSeconds(20));                  // simulate a 20s generation finishing
+        var r = acc.Add("second", T0.AddSeconds(23));  // 3s after the touch → same group
+        r.IsNewGroup.Should().BeFalse();
+        r.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Touch_WithoutActiveGroup_NextAddStillStartsNewGroup()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Touch(T0);                                 // no group yet
+        var r = acc.Add("first", T0.AddSeconds(1));
+        r.IsNewGroup.Should().BeTrue();
+        r.Count.Should().Be(1);
+    }
 }
