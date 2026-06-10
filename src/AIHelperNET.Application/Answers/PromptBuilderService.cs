@@ -48,13 +48,18 @@ public sealed class PromptBuilderService
 
         system.AppendLine();
         system.AppendLine("STRICT RULES:");
-        system.AppendLine("1. Be concise. 3–5 sentences or 3–4 bullets max. No padding.");
-        system.AppendLine("2. Answer like an experienced engineer speaking — clear, direct, no filler.");
-        system.AppendLine("3. NO markdown headers (no #, ##). Use plain prose or short bullets.");
+        system.AppendLine("1. Answer like an experienced engineer speaking — first person, spoken, direct, no filler.");
+        system.AppendLine("2. Structure the answer as: (a) a 1–2 sentence definition or reframe to open; " +
+            "(b) a first-person cue line (e.g. \"I would focus on:\") followed by terse \"- \" bullets; " +
+            "(c) a single closing principle line.");
+        AppendStructureGuidance(system, settings.Length);
+        system.AppendLine("3. FORMATTING: use **bold** for emphasis and sub-labels, and \"- \" for bullets. " +
+            "NO headers (no #, ##). Put any code in fenced ```language blocks.");
         system.AppendLine("4. CODE: include code ONLY when the question explicitly asks to write, " +
             "implement, fix, debug, show syntax, or provide a query/example. " +
             "For conceptual, design, 'what is', 'why', 'how does it work' questions — verbal answer only.");
         system.AppendLine("5. Start directly with the answer. Never say 'Great question' or restate the question.");
+        system.AppendLine("6. Give the answer only — no 'why this is a good answer' commentary or meta-notes.");
 
         AppendCodeProfile(system, profile);
 
@@ -124,6 +129,7 @@ public sealed class PromptBuilderService
             "You previously answered a question. Now the candidate asks a follow-up. " +
             "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
         AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
 
         var user = new StringBuilder();
         user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
@@ -148,6 +154,7 @@ public sealed class PromptBuilderService
         var system = new StringBuilder();
         system.AppendLine(ModeSystemPrompt(mode));
         AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
 
         var user = new StringBuilder();
         var lines = interviewerLines.ToList();
@@ -226,6 +233,32 @@ public sealed class PromptBuilderService
 
         if (!string.IsNullOrWhiteSpace(p.CustomNotes))
             sb.AppendLine(CultureInfo.InvariantCulture, $"- notes: {p.CustomNotes}");
+    }
+
+    private const string SharedMarkdownRule =
+        "Formatting: use \"- \" for bullets and **bold** for emphasis; " +
+        "put any code in fenced ```language blocks; no headers (#).";
+
+    private static void AppendStructureGuidance(StringBuilder sb, AnswerLength length)
+    {
+        switch (length)
+        {
+            case AnswerLength.VeryShort:
+            case AnswerLength.ShortLength:
+                sb.AppendLine("   Keep it flat: the opening definition, then 4–6 terse bullets, then the principle. " +
+                    "Do NOT group bullets under sub-labels and do NOT include a worked example.");
+                break;
+            case AnswerLength.Medium:
+                sb.AppendLine("   Bullets may be grouped under **bold sub-labels:** when the topic has natural dimensions.");
+                break;
+            case AnswerLength.Detailed:
+            case AnswerLength.DeepDive:
+                sb.AppendLine("   Group bullets under **bold sub-labels:** for each dimension, and include one short " +
+                    "concrete example (a brief scenario or ordered steps) before the closing principle.");
+                break;
+            default:
+                break;
+        }
     }
 
     private static int MapLengthToTokens(AnswerLength length) => length switch
