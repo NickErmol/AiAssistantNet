@@ -34,13 +34,13 @@ public sealed class CreateScreenTurnHandler(
         if (turnResult.IsFailed) return Result.Fail<ConversationTurnId>(turnResult.Error);
         var turn = turnResult.Value;
 
-        // Notify UI so the card exists before the first answer chunk arrives.
-        turnSink.OnTurnCreated(turn.Id, QuestionLabel);
-
         repository.Update(session);
         var save = await unitOfWork.SaveChangesAsync(cancellationToken);
         if (save.IsFailed) return Result.Fail<ConversationTurnId>(save.Errors);
 
+        // Notify the UI only after a successful save, so a cancelled or failed create never
+        // leaves a phantom card. The streaming answer (RegenerateAnswerWithScreen) runs afterwards.
+        turnSink.OnTurnCreated(turn.Id, QuestionLabel);
         return Result.Ok(turn.Id);
     }
 }

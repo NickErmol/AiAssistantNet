@@ -251,8 +251,17 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
     public void AddTurn(ConversationTurnId id, string question)
         => Turns.Insert(0, new TurnVm(id, question));
 
-    /// <summary>Clears all turns and resets the active session.</summary>
-    public void Clear() { Turns.Clear(); ActiveSessionId = null; }
+    /// <summary>Clears all turns and resets the active session and any in-progress screen-capture group.</summary>
+    public void Clear()
+    {
+        _screenGenCts?.Cancel();
+        _screenGenCts?.Dispose();
+        _screenGenCts = null;
+        _screenGroupTurnId = null;
+        _screenAccumulator.Reset();
+        Turns.Clear();
+        ActiveSessionId = null;
+    }
 
     /// <summary>Regenerates the answer for the given turn, optionally with screen context.</summary>
     [RelayCommand]
@@ -350,7 +359,8 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
         }
         catch (OperationCanceledException)
         {
-            // Superseded by a newer capture — the next capture's generation takes over.
+            // Either CreateScreenTurnCommand or RegenerateAnswerWithScreenCommand was superseded by a
+            // newer capture (its CTS was cancelled). The winning capture's generation takes over.
         }
     }
 
