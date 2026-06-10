@@ -1,0 +1,67 @@
+using AIHelperNET.Application.Answers;
+using FluentAssertions;
+using Xunit;
+
+namespace AIHelperNET.Application.Tests.Answers;
+
+public class ScreenCaptureAccumulatorTests
+{
+    private static readonly DateTimeOffset T0 = DateTimeOffset.UnixEpoch;
+    private static readonly TimeSpan Gap = TimeSpan.FromSeconds(8);
+
+    [Fact]
+    public void Add_FirstCapture_IsNewGroup_RawOcr()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        var r = acc.Add("screen one", T0);
+        r.IsNewGroup.Should().BeTrue();
+        r.Count.Should().Be(1);
+        r.CombinedOcr.Should().Be("screen one");
+    }
+
+    [Fact]
+    public void Add_SecondCaptureWithinGap_ContinuesGroup_LabeledConcat()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("first", T0);
+        var r = acc.Add("second", T0.AddSeconds(3));
+        r.IsNewGroup.Should().BeFalse();
+        r.Count.Should().Be(2);
+        r.CombinedOcr.Should().Be("--- Screen 1 ---\nfirst\n\n--- Screen 2 ---\nsecond");
+    }
+
+    [Fact]
+    public void Add_CaptureAtGapBoundary_StartsNewGroup()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("first", T0);
+        var r = acc.Add("second", T0.AddSeconds(8)); // exactly gap → new group
+        r.IsNewGroup.Should().BeTrue();
+        r.Count.Should().Be(1);
+        r.CombinedOcr.Should().Be("second");
+    }
+
+    [Fact]
+    public void Add_ThreeWithinGap_AccumulatesAllInOrder()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("a", T0);
+        acc.Add("b", T0.AddSeconds(2));
+        var r = acc.Add("c", T0.AddSeconds(4));
+        r.IsNewGroup.Should().BeFalse();
+        r.Count.Should().Be(3);
+        r.CombinedOcr.Should().Be("--- Screen 1 ---\na\n\n--- Screen 2 ---\nb\n\n--- Screen 3 ---\nc");
+    }
+
+    [Fact]
+    public void Reset_StartsFreshGroupOnNextAdd()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("first", T0);
+        acc.Reset();
+        var r = acc.Add("second", T0.AddSeconds(1)); // within gap, but reset → new group
+        r.IsNewGroup.Should().BeTrue();
+        r.Count.Should().Be(1);
+        r.CombinedOcr.Should().Be("second");
+    }
+}
