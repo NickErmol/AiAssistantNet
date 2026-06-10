@@ -131,4 +131,33 @@ public class AnswerMarkdownParserTests
         blocks[3].Should().BeOfType<CodeBlock>();
         blocks[4].Should().BeOfType<ParagraphBlock>();
     }
+
+    [Fact]
+    public void Parse_UnclosedInlineCode_TreatedAsLiteralText()
+    {
+        var blocks = AnswerMarkdownParser.Parse("Use `foo bar");
+        var p = (ParagraphBlock)blocks[0];
+        p.Inlines.Should().ContainSingle()
+            .Which.Should().BeOfType<TextRun>()
+            .Which.Text.Should().Be("Use `foo bar");
+    }
+
+    [Fact]
+    public void Parse_FencedCodeWithBlankLine_PreservesBlankLineInCode()
+    {
+        var blocks = AnswerMarkdownParser.Parse("```\nline one\n\nline two\n```");
+        ((CodeBlock)blocks[0]).Code.Should().Be("line one\n\nline two");
+    }
+
+    [Fact]
+    public void Parse_EmptyBoldAndCodeMarkers_TreatedAsLiteralText()
+    {
+        var bold = (ParagraphBlock)AnswerMarkdownParser.Parse("a ****b")[0];
+        bold.Inlines.Should().ContainSingle().Which.Should().BeOfType<TextRun>()
+            .Which.Text.Should().Be("a ****b");
+
+        var code = (ParagraphBlock)AnswerMarkdownParser.Parse("a ``b")[0];
+        code.Inlines.Should().ContainSingle().Which.Should().BeOfType<TextRun>()
+            .Which.Text.Should().Be("a ``b");
+    }
 }

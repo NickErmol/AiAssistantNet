@@ -59,6 +59,8 @@ public static class AnswerMarkdownParser
                 continue;
             }
 
+            // Note: a blank line between bullets splits them into separate ListBlocks — acceptable
+            // given the constrained answer-prompt output (the renderer treats adjacent lists the same).
             // Unordered list
             if (IsUnorderedBullet(trimmed))
             {
@@ -130,7 +132,7 @@ public static class AnswerMarkdownParser
             if (i + 1 < text.Length && text[i] == '*' && text[i + 1] == '*')
             {
                 var close = text.IndexOf("**", i + 2, StringComparison.Ordinal);
-                if (close > i + 1)
+                if (close > i + 2)
                 {
                     FlushText();
                     inlines.Add(new BoldRun(text[(i + 2)..close]));
@@ -143,7 +145,7 @@ public static class AnswerMarkdownParser
             if (text[i] == '`')
             {
                 var close = text.IndexOf('`', i + 1);
-                if (close > i)
+                if (close > i + 1)
                 {
                     FlushText();
                     inlines.Add(new CodeRun(text[(i + 1)..close]));
