@@ -133,7 +133,7 @@ public sealed class GenerateAnswerHandler(
         {
             answer.Fail(clock.GetUtcNow());
             feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
-            await streamSink.OnErrorAsync(cmd.TurnId, ex.Message, cancellationToken);
+            await streamSink.OnErrorAsync(cmd.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 

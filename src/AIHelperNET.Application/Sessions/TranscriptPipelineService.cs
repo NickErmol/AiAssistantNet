@@ -543,6 +543,33 @@ public sealed partial class TranscriptPipelineService(
         return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
     }
 
+    /// <summary>
+    /// Resets all per-session mutable state so the singleton pipeline is clean at the start of
+    /// a new session. Call this once from <c>SessionRunner.StartAsync</c> after the session loads
+    /// successfully and before the audio/transcription loop begins.
+    /// </summary>
+    /// <remarks>
+    /// Cancels and disposes every in-flight <see cref="CancellationTokenSource"/> (mirrors
+    /// <see cref="Dispose"/>), clears turn-activity timestamps, nulls the collection-start
+    /// marker, clears the recent-items context window used by the AI boundary classifier, and
+    /// resets the segment accumulator and regen debouncer. Stateless helpers
+    /// (<c>_detector</c>, <c>_boundaryDetector</c>, <c>_splitGuard</c>) are not affected.
+    /// </remarks>
+    public void Reset()
+    {
+        foreach (var cts in _turnCts.Values)
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+        _turnCts.Clear();
+        _lastActivityAt.Clear();
+        _collectionStartedAt = null;
+        _recentItems.Clear();
+        _accumulator.Reset();
+        _regenDebouncer.Reset();
+    }
+
     /// <summary>Releases resources owned by this service.</summary>
     public void Dispose()
     {

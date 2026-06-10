@@ -88,7 +88,7 @@ public sealed class StartScreenTurnHandler(
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
-            await streamSink.OnErrorAsync(turn.Id, ex.Message, cancellationToken);
+            await streamSink.OnErrorAsync(turn.Id, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 

@@ -40,6 +40,7 @@ public sealed class SessionRunner(
             return;
         }
 
+        pipeline.Reset();
         _cts          = new CancellationTokenSource();
         _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, _cts.Token);
     }

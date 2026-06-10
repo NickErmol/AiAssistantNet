@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AIHelperNET.App.Windows"
         Title="AIHelper — Settings" Width="560" Height="600"
-        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" ResizeMode="NoResize"
         Background="{DynamicResource Brush.Background.Window}"
         Loaded="Window_Loaded">
 
