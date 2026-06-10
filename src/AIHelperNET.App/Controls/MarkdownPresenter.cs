@@ -81,7 +81,7 @@ public sealed class MarkdownPresenter : ContentControl
                 code.SetResourceReference(TextElement.ForegroundProperty, "Brush.Markdown.InlineCode");
                 return code;
             default:
-                return new Run(((TextRun)inline).Text);
+                return inline is TextRun t ? new Run(t.Text) : new Run(string.Empty);
         }
     }
 

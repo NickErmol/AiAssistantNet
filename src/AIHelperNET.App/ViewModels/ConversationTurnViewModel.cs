@@ -71,7 +71,10 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
     }
 
     /// <summary>Gets the answer text for markdown rendering — non-empty only once streaming is
-    /// complete and this is not an error version, so the parser runs once (not per chunk).</summary>
+    /// complete and this is not an error version, so the parser runs once (not per chunk).
+    /// Change notification is raised only from the <see cref="IsComplete"/> setter (not from
+    /// <see cref="Text"/>) by design, so updating <see cref="Text"/> after completion would not
+    /// refresh the rendered view — the current flow always finishes streaming before IsComplete flips.</summary>
     public string RenderedMarkdown => IsComplete && !IsError ? Text : string.Empty;
 }
 
