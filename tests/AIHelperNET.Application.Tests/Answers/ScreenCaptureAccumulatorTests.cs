@@ -64,4 +64,28 @@ public class ScreenCaptureAccumulatorTests
         r.Count.Should().Be(1);
         r.CombinedOcr.Should().Be("second");
     }
+
+    [Fact]
+    public void Add_JustBelowGapBoundary_ContinuesGroup()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        acc.Add("first", T0);
+        var r = acc.Add("second", T0.Add(Gap).AddTicks(-1)); // one tick under the gap → same group
+        r.IsNewGroup.Should().BeFalse();
+        r.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Add_EmptyOcrString_AcceptedAndAccumulated()
+    {
+        var acc = new ScreenCaptureAccumulator(Gap);
+        var first = acc.Add("", T0);
+        first.IsNewGroup.Should().BeTrue();
+        first.Count.Should().Be(1);
+        first.CombinedOcr.Should().Be("");
+
+        var second = acc.Add("real", T0.AddSeconds(1));
+        second.Count.Should().Be(2);
+        second.CombinedOcr.Should().Be("--- Screen 1 ---\n\n\n--- Screen 2 ---\nreal");
+    }
 }

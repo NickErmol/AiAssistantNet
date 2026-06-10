@@ -33,7 +33,8 @@ public sealed class ScreenCaptureAccumulator(TimeSpan gap)
         return new ScreenCaptureAddResult(isNewGroup, Combine(_captures), _captures.Count);
     }
 
-    /// <summary>Ends the current group; the next <see cref="Add"/> starts fresh.</summary>
+    /// <summary>Ends the current group; the next <see cref="Add"/> starts a fresh group regardless of
+    /// timing (the previous capture timestamp is not retained).</summary>
     public void Reset()
     {
         _captures.Clear();
