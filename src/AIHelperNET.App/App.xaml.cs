@@ -83,7 +83,7 @@ public partial class App : System.Windows.Application
         var answerSink = _host.Services.GetRequiredService<AnswerStreamSink>();
         answerSink.SetHandlers(
             onChunk:    (id, type, chunk) => turnVm.OnChunk(id, type, chunk),
-            onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
+            onComplete: (id, type)        => turnVm.OnComplete(id, type),
             onError:    (id, err)         => turnVm.OnError(id, err));
 
         // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel

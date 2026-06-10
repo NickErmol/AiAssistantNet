@@ -56,6 +56,23 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
         get => _isError;
         set => SetProperty(ref _isError, value);
     }
+
+    private bool _isComplete;
+    /// <summary>Gets or sets a value indicating whether streaming for this version has finished
+    /// (drives the swap from raw streaming text to the rendered markdown card).</summary>
+    public bool IsComplete
+    {
+        get => _isComplete;
+        set
+        {
+            if (SetProperty(ref _isComplete, value))
+                OnPropertyChanged(nameof(RenderedMarkdown));
+        }
+    }
+
+    /// <summary>Gets the answer text for markdown rendering — non-empty only once streaming is
+    /// complete and this is not an error version, so the parser runs once (not per chunk).</summary>
+    public string RenderedMarkdown => IsComplete && !IsError ? Text : string.Empty;
 }
 
 /// <summary>Coarse status grouping that drives the answer card's status color.</summary>
@@ -211,10 +228,14 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
         version.Text += chunk;
     }
 
-    /// <summary>Called when streaming for the given turn and version type completes.</summary>
-    public static void OnComplete(ConversationTurnId turnId, AnswerVersionType versionType)
+    /// <summary>Called when streaming for the given turn completes; marks the latest version
+    /// complete so the card swaps to rendered markdown.</summary>
+    public void OnComplete(ConversationTurnId turnId, AnswerVersionType versionType)
     {
-        // Version already marked IsLatest during streaming — no further action needed.
+        var turn = Turns.FirstOrDefault(t => t.Id == turnId);
+        var version = turn?.AnswerVersions.FirstOrDefault(v => v.IsLatest);
+        if (version is not null)
+            version.IsComplete = true;
     }
 
     /// <summary>Appends an error version to the given turn.</summary>
@@ -231,7 +252,7 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator) : Obse
     {
         foreach (var v in turn.AnswerVersions) v.IsLatest = false;
         var version = new AnswerVersionVm(id, type, DateTimeOffset.UtcNow)
-            { Text = text, IsLatest = true, IsError = isError };
+            { Text = text, IsLatest = true, IsError = isError, IsComplete = isError };
         turn.AnswerVersions.Insert(0, version);
         turn.LatestVersion = version;
         return version;
