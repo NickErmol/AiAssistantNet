@@ -361,9 +361,18 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
             var turnId = _screenGroupTurnId.Value;
             var turn = Turns.FirstOrDefault(t => t.Id == turnId);
             if (turn is not null)
+            {
                 turn.InitialQuestion = add.Count > 1
                     ? $"[Screen capture · {add.Count} screens]"
                     : "[Screen capture]";
+
+                // Reset the displayed answer before this (re)generation streams. Chunks append to the
+                // latest version, so without this a superseded partial answer would be concatenated
+                // with the new one (the card shows two glued answers).
+                var latest = turn.AnswerVersions.FirstOrDefault(v => v.IsLatest);
+                if (latest is not null)
+                    latest.Text = string.Empty;
+            }
 
             await mediator.Send(new RegenerateAnswerWithScreenCommand(
                 sid, turnId, add.CombinedOcr, sessionControl.ScreenAnalysisMode, interviewerLines), token);
