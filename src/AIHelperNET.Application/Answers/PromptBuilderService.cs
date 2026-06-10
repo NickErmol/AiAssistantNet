@@ -176,6 +176,68 @@ public sealed class PromptBuilderService
             MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
     }
 
+    /// <summary>Builds a prompt for an interviewer follow-up on a captured screen task: the model
+    /// either answers a question about the task or emits an updated solution incorporating all
+    /// accumulated requirements. Captured OCR, additions, transcript, and prior answer are fenced
+    /// and labeled as untrusted data.</summary>
+    /// <param name="profile">Candidate's code profile.</param>
+    /// <param name="settings">Answer settings.</param>
+    /// <param name="screenContext">Combined OCR of the captured task.</param>
+    /// <param name="mode">The screen analysis mode the capture used.</param>
+    /// <param name="additions">Accumulated interviewer additions (oldest → newest).</param>
+    /// <param name="recentTranscript">Recent transcript lines for interpreting terse replies.</param>
+    /// <param name="priorAnswer">The most recent prior answer in the lineage, or <see langword="null"/>.</param>
+    public static AnswerPrompt BuildScreenFollowUp(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string screenContext,
+        ScreenAnalysisMode mode,
+        IReadOnlyList<string> additions,
+        IReadOnlyList<string> recentTranscript,
+        string? priorAnswer)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(ModeSystemPrompt(mode));
+        AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
+        system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
+            "concise; do not pad, repeat, or add filler to fill space.");
+        system.AppendLine("The interviewer has added requirements to, or asked about, the task on " +
+            "screen. If they added conditions, give the UPDATED solution incorporating ALL listed " +
+            "requirements (complete and runnable). If they asked a question about the task or your " +
+            "approach, answer it directly and briefly. Do not restate the task. Decide which from " +
+            "their words.");
+
+        var user = new StringBuilder();
+        user.AppendLine("On-screen task (OCR):");
+        user.AppendLine(screenContext);
+        user.AppendLine();
+        user.AppendLine("Interviewer requirements (most recent last):");
+        for (var i = 0; i < additions.Count; i++)
+            user.AppendLine(CultureInfo.InvariantCulture, $"{i + 1}. {additions[i]}");
+
+        if (recentTranscript is { Count: > 0 })
+        {
+            user.AppendLine();
+            user.AppendLine("Recent conversation:");
+            foreach (var line in recentTranscript)
+                user.AppendLine(CultureInfo.InvariantCulture, $"- {line}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(priorAnswer))
+        {
+            user.AppendLine();
+            user.AppendLine("Your previous answer:");
+            user.AppendLine(priorAnswer);
+        }
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
+    }
+
     private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
     {
         ScreenAnalysisMode.SolveCodingTask =>

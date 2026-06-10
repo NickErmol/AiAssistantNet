@@ -20,7 +20,8 @@ public sealed partial class TranscriptPipelineService(
     IQuestionBoundaryClassifier? boundaryClassifier = null,
     ITurnStatusFeedback? feedback = null,
     TimeProvider? timeProvider = null,
-    IBoundaryDecisionRecorder? recorder = null) : IDisposable
+    IBoundaryDecisionRecorder? recorder = null,
+    Answers.ScreenTaskContextStore? screenStore = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
@@ -34,11 +35,15 @@ public sealed partial class TranscriptPipelineService(
     private const int MaxCollectionSeconds = 8;
     private readonly List<TranscriptItem> _recentItems = [];
     private const int MaxRecentItems = 5;
+    private readonly Answers.ScreenTaskContextStore _screenStore = screenStore ?? new Answers.ScreenTaskContextStore();
+    private SessionId? _sessionId;
+    private string[] _recentTranscriptSnapshot = [];
 
     /// <summary>Processes a single transcript item against the active session.</summary>
     public async Task ProcessAsync(Session session, TranscriptItem item, IUnitOfWork unitOfWork, CancellationToken ct)
     {
         session.AddTranscriptItem(item);
+        _sessionId = session.Id;
         transcriptSink.OnTranscriptItem(item);
         DrainStatusFeedback(session);
 
@@ -136,6 +141,25 @@ public sealed partial class TranscriptPipelineService(
         // Me utterances are routed deterministically: no AI, never open a turn, never generate.
         if (item.Speaker == Speaker.Me)
             return HandleMeUtterance(session, item);
+
+        // Screen-task follow-up: while a captured task is in focus, interviewer speech that adds to
+        // or asks about it spawns a NEW context-aware card (the capture card is never mutated).
+        if (_screenStore.Current is { } screenCtx)
+        {
+            switch (await ClassifyScreenFollowUpAsync(item, ct))
+            {
+                case Answers.ScreenFollowUpOutcome.FollowUp:
+                    _screenStore.AddAddition(item.Text);
+                    _recentTranscriptSnapshot = SnapshotRecentTranscript();
+                    _regenDebouncer.Touch(screenCtx.ScreenCardId, FireScreenFollowUp);
+                    return null;
+                case Answers.ScreenFollowUpOutcome.MovedOn:
+                    _screenStore.Clear();   // fall through to normal audio routing below
+                    break;
+                default:
+                    return null;            // Noise — ignore
+            }
+        }
 
         // Force-complete if collecting for too long
         var activeTurn = session.ActiveTurn;
@@ -402,6 +426,54 @@ public sealed partial class TranscriptPipelineService(
         return null; // Me never generates
     }
 
+    /// <summary>Classifies an interviewer utterance against the captured screen task. Prefers the AI
+    /// boundary classifier (the heuristic was tuned for audio turns); falls back to the heuristic.</summary>
+    private async Task<Answers.ScreenFollowUpOutcome> ClassifyScreenFollowUpAsync(
+        TranscriptItem item, CancellationToken ct)
+    {
+        if (boundaryClassifier is not null)
+        {
+            try
+            {
+                var r = await boundaryClassifier.ClassifyAsync(
+                    ConversationTurnStatus.RefinedReady, _recentItems.AsReadOnly(), item, item.Speaker, ct);
+                return Answers.ScreenFollowUpRouter.Map(r.Classification);
+            }
+            catch (Exception ex)
+            {
+                if (logger is not null)
+                    Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
+            }
+        }
+
+        var h = _boundaryDetector.Evaluate(item.Text, item.Speaker, ConversationTurnStatus.RefinedReady, []);
+        return Answers.ScreenFollowUpRouter.Map(h.Classification);
+    }
+
+    /// <summary>Snapshots the last few transcript lines (both speakers) for follow-up prompt context.</summary>
+    private string[] SnapshotRecentTranscript()
+        => _recentItems.TakeLast(4)
+            .Select(i => $"{(i.Speaker == Speaker.Me ? "Me" : "Interviewer")}: {i.Text}")
+            .ToArray();
+
+    /// <summary>Fires a screen follow-up command (debounced) in a fresh scope. Runs on a timer thread,
+    /// so it reads the thread-safe store snapshot and must not touch the pipeline's session.</summary>
+    private void FireScreenFollowUp()
+    {
+        var ctx = _screenStore.Current;
+        if (ctx is null || _sessionId is not { } sid) return;
+
+        var cmd = new Answers.Commands.GenerateScreenFollowUpCommand(
+            sid, ctx.LatestCardId, ctx.TopicLabel, ctx.Ocr, ctx.Mode, ctx.Additions, _recentTranscriptSnapshot);
+
+        _ = Task.Run(async () =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            await mediator.Send(cmd, CancellationToken.None);
+        }, CancellationToken.None);
+    }
+
     private static bool IsTerminal(ConversationTurnStatus status)
         => status is ConversationTurnStatus.Dismissed or ConversationTurnStatus.Resolved;
 
@@ -568,6 +640,9 @@ public sealed partial class TranscriptPipelineService(
         _recentItems.Clear();
         _accumulator.Reset();
         _regenDebouncer.Reset();
+        _screenStore.Clear();
+        _sessionId = null;
+        _recentTranscriptSnapshot = [];
     }
 
     /// <summary>Releases resources owned by this service.</summary>

@@ -12,5 +12,7 @@ public enum AnswerVersionType
     /// <summary>Manually triggered regeneration.</summary>
     ManuallyRegenerated,
     /// <summary>Continuation of a previous answer with user-supplied follow-up text.</summary>
-    FollowUp
+    FollowUp,
+    /// <summary>Answer to an interviewer follow-up about a captured screen task (new card).</summary>
+    ScreenFollowUp
 }

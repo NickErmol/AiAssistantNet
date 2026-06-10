@@ -26,6 +26,7 @@ public sealed class AnswerVersionVm(AnswerVersionId id, AnswerVersionType type, 
         AnswerVersionType.UpdatedWithScreen         => "Screen analysis",
         AnswerVersionType.ManuallyRegenerated       => "Manually regenerated",
         AnswerVersionType.FollowUp                  => "Follow-up",
+        AnswerVersionType.ScreenFollowUp            => "Screen follow-up",
         _                                           => type.ToString()
     };
 
@@ -185,7 +186,8 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
 }
 
 /// <summary>Manages the list of conversation turns and routes streaming events to the correct turn.</summary>
-public sealed partial class ConversationTurnViewModel(IMediator mediator, TimeProvider clock) : ObservableObject
+public sealed partial class ConversationTurnViewModel(
+    IMediator mediator, TimeProvider clock, ScreenTaskContextStore screenStore) : ObservableObject
 {
     [ObservableProperty] private ObservableCollection<TurnVm> _turns = [];
     [ObservableProperty] private SessionId? _activeSessionId;
@@ -404,6 +406,10 @@ public sealed partial class ConversationTurnViewModel(IMediator mediator, TimePr
             // Generation finished normally — restart the idle window from the completion moment so a
             // capture taken after reading a slow answer still joins this card.
             _screenAccumulator.Touch(clock.GetUtcNow());
+
+            // Bridge the captured task to the audio pipeline so a later interviewer follow-up can
+            // answer with this OCR as context. Runs only on the winning (non-cancelled) capture.
+            screenStore.Register(turnId, add.CombinedOcr, sessionControl.ScreenAnalysisMode, add.IsNewGroup);
         }
         catch (OperationCanceledException)
         {
