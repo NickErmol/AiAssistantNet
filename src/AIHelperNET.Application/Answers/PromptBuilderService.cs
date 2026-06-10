@@ -148,6 +148,8 @@ public sealed class PromptBuilderService
         var system = new StringBuilder();
         system.AppendLine(ModeSystemPrompt(mode));
         AppendCodeProfile(system, profile);
+        system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
+            "concise; do not pad, repeat, or add filler to fill space.");
 
         var user = new StringBuilder();
         var lines = interviewerLines.ToList();
@@ -164,7 +166,7 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 1000));
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
     }
 
     private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch

@@ -228,20 +228,19 @@ public class PromptBuilderServiceTests
     [Theory]
     [InlineData(AnswerLength.VeryShort)]
     [InlineData(AnswerLength.ShortLength)]
-    public void BuildWithScreenMode_AppliesThousandTokenFloor(AnswerLength length)
+    public void BuildWithScreenMode_AppliesMinimumTokenFloor(AnswerLength length)
     {
         var settings = AnswerSettings.Default with { Length = length };
         var prompt = PromptBuilderService.BuildWithScreenMode(
             CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
-        prompt.MaxTokens.Should().Be(1000);
+        prompt.MaxTokens.Should().Be(2000);
     }
 
     [Fact]
-    public void BuildWithScreenMode_DeepDive_KeepsHigherMapping()
+    public void BuildWithScreenMode_InstructsModelNotToPad()
     {
-        var settings = AnswerSettings.Default with { Length = AnswerLength.DeepDive };
         var prompt = PromptBuilderService.BuildWithScreenMode(
-            CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
-        prompt.MaxTokens.Should().Be(2000);
+            CodeProfile.Empty, AnswerSettings.Default, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.System.Should().Contain("do not pad");
     }
 }
