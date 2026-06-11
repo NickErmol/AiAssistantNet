@@ -405,11 +405,11 @@
                                                 <TextBlock FontSize="{DynamicResource Font.XS}"
                                                            Foreground="{DynamicResource Brush.Foreground.Muted}"
                                                            Margin="0,0,0,4">
-                                                    <Run Text="{Binding LatestVersion.VersionLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding LatestVersion.TimeLabel, Mode=OneWay}"/>
+                                                    <Run Text="{Binding DisplayedVersion.VersionLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding DisplayedVersion.TimeLabel, Mode=OneWay}"/>
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding LatestVersion}" Value="{x:Null}">
+                                                                <DataTrigger Binding="{Binding DisplayedVersion}" Value="{x:Null}">
                                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -418,7 +418,7 @@
                                                 </TextBlock>
                                                 <Grid Margin="0,0,0,4">
                                                     <!-- Streaming: live raw mono text -->
-                                                    <TextBlock Text="{Binding LatestVersion.Text}"
+                                                    <TextBlock Text="{Binding DisplayedVersion.Text}"
                                                                FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
                                                                                   RelativeSource={RelativeSource AncestorType=Window}}"
                                                                TextWrapping="Wrap"
@@ -430,8 +430,8 @@
                                                                 <Style.Triggers>
                                                                     <MultiDataTrigger>
                                                                         <MultiDataTrigger.Conditions>
-                                                                            <Condition Binding="{Binding LatestVersion.IsComplete}" Value="False"/>
-                                                                            <Condition Binding="{Binding LatestVersion.IsError}" Value="False"/>
+                                                                            <Condition Binding="{Binding DisplayedVersion.IsComplete}" Value="False"/>
+                                                                            <Condition Binding="{Binding DisplayedVersion.IsError}" Value="False"/>
                                                                         </MultiDataTrigger.Conditions>
                                                                         <Setter Property="Visibility" Value="Visible"/>
                                                                     </MultiDataTrigger>
@@ -442,7 +442,7 @@
 
                                                     <!-- Complete: rendered markdown -->
                                                     <controls:MarkdownPresenter
-                                                        Markdown="{Binding LatestVersion.RenderedMarkdown}"
+                                                        Markdown="{Binding DisplayedVersion.RenderedMarkdown}"
                                                         BaseFontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
                                                                                RelativeSource={RelativeSource AncestorType=Window}}">
                                                         <controls:MarkdownPresenter.Style>
@@ -451,8 +451,8 @@
                                                                 <Style.Triggers>
                                                                     <MultiDataTrigger>
                                                                         <MultiDataTrigger.Conditions>
-                                                                            <Condition Binding="{Binding LatestVersion.IsComplete}" Value="True"/>
-                                                                            <Condition Binding="{Binding LatestVersion.IsError}" Value="False"/>
+                                                                            <Condition Binding="{Binding DisplayedVersion.IsComplete}" Value="True"/>
+                                                                            <Condition Binding="{Binding DisplayedVersion.IsError}" Value="False"/>
                                                                         </MultiDataTrigger.Conditions>
                                                                         <Setter Property="Visibility" Value="Visible"/>
                                                                     </MultiDataTrigger>
@@ -462,13 +462,13 @@
                                                     </controls:MarkdownPresenter>
 
                                                     <!-- Error: distinct error styling -->
-                                                    <TextBlock Text="{Binding LatestVersion.Text}"
+                                                    <TextBlock Text="{Binding DisplayedVersion.Text}"
                                                                FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
                                                                                   RelativeSource={RelativeSource AncestorType=Window}}"
                                                                TextWrapping="Wrap"
                                                                FontFamily="Cascadia Mono, Consolas"
                                                                Foreground="{DynamicResource Brush.Semantic.Error}"
-                                                               Visibility="{Binding LatestVersion.IsError,
+                                                               Visibility="{Binding DisplayedVersion.IsError,
                                                                    Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 </Grid>
                                                 <StackPanel Orientation="Horizontal">
