@@ -338,6 +338,7 @@ public sealed partial class ConversationTurnViewModel(
             { Text = text, IsLatest = true, IsError = isError, IsComplete = isError };
         turn.AnswerVersions.Insert(0, version);
         turn.LatestVersion = version;
+        turn.DisplayedVersion = version;   // snap forward; also raises pager nav (Count now updated)
         return version;
     }
 
@@ -364,6 +365,14 @@ public sealed partial class ConversationTurnViewModel(
         if (turn is null || ActiveSessionId is not { } sid) return;
         await mediator.Send(new RegenerateAnswerCommand(sid, turn.Id));
     }
+
+    /// <summary>Pages the given turn's card to the next older answer version.</summary>
+    [RelayCommand]
+    private static void ShowOlderVersion(TurnVm? turn) => turn?.ShowOlder();
+
+    /// <summary>Pages the given turn's card to the next newer answer version.</summary>
+    [RelayCommand]
+    private static void ShowNewerVersion(TurnVm? turn) => turn?.ShowNewer();
 
     /// <summary>Dismisses the given turn and removes it from the list.</summary>
     [RelayCommand]
@@ -398,11 +407,11 @@ public sealed partial class ConversationTurnViewModel(
         await mediator.Send(new GenerateFollowUpCommand(sid, turn.Id, text));
     }
 
-    /// <summary>Copies the latest answer version text to the clipboard.</summary>
+    /// <summary>Copies the currently displayed answer version's text to the clipboard.</summary>
     [RelayCommand]
     private static void CopyLatest(TurnVm? turn)
     {
-        var text = turn?.LatestVersion?.Text;
+        var text = turn?.DisplayedVersion?.Text;
         if (!string.IsNullOrEmpty(text))
             System.Windows.Clipboard.SetText(text);
     }
