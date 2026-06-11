@@ -12,14 +12,21 @@ public sealed class BackendToggleTests(AppFixture fixture)
 
     private Window OpenSettingsAndWait()
     {
-        fixture.Main.BtnOpenSettings.Click();
-
+        // Invoke via the UIA InvokePattern rather than a coordinate-based Click: when a prior test in
+        // the shared app instance leaves another window foreground (e.g. the screen-capture image
+        // viewer), a mouse-coordinate click lands on that window and the Settings window never opens.
+        // The pattern raises the button's Click regardless of z-order/foreground. Re-invoke on each
+        // poll in case the first invoke is swallowed while focus is still settling.
         var win = Retry.WhileNull(
-            () => fixture.App.GetAllTopLevelWindows(fixture.Automation)
-                .FirstOrDefault(w =>
-                    (w.Properties.Name.ValueOrDefault ?? string.Empty)
-                    .Contains("Settings", StringComparison.OrdinalIgnoreCase)),
-            TimeSpan.FromSeconds(5)).Result;
+            () =>
+            {
+                fixture.Main.BtnOpenSettings.Invoke();
+                return fixture.App.GetAllTopLevelWindows(fixture.Automation)
+                    .FirstOrDefault(w =>
+                        (w.Properties.Name.ValueOrDefault ?? string.Empty)
+                        .Contains("Settings", StringComparison.OrdinalIgnoreCase));
+            },
+            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(500)).Result;
 
         win.Should().NotBeNull("Settings window should open");
 
