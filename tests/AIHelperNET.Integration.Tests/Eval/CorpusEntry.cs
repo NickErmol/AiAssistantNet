@@ -31,14 +31,22 @@ public static class CorpusLoader
     public static string CorpusPath =>
         Path.Combine(AppContext.BaseDirectory, "Eval", "boundary-corpus.json");
 
+    /// <summary>Path to the held-out generalization corpus JSON.</summary>
+    public static string HoldoutPath =>
+        Path.Combine(AppContext.BaseDirectory, "Eval", "boundary-holdout.json");
+
     /// <summary>Deserializes the corpus. Throws if the file is missing, malformed, or empty.</summary>
-    public static IReadOnlyList<CorpusEntry> Load()
+    public static IReadOnlyList<CorpusEntry> Load() => Load("boundary-corpus.json");
+
+    /// <summary>Loads a corpus file by filename from the Eval output directory. Throws if the file is missing, malformed, or empty.</summary>
+    public static IReadOnlyList<CorpusEntry> Load(string fileName)
     {
-        var json = File.ReadAllText(CorpusPath);
+        var path = Path.Combine(AppContext.BaseDirectory, "Eval", fileName);
+        var json = File.ReadAllText(path);
         var entries = JsonSerializer.Deserialize<List<CorpusEntry>>(json, Options)
-            ?? throw new InvalidOperationException("Corpus deserialized to null.");
+            ?? throw new InvalidOperationException($"Corpus '{fileName}' deserialized to null.");
         if (entries.Count == 0)
-            throw new InvalidOperationException("Corpus is empty.");
+            throw new InvalidOperationException($"Corpus '{fileName}' is empty.");
         return entries;
     }
 }
