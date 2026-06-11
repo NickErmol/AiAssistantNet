@@ -33,11 +33,6 @@ public class ScreenTaskFollowUpE2ETests : IAsyncLifetime
     /// <inheritdoc/>
     public async Task DisposeAsync() => await _host.DisposeAsync();
 
-    private static BoundaryClassificationResult AdditionalRequirement(string text) =>
-        new(BoundaryLabel.AdditionalRequirement, 0.95, ShouldGenerateAnswer: true,
-            ShouldRefineExistingAnswer: true, ShouldCreateNewTurn: false,
-            NormalizedQuestionText: text, Reason: "scripted");
-
     private static BoundaryClassificationResult NewQuestion(string text) =>
         new(BoundaryLabel.NewQuestion, 0.95, ShouldGenerateAnswer: true,
             ShouldRefineExistingAnswer: false, ShouldCreateNewTurn: true,
@@ -66,7 +61,7 @@ public class ScreenTaskFollowUpE2ETests : IAsyncLifetime
         // 2) Interviewer adds the first condition → a NEW follow-up card (capture card untouched).
         //    Assertions read in-memory sinks/store, not the DB, to avoid contending with the handler's
         //    background (debounced) write on the shared in-memory SQLite cache.
-        _host.Classifier.Enqueue(AdditionalRequirement(Cond1));
+        _host.ScreenClassifier.Enqueue(ScreenFollowUpOutcome.FollowUp);
         await pipeline.ProcessAsync(session,
             TranscriptItem.Create(Speaker.Other, Cond1, clock = clock.AddSeconds(1), 0.95f),
             uow, CancellationToken.None);
@@ -82,7 +77,7 @@ public class ScreenTaskFollowUpE2ETests : IAsyncLifetime
         store.Current.LatestCardId.Should().Be(cardB, "the lineage now points at the new card");
 
         // 3) Interviewer layers a second condition → a THIRD card that accumulates BOTH conditions.
-        _host.Classifier.Enqueue(AdditionalRequirement(Cond2));
+        _host.ScreenClassifier.Enqueue(ScreenFollowUpOutcome.FollowUp);
         await pipeline.ProcessAsync(session,
             TranscriptItem.Create(Speaker.Other, Cond2, clock.AddSeconds(1), 0.95f),
             uow, CancellationToken.None);
@@ -117,9 +112,10 @@ public class ScreenTaskFollowUpE2ETests : IAsyncLifetime
         await uow.SaveChangesAsync(default);
         store.Register(captureCard.Id, Ocr, ScreenAnalysisMode.SolveCodingTask, isNewGroup: true);
 
-        // A clearly new, unrelated interviewer question drops the screen-task linkage. Two scripted
-        // results are queued because the MovedOn outcome falls through to the normal routing path,
-        // which may consult the classifier again.
+        // A clearly new, unrelated interviewer question drops the screen-task linkage. The dedicated
+        // classifier returns MovedOn; that clears the store and falls through to the normal routing
+        // path, which consults the boundary classifier (hence the queued NewQuestion results).
+        _host.ScreenClassifier.Enqueue(ScreenFollowUpOutcome.MovedOn);
         _host.Classifier.Enqueue(NewQuestion("explain hash maps"));
         _host.Classifier.Enqueue(NewQuestion("explain hash maps"));
         await pipeline.ProcessAsync(session,

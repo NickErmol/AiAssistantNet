@@ -64,6 +64,9 @@ public static class DependencyInjection
         services.AddHttpClient<QuestionBoundaryClassifier>();
         services.AddSingleton<IQuestionBoundaryClassifier, QuestionBoundaryClassifier>();
 
+        services.AddHttpClient<ScreenFollowUpClassifier>();
+        services.AddSingleton<IScreenFollowUpClassifier, ScreenFollowUpClassifier>();
+
         services.AddSingleton<IBoundaryDecisionRecorder>(
             _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));
 
