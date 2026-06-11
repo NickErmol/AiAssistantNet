@@ -163,6 +163,33 @@ public sealed class QuestionBoundaryClassifierTests
 
         Assert.Equal(BoundaryLabel.NoQuestion, result.Classification);
     }
+
+    // ── 8. Markdown code fence → stripped and parsed correctly ──────────────
+
+    [Fact]
+    public async Task ClassifyAsync_StripsMarkdownCodeFence_ParsesLabel()
+    {
+        // Haiku often wraps JSON in a ```json fence despite instructions — parse it anyway.
+        var sut = MakeSut(MakeApiResponse("```json\\n{\"classification\":\"QuestionComplete\",\"confidence\":0.9,\"normalized_text\":\"x\",\"reason\":\"y\"}\\n```"));
+
+        var result = await sut.ClassifyAsync(
+            null, [], MakeItem("what is dependency injection?"), Speaker.Other, CancellationToken.None);
+
+        Assert.Equal(BoundaryLabel.QuestionComplete, result.Classification);
+    }
+
+    // ── 9. Plain unfenced JSON still works after StripCodeFence change ───────
+
+    [Fact]
+    public async Task ClassifyAsync_PlainJson_ParsesLabel()
+    {
+        var sut = MakeSut(MakeApiResponse("{\"classification\":\"NewQuestion\",\"confidence\":0.85,\"normalized_text\":\"x\",\"reason\":\"y\"}"));
+
+        var result = await sut.ClassifyAsync(
+            null, [], MakeItem("what is dependency injection?"), Speaker.Other, CancellationToken.None);
+
+        Assert.Equal(BoundaryLabel.NewQuestion, result.Classification);
+    }
 }
 
 file sealed class BoundaryMockHttpMessageHandler(string body, HttpStatusCode status = HttpStatusCode.OK)

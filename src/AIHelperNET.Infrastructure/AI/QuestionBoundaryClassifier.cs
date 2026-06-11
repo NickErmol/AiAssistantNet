@@ -109,7 +109,7 @@ public sealed class QuestionBoundaryClassifier(
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             var content = root.GetProperty("content")[0].GetProperty("text").GetString()?.Trim() ?? "";
-            using var resultDoc = JsonDocument.Parse(content);
+            using var resultDoc = JsonDocument.Parse(StripCodeFence(content));
             var r = resultDoc.RootElement;
             var label = ParseLabel(r.GetProperty("classification").GetString() ?? "");
             var confidence = r.GetProperty("confidence").GetDouble();
@@ -142,6 +142,18 @@ public sealed class QuestionBoundaryClassifier(
         "Unrelated"                      => BoundaryLabel.Unrelated,
         _                                => BoundaryLabel.NoQuestion
     };
+
+    /// <summary>Strips a Markdown code fence (<c>```json … ```</c>) the model may wrap JSON in
+    /// despite instructions, leaving the bare JSON for parsing.</summary>
+    private static string StripCodeFence(string s)
+    {
+        s = s.Trim();
+        if (!s.StartsWith("```", StringComparison.Ordinal)) return s;
+        var firstNewline = s.IndexOf('\n');
+        if (firstNewline >= 0) s = s[(firstNewline + 1)..];       // drop the ```/```json opener line
+        if (s.EndsWith("```", StringComparison.Ordinal)) s = s[..^3];
+        return s.Trim();
+    }
 
     private static string SecureStringToString(SecureString ss)
     {
