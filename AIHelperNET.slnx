@@ -6,6 +6,7 @@
     <Project Path="src/AIHelperNET.Infrastructure/AIHelperNET.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AIHelperNET.App.Tests/AIHelperNET.App.Tests.csproj" />
     <Project Path="tests/AIHelperNET.Application.Tests/AIHelperNET.Application.Tests.csproj" />
     <Project Path="tests/AIHelperNET.Domain.Tests/AIHelperNET.Domain.Tests.csproj" />
     <Project Path="tests/AIHelperNET.Infrastructure.Tests/AIHelperNET.Infrastructure.Tests.csproj" />
