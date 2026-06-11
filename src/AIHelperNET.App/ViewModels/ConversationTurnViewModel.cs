@@ -176,6 +176,73 @@ public sealed class TurnVm(ConversationTurnId id, string initialQuestion)
         set => SetProperty(ref _latestVersion, value);
     }
 
+    private AnswerVersionVm? _displayedVersion;
+    /// <summary>Gets or sets the version currently shown on the card. Distinct from
+    /// <see cref="LatestVersion"/>: the user can page back to a superseded version, but creating a new
+    /// version snaps this forward to the newest. Drives the answer area and the version pager.</summary>
+    public AnswerVersionVm? DisplayedVersion
+    {
+        get => _displayedVersion;
+        set
+        {
+            if (SetProperty(ref _displayedVersion, value))
+                RaiseVersionNav();
+        }
+    }
+
+    /// <summary>Gets a value indicating whether more than one answer version exists (drives pager visibility).</summary>
+    public bool HasMultipleVersions => AnswerVersions.Count > 1;
+
+    /// <summary>Gets the pager label in chronological order, e.g. "v2 / 3" (v1 = oldest). Empty when no
+    /// version is displayed.</summary>
+    public string VersionPositionLabel
+    {
+        get
+        {
+            if (DisplayedVersion is null) return string.Empty;
+            var idx = AnswerVersions.IndexOf(DisplayedVersion);
+            if (idx < 0) return string.Empty;
+            // List is newest-first (index 0 = newest), so chronological position = Count - idx.
+            return $"v{AnswerVersions.Count - idx} / {AnswerVersions.Count}";
+        }
+    }
+
+    /// <summary>Gets a value indicating whether a strictly older version exists to page back to.</summary>
+    public bool CanShowOlder =>
+        DisplayedVersion is not null &&
+        AnswerVersions.IndexOf(DisplayedVersion) < AnswerVersions.Count - 1;
+
+    /// <summary>Gets a value indicating whether a strictly newer version exists to page forward to.</summary>
+    public bool CanShowNewer =>
+        DisplayedVersion is not null &&
+        AnswerVersions.IndexOf(DisplayedVersion) > 0;
+
+    private void RaiseVersionNav()
+    {
+        OnPropertyChanged(nameof(HasMultipleVersions));
+        OnPropertyChanged(nameof(VersionPositionLabel));
+        OnPropertyChanged(nameof(CanShowOlder));
+        OnPropertyChanged(nameof(CanShowNewer));
+    }
+
+    /// <summary>Pages the displayed version one step toward the older end (clamped).</summary>
+    public void ShowOlder()
+    {
+        if (DisplayedVersion is null) return;
+        var idx = AnswerVersions.IndexOf(DisplayedVersion);
+        if (idx >= 0 && idx < AnswerVersions.Count - 1)
+            DisplayedVersion = AnswerVersions[idx + 1];
+    }
+
+    /// <summary>Pages the displayed version one step toward the newer end (clamped).</summary>
+    public void ShowNewer()
+    {
+        if (DisplayedVersion is null) return;
+        var idx = AnswerVersions.IndexOf(DisplayedVersion);
+        if (idx > 0)
+            DisplayedVersion = AnswerVersions[idx - 1];
+    }
+
     private string _followUpText = string.Empty;
     /// <summary>Gets or sets the follow-up question text typed by the user for this turn.</summary>
     public string FollowUpText
