@@ -99,7 +99,8 @@ public sealed class GenerateAnswerHandler(
             session.CodeProfile, session.AnswerSettings, questionText,
             cmd.ScreenContext,
             recentTranscript,
-            recentQA);
+            recentQA,
+            maxTokens: settings.MaxAnswerTokens);
 
         var chunks = new System.Text.StringBuilder();
         try

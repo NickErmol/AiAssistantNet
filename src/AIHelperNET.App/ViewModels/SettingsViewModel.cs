@@ -67,6 +67,9 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
 
     partial void OnOverlayOpacityChanged(double value) => OpacityChanged?.Invoke(value);
 
+    // ── Answer settings ───────────────────────────────────────────
+    [ObservableProperty] private int _maxAnswerTokens = 800;
+
     // ── Load ──────────────────────────────────────────────────────
     [RelayCommand]
     public async Task LoadAsync()
@@ -80,6 +83,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
+        MaxAnswerTokens          = s.MaxAnswerTokens;
         ActiveBackend            = s.ActiveBackend;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
@@ -144,7 +148,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
             NullIfEmpty(SelectedLoopbackDeviceId),
             current?.AnswerFontSize ?? 12,
             WhisperLanguage,
-            OverlayOpacity)
+            OverlayOpacity,
+            MaxAnswerTokens)
         {
             Presets = [.. Presets]
         };

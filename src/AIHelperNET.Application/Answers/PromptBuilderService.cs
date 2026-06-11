@@ -9,21 +9,23 @@ namespace AIHelperNET.Application.Answers;
 public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
-    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?)"/> using <paramref name="question"/>.Text.</remarks>
+    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?, int?)"/> using <paramref name="question"/>.Text.</remarks>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
     /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
     /// <param name="question">The detected question whose <c>Text</c> is forwarded.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
     /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
+    /// <param name="maxTokens">Explicit output token cap; when null, falls back to the length-based mapping.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         DetectedQuestion question,
         string? screenContext = null,
         IReadOnlyList<TranscriptItem>? recentTranscript = null,
-        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
-        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA);
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null,
+        int? maxTokens = null)
+        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA, maxTokens);
 
     /// <summary>Constructs an <see cref="AnswerPrompt"/> using an explicit question text.</summary>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
@@ -32,13 +34,15 @@ public sealed class PromptBuilderService
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
     /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
+    /// <param name="maxTokens">Explicit output token cap; when null, falls back to the length-based mapping.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         string questionText,
         string? screenContext = null,
         IReadOnlyList<TranscriptItem>? recentTranscript = null,
-        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null,
+        int? maxTokens = null)
     {
         var system = new StringBuilder();
 
@@ -53,6 +57,10 @@ public sealed class PromptBuilderService
             "(b) a first-person cue line (e.g. \"I would focus on:\") followed by terse \"- \" bullets; " +
             "(c) a single closing principle line.");
         AppendStructureGuidance(system, settings.Length);
+        system.AppendLine("   Match depth to the question's difficulty: for a trivial or factual " +
+            "question, answer in 1–2 sentences and skip the bullet scaffold; for a complex design, " +
+            "trade-off, or implementation question, use the full structure. Never pad an easy question " +
+            "to fill space.");
         system.AppendLine("3. FORMATTING: use **bold** for emphasis and sub-labels, and \"- \" for bullets. " +
             "NO headers (no #, ##). Put any code in fenced ```language blocks.");
         system.AppendLine("4. CODE: include code ONLY when the question explicitly asks to write, " +
@@ -112,7 +120,7 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: MapLengthToTokens(settings.Length));
+            MaxTokens: maxTokens ?? MapLengthToTokens(settings.Length));
     }
 
     /// <summary>Builds a follow-up prompt with the original Q+A injected as context.</summary>

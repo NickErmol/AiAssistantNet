@@ -138,6 +138,30 @@
                                   SelectedValuePath="Value"
                                   SelectedValue="{Binding AnswerLength}"
                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Max answer length (tokens)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="200"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                            <Slider Grid.Column="1"
+                                    Minimum="200" Maximum="4000"
+                                    SmallChange="50" LargeChange="200"
+                                    TickFrequency="50" IsSnapToTickEnabled="True"
+                                    AutomationProperties.AutomationId="Settings_MaxAnswerTokens"
+                                    Value="{Binding MaxAnswerTokens}"/>
+                            <TextBlock Grid.Column="2" Text="4000"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
+                        </Grid>
+                        <TextBlock Text="{Binding MaxAnswerTokens, StringFormat='{}{0} tokens'}"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                   FontSize="{DynamicResource Font.XS}" Margin="0,0,0,8"/>
                         <TextBlock Text="Complexity"     Style="{StaticResource FieldLabel}"/>
                         <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerComplexities}}"
                                   DisplayMemberPath="Display"
