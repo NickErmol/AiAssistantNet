@@ -451,13 +451,25 @@
                                                     </StackPanel>
                                                 </StackPanel>
                                                 <Grid Margin="0,0,0,4">
-                                                    <!-- Streaming: live raw mono text -->
-                                                    <TextBlock Text="{Binding DisplayedVersion.Text}"
-                                                               FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
+                                                    <!-- Streaming: live raw mono text with a blinking completion caret -->
+                                                    <TextBlock FontSize="{Binding DataContext.ConversationTurn.AnswerFontSize,
                                                                                   RelativeSource={RelativeSource AncestorType=Window}}"
                                                                TextWrapping="Wrap"
                                                                FontFamily="Cascadia Mono, Consolas"
-                                                               Foreground="{DynamicResource Brush.Foreground.Primary}">
+                                                               Foreground="{DynamicResource Brush.Foreground.Primary}"><Run Text="{Binding DisplayedVersion.Text}"/><InlineUIContainer BaselineAlignment="TextBottom"><TextBlock Text="▋"
+                                                                   Foreground="{DynamicResource Brush.Semantic.Busy}"
+                                                                   FontFamily="Cascadia Mono, Consolas">
+                                                            <TextBlock.Triggers>
+                                                                <EventTrigger RoutedEvent="TextBlock.Loaded">
+                                                                    <BeginStoryboard>
+                                                                        <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                             From="1" To="0" Duration="0:0:0.6"/>
+                                                                        </Storyboard>
+                                                                    </BeginStoryboard>
+                                                                </EventTrigger>
+                                                            </TextBlock.Triggers>
+                                                        </TextBlock></InlineUIContainer>
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
