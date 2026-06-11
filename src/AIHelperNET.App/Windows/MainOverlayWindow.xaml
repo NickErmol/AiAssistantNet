@@ -401,21 +401,55 @@
                                                                  Visibility="{Binding IsBusy,
                                                                      Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 </StackPanel>
-                                                <!-- Refining-vs-new affordance: which version is showing + when -->
-                                                <TextBlock FontSize="{DynamicResource Font.XS}"
-                                                           Foreground="{DynamicResource Brush.Foreground.Muted}"
-                                                           Margin="0,0,0,4">
-                                                    <Run Text="{Binding DisplayedVersion.VersionLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding DisplayedVersion.TimeLabel, Mode=OneWay}"/>
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding DisplayedVersion}" Value="{x:Null}">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
+                                                <!-- Refining-vs-new affordance: which version is showing + when, plus the version pager -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <TextBlock FontSize="{DynamicResource Font.XS}"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource Brush.Foreground.Muted}">
+                                                        <Run Text="{Binding DisplayedVersion.VersionLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding DisplayedVersion.TimeLabel, Mode=OneWay}"/>
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding DisplayedVersion}" Value="{x:Null}">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <!-- Version pager: visible only when more than one version exists -->
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Margin="10,0,0,0"
+                                                                VerticalAlignment="Center"
+                                                                AutomationProperties.AutomationId="TurnCard_VersionPager"
+                                                                Visibility="{Binding HasMultipleVersions, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Button Content="‹"
+                                                                AutomationProperties.AutomationId="TurnCard_VersionOlder"
+                                                                Style="{StaticResource IconBtn}"
+                                                                FontSize="12"
+                                                                IsEnabled="{Binding CanShowOlder}"
+                                                                Command="{Binding DataContext.ConversationTurn.ShowOlderVersionCommand,
+                                                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip="Older version"/>
+                                                        <TextBlock Text="{Binding VersionPositionLabel}"
+                                                                   AutomationProperties.AutomationId="TurnCard_VersionPosition"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="3,0"
+                                                                   FontSize="{DynamicResource Font.XS}"
+                                                                   Foreground="{DynamicResource Brush.Foreground.Muted}"/>
+                                                        <Button Content="›"
+                                                                AutomationProperties.AutomationId="TurnCard_VersionNewer"
+                                                                Style="{StaticResource IconBtn}"
+                                                                FontSize="12"
+                                                                IsEnabled="{Binding CanShowNewer}"
+                                                                Command="{Binding DataContext.ConversationTurn.ShowNewerVersionCommand,
+                                                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip="Newer version"/>
+                                                    </StackPanel>
+                                                </StackPanel>
                                                 <Grid Margin="0,0,0,4">
                                                     <!-- Streaming: live raw mono text -->
                                                     <TextBlock Text="{Binding DisplayedVersion.Text}"
