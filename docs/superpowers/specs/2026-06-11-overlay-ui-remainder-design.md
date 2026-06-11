@@ -106,9 +106,24 @@ Pipeline and answer wiring are untouched. `OnChunk` / `OnComplete` / `OnError` c
 are fewer than two versions or `DisplayedVersion` is null; navigation commands clamp at both ends.
 
 ## Testing
-Follows the established App-layer convention from items 1–4: presentation bindings are not unit-tested
-(there is no VM test project); verified by `dotnet build` + manual run on the live overlay. The pager
-index math is small and clamped.
+The pager introduces real navigation logic (index math, clamping, chronological position label,
+snap-on-new) — unlike items 1–4, which were pure bindings. That logic lives in `TurnVm`, a plain
+`CommunityToolkit.Mvvm` `ObservableObject` callable headlessly (no `Dispatcher`/`Application`/STA), so it
+gets genuine automated coverage:
+
+- **New `tests/AIHelperNET.App.Tests` project** (`net10.0-windows10.0.17763.0`, xUnit + FluentAssertions
+  + NSubstitute + `TimeProvider.Testing`), referencing the `App` project. NetArchTest's layering rules
+  scan production assemblies only, so a test project referencing `App` does not violate them. This is the
+  first project to reference the `App` assembly directly (the UITests drive a prebuilt `.exe`).
+- **Unit tests on `TurnVm`** (populate `AnswerVersions` directly + set `DisplayedVersion`): single-version
+  has no pager; newest-displayed shows highest position and can only go older; `ShowOlder`/`ShowNewer`
+  step chronologically and clamp at both bounds; null/empty is a safe no-op.
+- **One VM-level snap test** drives `ConversationTurnViewModel.OnChunk` + `OnError` (the public version-
+  creation paths) to assert a new version snaps `DisplayedVersion` forward even when paged back.
+- Written test-first (TDD) per the plan.
+
+The XAML bindings, the blinking caret, the UIA names, and the snap *visual* behavior remain verified by
+`dotnet build` (compile gate) + manual run on the live overlay — those cannot be meaningfully unit-tested.
 
 **Optional** (not a blocker): one FlaUI UITest — start a session, trigger a turn, `Regen` to create a
 second version, assert the `TurnCard` pager is visible and `VersionPositionLabel` reads `"v2 / 2"`.
