@@ -173,3 +173,35 @@ No interface changes; no consumer of the classifier sees a behavioral contract c
    smaller than baseline.
 4. Only `boundary-corpus.json`, `QuestionBoundaryClassifier.SystemPrompt`, and (if needed)
    the heuristic baseline constant changed. No pipeline/Domain/EF/guardrail change.
+
+## Results (2026-06-11)
+
+Run via the opt-in `BoundaryClassifierAiEvalTests` against real Claude Haiku
+(`claude-haiku-4-5-20251001`).
+
+### Prerequisite bug found while measuring
+The first eval scored **0% — every one of the 55 cases returned `NoQuestion`**. Root cause:
+`QuestionBoundaryClassifier.ParseResponse` called `JsonDocument.Parse` directly on Haiku's
+output, but Haiku wraps its JSON in a ```` ```json ```` markdown fence, so every parse threw and
+fell back to `Ambiguous`/`NoQuestion`. **The AI boundary classifier had been silently dead in
+production** (every call degraded to the heuristic) — the AI path had apparently never been run
+against real Haiku until now. Fixed by mirroring `ScreenFollowUpClassifier.StripCodeFence`
+(commit `4ff8968`, with regression tests). This fix is a prerequisite to any measurement.
+
+### Before → after
+
+| Measurement | Accuracy | Notes |
+|---|---|---|
+| Baseline (current prompt, after fence-fix) | **47.3%** (26/55) | `QuestionComplete` & `TaskComplete` recall **0%** (model mapped them to `QuestionStarted`); `QuestionContinued → ClarificationOfCurrentQuestion` ×5; `Unrelated → NoQuestion` ×4; over-split `QuestionContinued → NewQuestion` ×2 |
+| Enriched prompt — tuning corpus | **100%** (55/55) | Every label P/R = 100%. Partly overfit: the corpus is also the tuning input and ~9 examples are verbatim corpus entries |
+| Enriched prompt — **held-out novel set** | **100%** (12/12) | 12 entries with topics/phrasings absent from the corpus **and** the prompt examples — including the status-gated `also`-cases and a no-marker over-split. Confirms genuine generalization, not memorization |
+
+The over-split confusion cells (`QuestionContinued/AdditionalRequirement → NewQuestion`) went to
+**zero** on both the tuning corpus and the held-out set. Acceptance criteria 1–4 met; the
+held-out run is the evidence behind criterion 3's "meaningful margin."
+
+### Caveats
+- Haiku numbers are **documented, not CI-asserted** (non-deterministic, cost money). CI continues
+  to guard only the deterministic heuristic (re-baselined to 0.60 over the expanded corpus).
+- 100% on the tuning corpus alone would be untrustworthy; it is reported here only alongside the
+  held-out 12/12. Future tuning should keep growing the held-out set as the trustworthy signal.
