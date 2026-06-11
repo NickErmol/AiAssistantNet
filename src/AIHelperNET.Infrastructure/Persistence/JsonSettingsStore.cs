@@ -16,8 +16,9 @@ public sealed class JsonSettingsStore : ISettingsStore
         if (!File.Exists(path)) return DefaultSettings();
 
         await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<AppSettingsDto>(stream, Options, ct)
-               ?? DefaultSettings();
+        var dto = await JsonSerializer.DeserializeAsync<AppSettingsDto>(stream, Options, ct)
+                  ?? DefaultSettings();
+        return dto.Normalized();
     }
 
     public async Task SaveAsync(AppSettingsDto settings, CancellationToken ct)

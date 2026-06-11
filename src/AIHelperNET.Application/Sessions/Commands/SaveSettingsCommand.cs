@@ -15,7 +15,7 @@ public sealed class SaveSettingsHandler(ISettingsStore settingsStore)
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(SaveSettingsCommand request, CancellationToken cancellationToken)
     {
-        await settingsStore.SaveAsync(request.Settings, cancellationToken);
+        await settingsStore.SaveAsync(request.Settings.Normalized(), cancellationToken);
         return Result.Ok();
     }
 }
