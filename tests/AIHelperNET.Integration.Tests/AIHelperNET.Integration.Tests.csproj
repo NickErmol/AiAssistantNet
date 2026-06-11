@@ -33,6 +33,9 @@
     <None Update="Eval\boundary-corpus.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Eval\boundary-holdout.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Fixtures/audio/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

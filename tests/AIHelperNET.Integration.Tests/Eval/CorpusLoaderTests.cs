@@ -26,4 +26,14 @@ public class CorpusLoaderTests
         entries.Should().Contain(e => e.Id == "scenarioB-different-topic"
             && e.ExpectedLabel == BoundaryLabel.NewQuestion);
     }
+
+    [Fact]
+    public void LoadHoldout_ReturnsTwelveNovelEntries()
+    {
+        var entries = CorpusLoader.Load("boundary-holdout.json");
+        entries.Should().HaveCount(12);
+        entries.Should().OnlyHaveUniqueItems(e => e.Id);
+        entries.Should().OnlyContain(e => !string.IsNullOrWhiteSpace(e.LatestItem.Text));
+        entries.Select(e => e.ExpectedLabel).Distinct().Count().Should().BeGreaterThanOrEqualTo(6);
+    }
 }

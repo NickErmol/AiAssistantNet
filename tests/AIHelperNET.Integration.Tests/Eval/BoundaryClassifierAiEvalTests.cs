@@ -25,13 +25,29 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
             output.WriteLine($"Skipped: set {KeyEnvVar} to an Anthropic API key to run the real-Haiku eval.");
             return; // CI path — no network, passes trivially
         }
+        await RunEvalAsync(apiKey, CorpusLoader.Load(), "Real Haiku (QuestionBoundaryClassifier)", "ai-eval");
+    }
 
+    [Fact]
+    public async Task RealHaiku_OverHoldout_ProducesReport()
+    {
+        var apiKey = Environment.GetEnvironmentVariable(KeyEnvVar);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            output.WriteLine($"Skipped: set {KeyEnvVar} to an Anthropic API key to run the held-out eval.");
+            return;
+        }
+        await RunEvalAsync(apiKey, CorpusLoader.Load("boundary-holdout.json"),
+            "Real Haiku — HELD-OUT (generalization)", "ai-eval-holdout");
+    }
+
+    private async Task RunEvalAsync(string apiKey, IReadOnlyList<CorpusEntry> corpus, string title, string reportPrefix)
+    {
         var classifier = new QuestionBoundaryClassifier(
             new HttpClient(),
             new EnvSecretStore(apiKey),
             Options.Create(new ClaudeOptions()));
 
-        var corpus = CorpusLoader.Load();
         var matrix = new ConfusionMatrix();
         var failures = 0;
         var misses = new List<string>();
@@ -59,12 +75,12 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
             }
         }
 
-        var report = EvalReport.ToText(matrix, "Real Haiku (QuestionBoundaryClassifier)")
+        var report = EvalReport.ToText(matrix, title)
             + $"\nAPI failures: {failures}\nMisses:\n  " + string.Join("\n  ", misses);
         output.WriteLine(report);
 
         Directory.CreateDirectory(AppPaths.DiagnosticsDir);
-        var reportPath = Path.Combine(AppPaths.DiagnosticsDir, $"ai-eval-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt");
+        var reportPath = Path.Combine(AppPaths.DiagnosticsDir, $"{reportPrefix}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt");
         await File.WriteAllTextAsync(reportPath, report);
         output.WriteLine($"Report written to {reportPath}");
     }

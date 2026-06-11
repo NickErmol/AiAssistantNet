@@ -8,8 +8,13 @@ namespace AIHelperNET.Integration.Tests.Eval;
 
 public class BoundaryHeuristicEvalTests(ITestOutputHelper output)
 {
-    // measured 2026-06-09: 0.833  (floored to the 0.05 step below)
-    private const double Baseline = 0.80;
+    // measured 2026-06-11 over the expanded 55-entry corpus: 0.600 (floored to the 0.05 step
+    // below). The corpus now intentionally contains ~22 over-split continuations / additional
+    // requirements / Me-clarifications beyond the simple heuristic's reach — the AI classifier
+    // (Spec 3d) is what catches those, so ~33/55 is the healthy heuristic-correct count. This
+    // floor only guards against a CATASTROPHIC heuristic regression, not a moderate one; if you
+    // tighten the heuristic, re-measure and raise it toward the new measured value.
+    private const double Baseline = 0.60;
 
     [Fact]
     public void Heuristic_MeetsAccuracyBaseline_OverCorpus()
