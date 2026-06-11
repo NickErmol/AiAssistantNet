@@ -22,7 +22,8 @@ public class TranscriptPipelineScreenFollowUpTests
         new(l, 0.95, false, false, false, "x", "test");
 
     // Session pre-seeded with a capture card; store registered for that card.
-    private static (TranscriptPipelineService svc, Session session, ScreenTaskContextStore store, IUnitOfWork uow)
+    private static (TranscriptPipelineService svc, Session session, ScreenTaskContextStore store, IUnitOfWork uow,
+        IQuestionBoundaryClassifier boundary)
         Make(BoundaryLabel classifierReturns)
     {
         var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, T0).Value;
@@ -55,13 +56,13 @@ public class TranscriptPipelineScreenFollowUpTests
         var svc = new TranscriptPipelineService(
             factory, transcriptSink, turnSink, legacy,
             boundaryClassifier: boundary, screenStore: store);
-        return (svc, session, store, uow);
+        return (svc, session, store, uow, boundary);
     }
 
     [Fact]
     public async Task InterviewerAddition_WhileScreenTaskActive_AccumulatesAddition()
     {
-        var (svc, session, store, uow) = Make(BoundaryLabel.AdditionalRequirement);
+        var (svc, session, store, uow, _) = Make(BoundaryLabel.AdditionalRequirement);
 
         await svc.ProcessAsync(session,
             TranscriptItem.Create(Speaker.Other, "now make it thread-safe", T0.AddSeconds(2), 0.9f),
@@ -74,7 +75,7 @@ public class TranscriptPipelineScreenFollowUpTests
     [Fact]
     public async Task InterviewerNewQuestion_WhileScreenTaskActive_ClearsLinkage()
     {
-        var (svc, session, store, uow) = Make(BoundaryLabel.NewQuestion);
+        var (svc, session, store, uow, _) = Make(BoundaryLabel.NewQuestion);
 
         await svc.ProcessAsync(session,
             TranscriptItem.Create(Speaker.Other, "next question, explain hash maps", T0.AddSeconds(2), 0.9f),
@@ -86,7 +87,7 @@ public class TranscriptPipelineScreenFollowUpTests
     [Fact]
     public async Task InterviewerNoise_WhileScreenTaskActive_LeavesLinkageUntouched()
     {
-        var (svc, session, store, uow) = Make(BoundaryLabel.NoQuestion);
+        var (svc, session, store, uow, _) = Make(BoundaryLabel.NoQuestion);
 
         await svc.ProcessAsync(session,
             TranscriptItem.Create(Speaker.Other, "hmm, okay", T0.AddSeconds(2), 0.9f),
@@ -94,5 +95,31 @@ public class TranscriptPipelineScreenFollowUpTests
 
         store.Current.Should().NotBeNull();
         store.Current!.Additions.Should().BeEmpty();
+    }
+
+    // Regression guard for the live-audio failure: the boundary classifier must be given the captured
+    // on-screen task as context, otherwise (as observed in production) it sees a context-free imperative,
+    // labels it NoQuestion, and the follow-up is silently dropped. We assert the classifier *receives*
+    // the task — the one thing the earlier stub-the-label tests never checked.
+    [Fact]
+    public async Task ScreenFollowUpClassification_GivesClassifierTheCapturedTaskAsContext()
+    {
+        var (svc, session, store, uow, boundary) = Make(BoundaryLabel.NoQuestion);
+
+        IReadOnlyList<TranscriptItem>? seen = null;
+        boundary.ClassifyAsync(default!, default!, default!, default, default)
+            .ReturnsForAnyArgs(ci =>
+            {
+                seen = ci.ArgAt<IReadOnlyList<TranscriptItem>>(1);
+                return Task.FromResult(Label(BoundaryLabel.NoQuestion));
+            });
+
+        await svc.ProcessAsync(session,
+            TranscriptItem.Create(Speaker.Other, "now make it thread-safe", T0.AddSeconds(2), 0.9f),
+            uow, CancellationToken.None);
+
+        seen.Should().NotBeNull("the screen-task branch must classify the interviewer utterance");
+        seen!.Should().Contain(i => i.Text.Contains("LRU cache"),
+            "the classifier must see the captured on-screen task so it can recognise an addition to it");
     }
 }

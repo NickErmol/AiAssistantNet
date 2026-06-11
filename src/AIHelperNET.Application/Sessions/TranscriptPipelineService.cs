@@ -21,7 +21,8 @@ public sealed partial class TranscriptPipelineService(
     ITurnStatusFeedback? feedback = null,
     TimeProvider? timeProvider = null,
     IBoundaryDecisionRecorder? recorder = null,
-    Answers.ScreenTaskContextStore? screenStore = null) : IDisposable
+    Answers.ScreenTaskContextStore? screenStore = null,
+    IScreenFollowUpClassifier? screenFollowUpClassifier = null) : IDisposable
 {
     private readonly QuestionDetector _detector = new();
     private readonly SegmentAccumulator _accumulator = new();
@@ -36,6 +37,7 @@ public sealed partial class TranscriptPipelineService(
     private readonly List<TranscriptItem> _recentItems = [];
     private const int MaxRecentItems = 5;
     private readonly Answers.ScreenTaskContextStore _screenStore = screenStore ?? new Answers.ScreenTaskContextStore();
+    private readonly IScreenFollowUpClassifier? _screenFollowUpClassifier = screenFollowUpClassifier;
     private SessionId? _sessionId;
     private string[] _recentTranscriptSnapshot = [];
 
@@ -146,7 +148,7 @@ public sealed partial class TranscriptPipelineService(
         // or asks about it spawns a NEW context-aware card (the capture card is never mutated).
         if (_screenStore.Current is { } screenCtx)
         {
-            switch (await ClassifyScreenFollowUpAsync(item, ct))
+            switch (await ClassifyScreenFollowUpAsync(screenCtx, item, ct))
             {
                 case Answers.ScreenFollowUpOutcome.FollowUp:
                     _screenStore.AddAddition(item.Text);
@@ -427,27 +429,82 @@ public sealed partial class TranscriptPipelineService(
     }
 
     /// <summary>Classifies an interviewer utterance against the captured screen task. Prefers the AI
-    /// boundary classifier (the heuristic was tuned for audio turns); falls back to the heuristic.</summary>
+    /// boundary classifier (the heuristic was tuned for audio turns); falls back to the heuristic.
+    /// The captured task is fed in as a prior, already-answered interviewer question so an utterance
+    /// that adds a constraint is recognised as an <see cref="BoundaryLabel.AdditionalRequirement"/>
+    /// rather than a context-free <see cref="BoundaryLabel.NoQuestion"/> (which would be dropped).</summary>
     private async Task<Answers.ScreenFollowUpOutcome> ClassifyScreenFollowUpAsync(
-        TranscriptItem item, CancellationToken ct)
+        Answers.ScreenTaskContext screenCtx, TranscriptItem item, CancellationToken ct)
     {
-        if (boundaryClassifier is not null)
+        // Preferred: the dedicated classifier, which sees the captured task and answers the 3-way
+        // question directly. The audio boundary classifier below is a fallback only.
+        if (_screenFollowUpClassifier is not null)
         {
             try
             {
-                var r = await boundaryClassifier.ClassifyAsync(
-                    ConversationTurnStatus.RefinedReady, _recentItems.AsReadOnly(), item, item.Speaker, ct);
-                return Answers.ScreenFollowUpRouter.Map(r.Classification);
+                var decided = await _screenFollowUpClassifier.ClassifyAsync(
+                    screenCtx.Ocr, screenCtx.Additions, item.Text, ct);
+                if (logger is not null)
+                    Log.ScreenFollowUpClassified(logger, screenCtx.TopicLabel, decided,
+                        item.Text[..Math.Min(80, item.Text.Length)]);
+                return decided;
             }
             catch (Exception ex)
             {
                 if (logger is not null)
                     Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
+                // fall through to the boundary/heuristic fallback
             }
         }
 
-        var h = _boundaryDetector.Evaluate(item.Text, item.Speaker, ConversationTurnStatus.RefinedReady, []);
-        return Answers.ScreenFollowUpRouter.Map(h.Classification);
+        var context = BuildScreenFollowUpContext(screenCtx, item.Timestamp);
+        var label = BoundaryLabel.NoQuestion;
+
+        if (boundaryClassifier is not null)
+        {
+            try
+            {
+                var r = await boundaryClassifier.ClassifyAsync(
+                    ConversationTurnStatus.RefinedReady, context, item, item.Speaker, ct);
+                label = r.Classification;
+            }
+            catch (Exception ex)
+            {
+                if (logger is not null)
+                    Log.BoundaryClassifierFailed(logger, ex, item.Text[..Math.Min(80, item.Text.Length)]);
+                label = _boundaryDetector
+                    .Evaluate(item.Text, item.Speaker, ConversationTurnStatus.RefinedReady, [screenCtx.TopicLabel])
+                    .Classification;
+            }
+        }
+        else
+        {
+            label = _boundaryDetector
+                .Evaluate(item.Text, item.Speaker, ConversationTurnStatus.RefinedReady, [screenCtx.TopicLabel])
+                .Classification;
+        }
+
+        var outcome = Answers.ScreenFollowUpRouter.Map(label);
+        if (logger is not null)
+            Log.ScreenFollowUpRouted(logger, screenCtx.TopicLabel, label, outcome,
+                item.Text[..Math.Min(80, item.Text.Length)]);
+        return outcome;
+    }
+
+    /// <summary>Builds the classifier context for a screen follow-up: the captured task (as a prior
+    /// interviewer question) followed by recent accumulated additions and live transcript, capped so
+    /// the task itself stays inside the classifier's last-N context window.</summary>
+    private List<TranscriptItem> BuildScreenFollowUpContext(
+        Answers.ScreenTaskContext screenCtx, DateTimeOffset ts)
+    {
+        var items = new List<TranscriptItem>
+        {
+            TranscriptItem.Create(Speaker.Other, $"[On-screen task] {screenCtx.TopicLabel}", ts, 1f),
+        };
+        foreach (var addition in screenCtx.Additions.TakeLast(2))
+            items.Add(TranscriptItem.Create(Speaker.Other, addition, ts, 1f));
+        items.AddRange(_recentItems.TakeLast(2));
+        return items;
     }
 
     /// <summary>Snapshots the last few transcript lines (both speakers) for follow-up prompt context.</summary>
@@ -697,5 +754,16 @@ public sealed partial class TranscriptPipelineService(
             BoundaryLabel heuristic, double heuristicConf, BoundaryLabel? aiLabel, double? aiConf,
             bool agreed, double effective, string guard,
             BoundaryLabel label, double confidence, string text);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "ScreenFollowUp: task='{Task}' label={Label} -> {Outcome} text='{Text}'")]
+        internal static partial void ScreenFollowUpRouted(
+            ILogger logger, string task, BoundaryLabel label,
+            Answers.ScreenFollowUpOutcome outcome, string text);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "ScreenFollowUp: task='{Task}' classifier -> {Outcome} text='{Text}'")]
+        internal static partial void ScreenFollowUpClassified(
+            ILogger logger, string task, Answers.ScreenFollowUpOutcome outcome, string text);
     }
 }

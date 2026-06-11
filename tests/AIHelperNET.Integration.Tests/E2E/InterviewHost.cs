@@ -30,6 +30,9 @@ public sealed class InterviewHost : IAsyncDisposable
     /// <summary>The scripted boundary classifier (singleton) to enqueue per-Other-step results.</summary>
     public FakeQuestionBoundaryClassifier Classifier { get; }
 
+    /// <summary>The scripted screen-task follow-up classifier (singleton) to enqueue per-utterance outcomes.</summary>
+    public FakeScreenFollowUpClassifier ScreenClassifier { get; }
+
     /// <summary>The capturing transcript sink (singleton) for asserting per-speaker transcripts.</summary>
     public CapturingTranscriptSink Transcripts { get; }
 
@@ -38,12 +41,14 @@ public sealed class InterviewHost : IAsyncDisposable
 
     private InterviewHost(ServiceProvider provider, SqliteConnection keepAlive,
         CapturingAnswerStreamSink sink, FakeQuestionBoundaryClassifier classifier,
+        FakeScreenFollowUpClassifier screenClassifier,
         CapturingTranscriptSink transcripts, CapturingTurnSink cards)
     {
         _provider = provider;
         _keepAlive = keepAlive;
         Sink = sink;
         Classifier = classifier;
+        ScreenClassifier = screenClassifier;
         Transcripts = transcripts;
         Cards = cards;
     }
@@ -72,6 +77,8 @@ public sealed class InterviewHost : IAsyncDisposable
             services.AddSingleton<IAnswerProviderResolver>(new FakeAnswerProviderResolver(fakeProvider));
         var classifier = new FakeQuestionBoundaryClassifier();
         services.AddSingleton<IQuestionBoundaryClassifier>(classifier);
+        var screenClassifier = new FakeScreenFollowUpClassifier();
+        services.AddSingleton<IScreenFollowUpClassifier>(screenClassifier);
         services.AddSingleton<ISettingsStore, StubSettingsStore>();
 
         var sink = new CapturingAnswerStreamSink();
@@ -91,7 +98,7 @@ public sealed class InterviewHost : IAsyncDisposable
             await db.Database.MigrateAsync();
         }
 
-        return new InterviewHost(provider, keepAlive, sink, classifier, transcripts, cards);
+        return new InterviewHost(provider, keepAlive, sink, classifier, screenClassifier, transcripts, cards);
     }
 
     private static void RemoveDbContext(ServiceCollection services)
