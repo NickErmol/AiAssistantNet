@@ -85,7 +85,7 @@ public sealed class AnswerLatestQuestionHandler(
         Session session, string questionText, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var question = DetectedQuestion.Create(questionText, QuestionSource.Audio, now);
+        var question = DetectedQuestion.Create(questionText, QuestionSource.Manual, now);
         session.AddDetectedQuestion(question);
 
         var turnResult = session.AddConversationTurn(question.Id, questionText, now);

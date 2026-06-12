@@ -97,7 +97,7 @@ public class AnswerLatestQuestionHandlerTests
             new AnswerLatestQuestionCommand(session.Id, []), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        h.TurnSink.Received().OnTurnCreated(Arg.Any<ConversationTurnId>(), Arg.Any<string>());
+        h.TurnSink.Received().OnTurnCreated(Arg.Any<ConversationTurnId>(), "[No recent question found]");
         await h.StreamSink.Received().OnErrorAsync(Arg.Any<ConversationTurnId>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await h.Mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
     }
@@ -115,7 +115,10 @@ public class AnswerLatestQuestionHandlerTests
         result.IsSuccess.Should().BeTrue();
         await h.Extractor.DidNotReceive().ExtractAsync(
             Arg.Any<IReadOnlyList<TranscriptLine>>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await h.StreamSink.Received().OnErrorAsync(Arg.Any<ConversationTurnId>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await h.StreamSink.Received().OnErrorAsync(
+            Arg.Any<ConversationTurnId>(),
+            Arg.Is<string>(m => m.Contains("120s")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
