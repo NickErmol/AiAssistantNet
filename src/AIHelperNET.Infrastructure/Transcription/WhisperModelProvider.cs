@@ -2,8 +2,10 @@ using System.IO;
 using System.Net.Http;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.Common;
+using Serilog;
 using Whisper.net;
 using Whisper.net.Ggml;
+using Whisper.net.LibraryLoader;
 
 namespace AIHelperNET.Infrastructure.Transcription;
 
@@ -27,13 +29,55 @@ public sealed class WhisperModelProvider : IAsyncDisposable
             if (!File.Exists(path))
                 await DownloadAsync(size, path, ct);
 
-            var factory = WhisperFactory.FromPath(path);
+            var factory = BuildFactoryWithFallback(path);
             _factories[size] = factory;
             return factory;
         }
         finally
         {
             _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Creates a <see cref="WhisperFactory"/> for the given model path, falling back to the CPU
+    /// runtime if the preferred GPU backend (Vulkan/CUDA) loads its native library successfully
+    /// but then fails to build a processor — which happens on machines that have vulkan-1.dll
+    /// present but no supported GPU.
+    /// </summary>
+    /// <remarks>
+    /// Whisper.net's native-library loader is a one-shot mechanism: the first successful
+    /// <c>FromPath</c> call commits a backend and caches it in <see cref="RuntimeOptions.LoadedLibrary"/>.
+    /// Resetting <see cref="RuntimeOptions.LoadedLibrary"/> to <c>null</c> before the retry causes
+    /// the loader to re-run its selection logic, picking the next candidate in
+    /// <see cref="RuntimeOptions.RuntimeLibraryOrder"/>.  Because the CPU runtime ships as a
+    /// managed P/Invoke wrapper that does not depend on the native DLL that Vulkan loaded, the
+    /// reset unblocks CPU usage even within the same process.
+    /// </remarks>
+    private static WhisperFactory BuildFactoryWithFallback(string modelPath)
+    {
+        var factory = WhisperFactory.FromPath(modelPath);
+        try
+        {
+            // Probe: attempt to build a processor to verify the GPU backend actually works.
+            // On machines with vulkan-1.dll but no supported GPU, FromPath succeeds (the
+            // Vulkan DLL loads) but Build() throws WhisperModelLoadException.
+            using var probe = factory.CreateBuilder().Build();
+            return factory;
+        }
+        catch (WhisperModelLoadException ex)
+        {
+            // GPU backend loaded but is not functional on this machine.
+            // Reset the loader state and retry with CPU only.
+            Log.Warning(ex,
+                "Whisper GPU backend unavailable (LoadedLibrary={Backend}); falling back to CPU runtime.",
+                RuntimeOptions.LoadedLibrary?.ToString() ?? "unknown");
+
+            factory.Dispose();
+            RuntimeOptions.LoadedLibrary        = null;
+            RuntimeOptions.RuntimeLibraryOrder  = [RuntimeLibrary.Cpu];
+
+            return WhisperFactory.FromPath(modelPath);
         }
     }
 

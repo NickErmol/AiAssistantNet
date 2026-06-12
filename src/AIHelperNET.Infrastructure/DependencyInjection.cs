@@ -3,6 +3,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Audio;
 using AIHelperNET.Infrastructure.Common;
+using AIHelperNET.Infrastructure.Diagnostics;
 using AIHelperNET.Infrastructure.Export;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
@@ -62,6 +63,12 @@ public static class DependencyInjection
 
         services.AddHttpClient<QuestionBoundaryClassifier>();
         services.AddSingleton<IQuestionBoundaryClassifier, QuestionBoundaryClassifier>();
+
+        services.AddHttpClient<ScreenFollowUpClassifier>();
+        services.AddSingleton<IScreenFollowUpClassifier, ScreenFollowUpClassifier>();
+
+        services.AddSingleton<IBoundaryDecisionRecorder>(
+            _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));
 
         services.AddHttpClient<ClaudeAnswerProvider>();
         services.AddSingleton<ClaudeAnswerProvider>();

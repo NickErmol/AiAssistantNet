@@ -23,10 +23,65 @@ public sealed class QuestionBoundaryClassifier(
     private const string HaikuModel = "claude-haiku-4-5-20251001";
 
     private const string SystemPrompt =
-        "You are classifying a live technical interview speech segment for boundary detection.\n" +
-        "You must return valid JSON only — no prose, no markdown, no code blocks.\n" +
-        "Valid labels: NoQuestion | QuestionStarted | QuestionContinued | QuestionComplete | TaskComplete | ClarificationOfCurrentQuestion | AdditionalRequirement | NewQuestion | Unrelated\n" +
-        "JSON schema: {\"classification\":\"<label>\",\"confidence\":<0.0-1.0>,\"normalized_text\":\"<trimmed input>\",\"reason\":\"<one short sentence>\"}";
+        """
+        You are classifying one speech segment from a live technical interview to detect question boundaries.
+        Return VALID JSON ONLY — no prose, no markdown, no code fences.
+
+        You are given: active_turn_status (state of the question currently tracked, or null),
+        speaker_of_latest (Other = interviewer, Me = candidate), up to 5 recent_items for context,
+        and text_to_classify (the latest item). Classify text_to_classify.
+
+        Labels — read these definitions carefully; the names alone are NOT enough:
+        - QuestionComplete: text_to_classify is itself a complete, answerable QUESTION — a direct
+          interrogative such as "what is dependency injection?", "how do the SOLID principles apply?",
+          "when would you add an index?". A direct question is QuestionComplete, NOT QuestionStarted.
+        - TaskComplete: text_to_classify is a complete, answerable imperative/coding TASK — an instruction
+          verb such as "write...", "design...", "implement...", "explain...", "reverse a linked list".
+          An imperative task is TaskComplete, NOT QuestionStarted.
+        - QuestionStarted: ONLY an INCOMPLETE scenario setup not yet answerable on its own — "suppose we
+          have a payment service...", "imagine thousands of IoT devices...". If the text is already a full
+          question or task, use QuestionComplete/TaskComplete, never QuestionStarted.
+        - QuestionContinued: the interviewer (Other) extends, refines, or adds a follow-up QUESTION on the
+          SAME topic/scenario already in progress — even if phrased like a standalone question ("and how
+          would it handle bursts?", "what about rolling back?"). Valid whether the turn is still being
+          collected (CollectingQuestion) or already answered (PreliminaryReady). While still collecting
+          (CollectingQuestion), even an "also ..." addition is QuestionContinued, not AdditionalRequirement.
+          Default for an Other follow-up on the same subject.
+        - AdditionalRequirement: the interviewer (Other) adds a new CONSTRAINT to a question that was already
+          asked AND answered (active_turn_status = PreliminaryReady) — "also it must be idempotent", "keep it
+          under 100ms", "assume three regions". If the turn is still being collected (CollectingQuestion), the
+          same "also ..." phrasing is QuestionContinued instead.
+        - ClarificationOfCurrentQuestion: the CANDIDATE (speaker_of_latest = Me) asks the interviewer to
+          clarify the current question's scope ("do you mean reads or writes?"). Use ONLY when
+          speaker_of_latest is Me. An Other-speaker follow-up is NEVER a clarification — it is
+          QuestionContinued or AdditionalRequirement.
+        - NewQuestion: the interviewer moves to a genuinely DIFFERENT topic the prior turn did not cover,
+          usually flagged by an explicit shift marker ("moving on", "next question", "different topic",
+          "let's switch gears").
+        - Unrelated: social filler, acknowledgements, or logistics ("thanks for sharing", "can you hear me?",
+          "give me a second to share my screen", "take your time"). Use Unrelated for filler, NOT NoQuestion.
+        - NoQuestion: reserved for empty/meaningless audio; for human filler prefer Unrelated.
+
+        Tie-breaker (avoids over-splitting one question into two cards):
+        When active_turn_status is CollectingQuestion or PreliminaryReady (a live or just-answered turn) and
+        text_to_classify stays on the SAME subject as recent_items, prefer QuestionContinued or
+        AdditionalRequirement over NewQuestion. Choose
+        NewQuestion only when the topic clearly changes OR there is an explicit topic-shift marker.
+
+        Examples (input -> correct label):
+        - latest:"what is dependency injection?" status:null -> QuestionComplete (a direct question, not a setup)
+        - latest:"write a function to reverse a linked list" status:null -> TaskComplete (imperative task, not a setup)
+        - latest:"suppose we're building an ecommerce checkout flow" status:null -> QuestionStarted (incomplete setup)
+        - recent:["design a rate limiter for our gateway"] latest(Other):"and how would it handle sudden bursts" status:PreliminaryReady -> QuestionContinued (Other extends same topic; not a clarification, not new)
+        - recent:["design the notification service"] latest(Other):"also it needs to stay under 100ms p99" status:PreliminaryReady -> AdditionalRequirement (new constraint on an answered task)
+        - recent:["design a url shortener"] latest(Other):"also it should support custom aliases" status:CollectingQuestion -> QuestionContinued (still collecting, so an addition continues the question; not AdditionalRequirement)
+        - recent:["how would you scale the database?"] latest(Me):"do you mean the read path or the write path?" status:CollectingQuestion -> ClarificationOfCurrentQuestion (candidate Me clarifies scope)
+        - recent:["explain how dependency injection works"] latest(Other):"completely different topic, what's your experience with kubernetes?" status:PreliminaryReady -> NewQuestion (explicit shift + new topic)
+        - latest:"give me a second to share my screen" status:null -> Unrelated (logistics filler)
+
+        JSON schema (return exactly this shape):
+        {"classification":"<one label above>","confidence":<0.0-1.0>,"normalized_text":"<trimmed text_to_classify>","reason":"<one short sentence>"}
+        """;
 
     /// <inheritdoc/>
     public async Task<BoundaryClassificationResult> ClassifyAsync(
@@ -109,7 +164,7 @@ public sealed class QuestionBoundaryClassifier(
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             var content = root.GetProperty("content")[0].GetProperty("text").GetString()?.Trim() ?? "";
-            using var resultDoc = JsonDocument.Parse(content);
+            using var resultDoc = JsonDocument.Parse(StripCodeFence(content));
             var r = resultDoc.RootElement;
             var label = ParseLabel(r.GetProperty("classification").GetString() ?? "");
             var confidence = r.GetProperty("confidence").GetDouble();
@@ -142,6 +197,18 @@ public sealed class QuestionBoundaryClassifier(
         "Unrelated"                      => BoundaryLabel.Unrelated,
         _                                => BoundaryLabel.NoQuestion
     };
+
+    /// <summary>Strips a Markdown code fence (<c>```json … ```</c>) the model may wrap JSON in
+    /// despite instructions, leaving the bare JSON for parsing.</summary>
+    private static string StripCodeFence(string s)
+    {
+        s = s.Trim();
+        if (!s.StartsWith("```", StringComparison.Ordinal)) return s;
+        var firstNewline = s.IndexOf('\n');
+        if (firstNewline >= 0) s = s[(firstNewline + 1)..];       // drop the ```/```json opener line
+        if (s.EndsWith("```", StringComparison.Ordinal)) s = s[..^3];
+        return s.Trim();
+    }
 
     private static string SecureStringToString(SecureString ss)
     {

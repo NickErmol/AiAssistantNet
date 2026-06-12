@@ -17,6 +17,11 @@
     <SolidColorBrush x:Key="Brush.Accent"                     Color="#4F8EF7"/>
     <SolidColorBrush x:Key="Brush.Semantic.Active"            Color="#16A34A"/>
     <SolidColorBrush x:Key="Brush.Semantic.Question"          Color="#D97706"/>
+    <SolidColorBrush x:Key="Brush.Semantic.Busy"              Color="#2563EB"/>
+    <SolidColorBrush x:Key="Brush.Semantic.Error"             Color="#DC2626"/>
+    <SolidColorBrush x:Key="Brush.Markdown.CodeBackground"   Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="Brush.Markdown.InlineCode"       Color="#A31515"/>
+    <SolidColorBrush x:Key="Brush.Markdown.SubLabel"         Color="#0B5FB0"/>
     <SolidColorBrush x:Key="Brush.Border"                     Color="#CBD5E1"/>
     <SolidColorBrush x:Key="Brush.Splitter"                   Color="#94A3B8"/>
     <SolidColorBrush x:Key="Brush.Splitter.Hover"             Color="#804F8EF7"/>

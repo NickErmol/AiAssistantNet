@@ -1,0 +1,27 @@
+graph TD
+    subgraph Production
+        App["App"]
+        Infra["Infrastructure"]
+        Appl["Application"]
+        Dom["Domain"]
+        App --> Appl
+        App --> Infra
+        App --> Dom
+        Infra --> Appl
+        Infra --> Dom
+        Appl --> Dom
+    end
+
+    DomT["Domain.Tests"] --> Dom
+    ApplT["Application.Tests"] --> Appl
+    ApplT --> Dom
+    InfraT["Infrastructure.Tests"] --> Appl
+    InfraT --> Dom
+    InfraT --> Infra
+    IntT["Integration.Tests<br/><i>full E2E host</i>"] --> App
+    IntT --> Appl
+    IntT --> Dom
+    IntT --> Infra
+
+    classDef test fill:#4a3a2d,stroke:#bf9f7c,color:#fff;
+    class DomT,ApplT,InfraT,IntT test;

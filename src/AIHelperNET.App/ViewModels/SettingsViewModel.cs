@@ -11,12 +11,21 @@ using Mediator;
 
 namespace AIHelperNET.App.ViewModels;
 
-/// <summary>Backing ViewModel for all four tabs of SettingsWindow.</summary>
+/// <summary>Backing ViewModel for the tabs of SettingsWindow.</summary>
 public sealed partial class SettingsViewModel(IMediator mediator) : ObservableObject
 {
+    // ── Shortcuts tab ─────────────────────────────────────────────
+    /// <summary>The read-only list of global keyboard shortcuts shown in the Shortcuts tab.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
+        Justification = "Bound via WPF {Binding}; must be an instance member of the DataContext.")]
+    public IReadOnlyList<HotkeyBinding> Hotkeys => HotkeyDefaults.All;
+
     // ── API Key tab ───────────────────────────────────────────────
     [ObservableProperty] private string _apiKeyInput = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
+
+    // ── AI Backend (API Key tab) ──────────────────────────────────
+    [ObservableProperty] private AiBackend _activeBackend = AiBackend.Claude;
 
     // ── Audio tab ─────────────────────────────────────────────────
     [ObservableProperty] private string? _selectedMicDeviceId;
@@ -58,6 +67,9 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
 
     partial void OnOverlayOpacityChanged(double value) => OpacityChanged?.Invoke(value);
 
+    // ── Answer settings ───────────────────────────────────────────
+    [ObservableProperty] private int _maxAnswerTokens = 800;
+
     // ── Load ──────────────────────────────────────────────────────
     [RelayCommand]
     public async Task LoadAsync()
@@ -71,6 +83,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
+        MaxAnswerTokens          = s.MaxAnswerTokens;
+        ActiveBackend            = s.ActiveBackend;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
         BackendFramework    = s.CodeProfile.BackendFramework    ?? string.Empty;
@@ -123,7 +137,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         var current  = existing.IsSuccess ? existing.Value : null;
 
         var dto = new AppSettingsDto(
-            current?.ActiveBackend  ?? AiBackend.Claude,
+            ActiveBackend,
             WhisperModel,
             new AnswerSettings(AnswerLength, AnswerComplexity, AnswerStyle, AnswerTone, AnswerFormat, OutputLanguage),
             new CodeProfile(NullIfEmpty(ProgrammingLanguage), NullIfEmpty(BackendFramework),
@@ -134,7 +148,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
             NullIfEmpty(SelectedLoopbackDeviceId),
             current?.AnswerFontSize ?? 12,
             WhisperLanguage,
-            OverlayOpacity)
+            OverlayOpacity,
+            MaxAnswerTokens)
         {
             Presets = [.. Presets]
         };

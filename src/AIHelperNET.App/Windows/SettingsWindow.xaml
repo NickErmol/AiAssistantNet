@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AIHelperNET.App.Windows"
         Title="AIHelper — Settings" Width="560" Height="600"
-        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" ResizeMode="NoResize"
         Background="{DynamicResource Brush.Background.Window}"
         Loaded="Window_Loaded">
 
@@ -12,6 +12,7 @@
                 Content="Save"
                 HorizontalAlignment="Right"
                 Width="80" Margin="0,8,0,0"
+                AutomationProperties.AutomationId="Btn_SaveSettings"
                 Command="{Binding SaveSettingsCommand}"/>
 
         <TabControl>
@@ -43,6 +44,20 @@
                                Foreground="{DynamicResource Brush.Semantic.Active}"
                                Margin="0,8,0,0"
                                FontSize="{DynamicResource Font.SM}"/>
+                    <TextBlock Text="AI Backend" FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                               Margin="0,16,0,6"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Claude" GroupName="Backend"
+                                 AutomationProperties.AutomationId="Backend_Claude"
+                                 IsChecked="{Binding ActiveBackend,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Claude}"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Ollama (local)" GroupName="Backend"
+                                 AutomationProperties.AutomationId="Backend_Ollama"
+                                 IsChecked="{Binding ActiveBackend,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Ollama}"/>
                 </StackPanel>
             </TabItem>
 
@@ -123,6 +138,30 @@
                                   SelectedValuePath="Value"
                                   SelectedValue="{Binding AnswerLength}"
                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Max answer length (tokens)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="200"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                            <Slider Grid.Column="1"
+                                    Minimum="200" Maximum="4000"
+                                    SmallChange="50" LargeChange="200"
+                                    TickFrequency="50" IsSnapToTickEnabled="True"
+                                    AutomationProperties.AutomationId="Settings_MaxAnswerTokens"
+                                    Value="{Binding MaxAnswerTokens}"/>
+                            <TextBlock Grid.Column="2" Text="4000"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
+                        </Grid>
+                        <TextBlock Text="{Binding MaxAnswerTokens, StringFormat='{}{0} tokens'}"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                   FontSize="{DynamicResource Font.XS}" Margin="0,0,0,8"/>
                         <TextBlock Text="Complexity"     Style="{StaticResource FieldLabel}"/>
                         <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerComplexities}}"
                                   DisplayMemberPath="Display"
@@ -175,6 +214,42 @@
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- ═══ Shortcuts ═══ -->
+            <TabItem Header="Shortcuts">
+                <StackPanel Margin="8">
+                    <TextBlock Text="KEYBOARD SHORTCUTS" Style="{StaticResource SectionLabel}" Margin="0,0,0,4"/>
+                    <TextBlock Text="Global shortcuts work even when the overlay isn't focused."
+                               Foreground="{DynamicResource Brush.Foreground.Muted}"
+                               FontSize="{DynamicResource Font.XS}" Margin="0,0,0,10"
+                               TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding Hotkeys}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Description}"
+                                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                               FontSize="{DynamicResource Font.SM}"
+                                               VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1"
+                                            Background="{DynamicResource Brush.Background.Panel}"
+                                            BorderBrush="{DynamicResource Brush.Border}"
+                                            BorderThickness="1" CornerRadius="3" Padding="6,2">
+                                        <TextBlock Text="{Binding Gesture}"
+                                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="{DynamicResource Font.SM}"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </TabItem>
         </TabControl>

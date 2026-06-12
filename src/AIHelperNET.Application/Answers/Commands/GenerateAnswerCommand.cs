@@ -24,7 +24,8 @@ public sealed class GenerateAnswerHandler(
     ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : IRequestHandler<GenerateAnswerCommand, Result>
+    TimeProvider clock,
+    ITurnStatusFeedback feedback) : IRequestHandler<GenerateAnswerCommand, Result>
 {
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(GenerateAnswerCommand cmd, CancellationToken cancellationToken)
@@ -49,20 +50,33 @@ public sealed class GenerateAnswerHandler(
             ? question.Text
             : turn.InitialQuestionText;
 
-        // Collect last 5 transcript items up to (and including) when this turn was created.
-        var recentTranscript = session.Transcript
+        // Last 5 transcript items up to (and including) when this turn was created…
+        var preTurn = session.Transcript
             .Where(t => t.Timestamp <= turn.CreatedAt)
-            .TakeLast(5)
+            .TakeLast(5);
+
+        // …plus any clarification items recorded on this turn AFTER it was created (e.g. a Me
+        // clarification). These post-creation items are what makes a regenerated answer actually
+        // incorporate the clarification. See Spec 1 §3.
+        var clarificationIds = turn.ClarificationQuestionIds
+            .Concat(turn.ClarificationResponseIds)
+            .ToHashSet();
+        var clarifications = session.Transcript.Where(t => clarificationIds.Contains(t.Id));
+
+        var recentTranscript = preTurn
+            .Concat(clarifications)
+            .DistinctBy(t => t.Id)
+            .OrderBy(t => t.Timestamp)
             .ToList();
 
-        // Collect last 2 completed turns (excluding the current one) with at least one answer version.
+        // Collect last 3 completed turns (excluding the current one) with at least one answer version.
         var recentQA = session.ConversationTurns
             .Where(t => t.Id != cmd.TurnId
                      && t.AnswerVersions.Count > 0
                      && (t.Status == ConversationTurnStatus.PreliminaryReady
                          || t.Status == ConversationTurnStatus.RefinedReady
                          || t.Status == ConversationTurnStatus.Resolved))
-            .TakeLast(2)
+            .TakeLast(3)
             .Select(t =>
             {
                 var ans = t.AnswerVersions[^1].Text;
@@ -75,6 +89,7 @@ public sealed class GenerateAnswerHandler(
             ? ConversationTurnStatus.GeneratingPreliminary
             : ConversationTurnStatus.GeneratingRefined;
         turn.TransitionTo(genStatus);
+        feedback.Publish(new TurnStatusEvent(cmd.TurnId, genStatus));
 
         var start = session.StartAnswer(turn.InitialQuestionId, clock.GetUtcNow());
         if (start.IsFailed) return Result.Fail(start.Error);
@@ -84,7 +99,8 @@ public sealed class GenerateAnswerHandler(
             session.CodeProfile, session.AnswerSettings, questionText,
             cmd.ScreenContext,
             recentTranscript,
-            recentQA);
+            recentQA,
+            maxTokens: settings.MaxAnswerTokens);
 
         var chunks = new System.Text.StringBuilder();
         try
@@ -104,22 +120,28 @@ public sealed class GenerateAnswerHandler(
                 ? ConversationTurnStatus.PreliminaryReady
                 : ConversationTurnStatus.RefinedReady;
             turn.TransitionTo(readyStatus);
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, readyStatus));
 
             await streamSink.OnCompleteAsync(cmd.TurnId, cmd.VersionType, cancellationToken);
         }
         catch (OperationCanceledException)
         {
             answer.Cancel(clock.GetUtcNow());
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
         }
 #pragma warning disable CA1031
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
-            await streamSink.OnErrorAsync(cmd.TurnId, ex.Message, cancellationToken);
+            feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
+            await streamSink.OnErrorAsync(cmd.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 
-        repository.Update(session);
+        // No repository.Update(session): rely on EF change-tracking so only the entities this
+        // handler actually modified (turn Status, the new AnswerVersion, the GeneratedAnswer) are
+        // written. A full-graph Update would mark pipeline-owned columns (clarification IDs,
+        // pre-answer status) Modified and clobber them. See Spec 1 §5.5.
         return await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

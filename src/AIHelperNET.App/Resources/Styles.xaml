@@ -234,4 +234,72 @@
         <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
     </Style>
 
+    <!-- TabControl — themed; the default WPF template paints a light content
+         panel that ignores the dark theme, turning near-white Foreground.Primary
+         text invisible (Settings → Shortcuts). Re-template to a dark card. -->
+    <Style TargetType="TabControl">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground"      Value="{DynamicResource Brush.Foreground.Primary}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TabPanel Grid.Row="0" IsItemsHost="True"
+                                  Background="Transparent" Margin="0,0,0,4"/>
+                        <Border Grid.Row="1"
+                                Background="{DynamicResource Brush.Background.Panel}"
+                                BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="1" CornerRadius="3">
+                            <!-- Name MUST be PART_SelectedContentHost: TabControl.OnApplyTemplate binds
+                                 its internal SelectedContentPresenter to this part, and TabItemAutomationPeer
+                                 uses it to expose the selected tab's content to UI Automation. Without the
+                                 name the content still renders but has no automation peers (invisible to
+                                 screen readers and UI tests). -->
+                            <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- TabItem — themed header tabs with an accent underline on the active tab -->
+    <Style TargetType="TabItem">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Foreground.Secondary}"/>
+        <Setter Property="FontSize"   Value="{DynamicResource Font.SM}"/>
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="border"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="0,0,0,2"
+                            Padding="10,5" Margin="0,0,2,0">
+                        <ContentPresenter ContentSource="Header"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush"
+                                    Value="{DynamicResource Brush.Accent}"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.Foreground.Primary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

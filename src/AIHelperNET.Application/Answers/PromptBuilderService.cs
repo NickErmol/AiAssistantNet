@@ -9,21 +9,23 @@ namespace AIHelperNET.Application.Answers;
 public sealed class PromptBuilderService
 {
     /// <summary>Constructs an <see cref="AnswerPrompt"/> from the given session context.</summary>
-    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?)"/> using <paramref name="question"/>.Text.</remarks>
+    /// <remarks>Delegates to <see cref="Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?, int?)"/> using <paramref name="question"/>.Text.</remarks>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
     /// <param name="settings">Answer settings controlling complexity, language, and length.</param>
     /// <param name="question">The detected question whose <c>Text</c> is forwarded.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
-    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
+    /// <param name="maxTokens">Explicit output token cap; when null, falls back to the length-based mapping.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         DetectedQuestion question,
         string? screenContext = null,
         IReadOnlyList<TranscriptItem>? recentTranscript = null,
-        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
-        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA);
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null,
+        int? maxTokens = null)
+        => Build(profile, settings, question.Text, screenContext, recentTranscript, recentQA, maxTokens);
 
     /// <summary>Constructs an <see cref="AnswerPrompt"/> using an explicit question text.</summary>
     /// <param name="profile">Candidate's code profile used to tailor code examples.</param>
@@ -31,14 +33,16 @@ public sealed class PromptBuilderService
     /// <param name="questionText">The full question text to answer.</param>
     /// <param name="screenContext">Optional OCR text captured from the screen.</param>
     /// <param name="recentTranscript">Optional recent transcript items to include as conversation context.</param>
-    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 200 characters.</param>
+    /// <param name="recentQA">Optional recent Q&amp;A pairs to include as conversation context. Answers are capped at 400 characters.</param>
+    /// <param name="maxTokens">Explicit output token cap; when null, falls back to the length-based mapping.</param>
     public static AnswerPrompt Build(
         CodeProfile profile,
         AnswerSettings settings,
         string questionText,
         string? screenContext = null,
         IReadOnlyList<TranscriptItem>? recentTranscript = null,
-        IReadOnlyList<(string Question, string Answer)>? recentQA = null)
+        IReadOnlyList<(string Question, string Answer)>? recentQA = null,
+        int? maxTokens = null)
     {
         var system = new StringBuilder();
 
@@ -48,13 +52,22 @@ public sealed class PromptBuilderService
 
         system.AppendLine();
         system.AppendLine("STRICT RULES:");
-        system.AppendLine("1. Be concise. 3–5 sentences or 3–4 bullets max. No padding.");
-        system.AppendLine("2. Answer like an experienced engineer speaking — clear, direct, no filler.");
-        system.AppendLine("3. NO markdown headers (no #, ##). Use plain prose or short bullets.");
+        system.AppendLine("1. Answer like an experienced engineer speaking — first person, spoken, direct, no filler.");
+        system.AppendLine("2. Structure the answer as: (a) a 1–2 sentence definition or reframe to open; " +
+            "(b) a first-person cue line (e.g. \"I would focus on:\") followed by terse \"- \" bullets; " +
+            "(c) a single closing principle line.");
+        AppendStructureGuidance(system, settings.Length);
+        system.AppendLine("   Match depth to the question's difficulty: for a trivial or factual " +
+            "question, answer in 1–2 sentences and skip the bullet scaffold; for a complex design, " +
+            "trade-off, or implementation question, use the full structure. Never pad an easy question " +
+            "to fill space.");
+        system.AppendLine("3. FORMATTING: use **bold** for emphasis and sub-labels, and \"- \" for bullets. " +
+            "NO headers (no #, ##). Put any code in fenced ```language blocks.");
         system.AppendLine("4. CODE: include code ONLY when the question explicitly asks to write, " +
             "implement, fix, debug, show syntax, or provide a query/example. " +
             "For conceptual, design, 'what is', 'why', 'how does it work' questions — verbal answer only.");
         system.AppendLine("5. Start directly with the answer. Never say 'Great question' or restate the question.");
+        system.AppendLine("6. Give the answer only — no 'why this is a good answer' commentary or meta-notes.");
 
         AppendCodeProfile(system, profile);
 
@@ -90,7 +103,7 @@ public sealed class PromptBuilderService
             {
                 foreach (var (q, a) in recentQA!)
                 {
-                    var cappedAnswer = a.Length > 200 ? a[..200] + "…" : a;
+                    var cappedAnswer = a.Length > 400 ? a[..400] + "…" : a;
                     user.AppendLine(CultureInfo.InvariantCulture,
                         $"[Q&A] Q: {q}  A: {cappedAnswer}");
                 }
@@ -107,7 +120,7 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: MapLengthToTokens(settings.Length));
+            MaxTokens: maxTokens ?? MapLengthToTokens(settings.Length));
     }
 
     /// <summary>Builds a follow-up prompt with the original Q+A injected as context.</summary>
@@ -124,6 +137,7 @@ public sealed class PromptBuilderService
             "You previously answered a question. Now the candidate asks a follow-up. " +
             "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
         AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
 
         var user = new StringBuilder();
         user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
@@ -148,6 +162,9 @@ public sealed class PromptBuilderService
         var system = new StringBuilder();
         system.AppendLine(ModeSystemPrompt(mode));
         AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
+        system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
+            "concise; do not pad, repeat, or add filler to fill space.");
 
         var user = new StringBuilder();
         var lines = interviewerLines.ToList();
@@ -164,7 +181,69 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 500));
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
+    }
+
+    /// <summary>Builds a prompt for an interviewer follow-up on a captured screen task: the model
+    /// either answers a question about the task or emits an updated solution incorporating all
+    /// accumulated requirements. Captured OCR, additions, transcript, and prior answer are fenced
+    /// and labeled as untrusted data.</summary>
+    /// <param name="profile">Candidate's code profile.</param>
+    /// <param name="settings">Answer settings.</param>
+    /// <param name="screenContext">Combined OCR of the captured task.</param>
+    /// <param name="mode">The screen analysis mode the capture used.</param>
+    /// <param name="additions">Accumulated interviewer additions (oldest → newest).</param>
+    /// <param name="recentTranscript">Recent transcript lines for interpreting terse replies.</param>
+    /// <param name="priorAnswer">The most recent prior answer in the lineage, or <see langword="null"/>.</param>
+    public static AnswerPrompt BuildScreenFollowUp(
+        CodeProfile profile,
+        AnswerSettings settings,
+        string screenContext,
+        ScreenAnalysisMode mode,
+        IReadOnlyList<string> additions,
+        IReadOnlyList<string> recentTranscript,
+        string? priorAnswer)
+    {
+        var system = new StringBuilder();
+        system.AppendLine(ModeSystemPrompt(mode));
+        AppendCodeProfile(system, profile);
+        system.AppendLine(SharedMarkdownRule);
+        system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
+            "concise; do not pad, repeat, or add filler to fill space.");
+        system.AppendLine("The interviewer has added requirements to, or asked about, the task on " +
+            "screen. If they added conditions, give the UPDATED solution incorporating ALL listed " +
+            "requirements (complete and runnable). If they asked a question about the task or your " +
+            "approach, answer it directly and briefly. Do not restate the task. Decide which from " +
+            "their words.");
+
+        var user = new StringBuilder();
+        user.AppendLine("On-screen task (OCR):");
+        user.AppendLine(screenContext);
+        user.AppendLine();
+        user.AppendLine("Interviewer requirements (most recent last):");
+        for (var i = 0; i < additions.Count; i++)
+            user.AppendLine(CultureInfo.InvariantCulture, $"{i + 1}. {additions[i]}");
+
+        if (recentTranscript is { Count: > 0 })
+        {
+            user.AppendLine();
+            user.AppendLine("Recent conversation:");
+            foreach (var line in recentTranscript)
+                user.AppendLine(CultureInfo.InvariantCulture, $"- {line}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(priorAnswer))
+        {
+            user.AppendLine();
+            user.AppendLine("Your previous answer:");
+            user.AppendLine(priorAnswer);
+        }
+
+        return new AnswerPrompt(
+            System: system.ToString(),
+            User: user.ToString(),
+            OutputLanguage: settings.OutputLanguage,
+            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
     }
 
     private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
@@ -226,6 +305,32 @@ public sealed class PromptBuilderService
 
         if (!string.IsNullOrWhiteSpace(p.CustomNotes))
             sb.AppendLine(CultureInfo.InvariantCulture, $"- notes: {p.CustomNotes}");
+    }
+
+    private const string SharedMarkdownRule =
+        "Formatting: use \"- \" for bullets and **bold** for emphasis; " +
+        "put any code in fenced ```language blocks; no headers (#).";
+
+    private static void AppendStructureGuidance(StringBuilder sb, AnswerLength length)
+    {
+        switch (length)
+        {
+            case AnswerLength.VeryShort:
+            case AnswerLength.ShortLength:
+                sb.AppendLine("   Keep it flat: the opening definition, then 4–6 terse bullets, then the principle. " +
+                    "Do NOT group bullets under sub-labels and do NOT include a worked example.");
+                break;
+            case AnswerLength.Medium:
+                sb.AppendLine("   Bullets may be grouped under **bold sub-labels:** when the topic has natural dimensions.");
+                break;
+            case AnswerLength.Detailed:
+            case AnswerLength.DeepDive:
+                sb.AppendLine("   Group bullets under **bold sub-labels:** for each dimension, and include one short " +
+                    "concrete example (a brief scenario or ordered steps) before the closing principle.");
+                break;
+            default:
+                break;
+        }
     }
 
     private static int MapLengthToTokens(AnswerLength length) => length switch

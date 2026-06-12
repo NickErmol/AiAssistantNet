@@ -40,4 +40,11 @@ public sealed class SegmentAccumulator
         _buffer.Clear();
         return result;
     }
+
+    /// <summary>Clears the internal buffer and resets the last-seen timestamp to its default value.</summary>
+    public void Reset()
+    {
+        _buffer.Clear();
+        _lastTimestamp = default;
+    }
 }

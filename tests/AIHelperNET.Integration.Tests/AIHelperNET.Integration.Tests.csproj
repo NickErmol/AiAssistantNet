@@ -29,4 +29,18 @@
     <ProjectReference Include="..\..\src\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
     <ProjectReference Include="..\..\src\AIHelperNET.Infrastructure\AIHelperNET.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Eval\boundary-corpus.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Eval\boundary-holdout.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Eval\boundary-garbled.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Fixtures/audio/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

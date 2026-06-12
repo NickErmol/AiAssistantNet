@@ -9,6 +9,7 @@ namespace AIHelperNET.Application.Tests.Answers;
 public class PromptBuilderServiceTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UnixEpoch;
+    private static readonly string[] SingleInterviewerLine = ["line"];
 
     [Fact]
     public void Build_IncludesCodeProfileInSystem()
@@ -171,9 +172,9 @@ public class PromptBuilderServiceTests
     }
 
     [Fact]
-    public void Build_QAAnswerLongerThan200Chars_IsTruncated()
+    public void Build_QAAnswerLongerThan400Chars_IsTruncated()
     {
-        var longAnswer = new string('A', 250);
+        var longAnswer = new string('A', 450);
         var qa = new List<(string Question, string Answer)>
         {
             ("Short question?", longAnswer),
@@ -184,9 +185,9 @@ public class PromptBuilderServiceTests
             "What is the pattern?",
             recentQA: qa);
 
-        // The answer in the prompt should be capped at 200 chars + ellipsis
-        prompt.User.Should().NotContain(longAnswer);       // full 250-char string absent
-        prompt.User.Should().Contain(new string('A', 200)); // first 200 chars present
+        // The answer in the prompt should be capped at 400 chars + ellipsis
+        prompt.User.Should().NotContain(longAnswer);       // full 450-char string absent
+        prompt.User.Should().Contain(new string('A', 400)); // first 400 chars present
     }
 
     [Fact]
@@ -206,5 +207,102 @@ public class PromptBuilderServiceTests
         prompt.User.Should().Contain("[Transcript] Interviewer: Explain this code");
         prompt.User.Should().Contain("void Main()");
         prompt.User.Should().Contain("Question: What does this do?");
+    }
+
+    [Fact]
+    public void Build_ClipsPriorAnswerContextAt400Chars()
+    {
+        var longAnswer = new string('A', 500);
+        var prompt = PromptBuilderService.Build(
+            CodeProfile.Empty,
+            AnswerSettings.Default,
+            "What is DI?",
+            screenContext: null,
+            recentTranscript: null,
+            recentQA: new List<(string, string)> { ("Earlier question?", longAnswer) });
+
+        prompt.User.Should().Contain(new string('A', 400) + "…");
+        prompt.User.Should().NotContain(new string('A', 401));
+    }
+
+    [Theory]
+    [InlineData(AnswerLength.VeryShort)]
+    [InlineData(AnswerLength.ShortLength)]
+    public void BuildWithScreenMode_AppliesMinimumTokenFloor(AnswerLength length)
+    {
+        var settings = AnswerSettings.Default with { Length = length };
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, settings, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.MaxTokens.Should().Be(2000);
+    }
+
+    [Fact]
+    public void BuildWithScreenMode_InstructsModelNotToPad()
+    {
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, AnswerSettings.Default, "code on screen", SingleInterviewerLine, ScreenAnalysisMode.SolveCodingTask);
+        prompt.System.Should().Contain("do not pad");
+    }
+
+    [Fact]
+    public void Build_SystemDescribesFourPartStructure()
+    {
+        var q = DetectedQuestion.Create("What is resilience?", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("definition");
+        prompt.System.Should().Contain("bullets");
+        prompt.System.Should().Contain("principle");
+    }
+
+    [Fact]
+    public void Build_StillBansHeaders()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("NO headers");
+    }
+
+    [Fact]
+    public void Build_StillHasCodeOnlyRule()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, AnswerSettings.Default, q);
+        prompt.System.Should().Contain("include code ONLY");
+    }
+
+    [Fact]
+    public void Build_ShortLength_OmitsGroupingAndExample()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var settings = AnswerSettings.Default with { Length = AnswerLength.ShortLength };
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, q);
+        prompt.System.Should().Contain("Do NOT group");
+        prompt.System.Should().NotContain("concrete example");
+    }
+
+    [Fact]
+    public void Build_DeepDive_IncludesGroupingAndExample()
+    {
+        var q = DetectedQuestion.Create("x", QuestionSource.Audio, Now);
+        var settings = AnswerSettings.Default with { Length = AnswerLength.DeepDive };
+        var prompt = PromptBuilderService.Build(CodeProfile.Empty, settings, q);
+        prompt.System.Should().Contain("sub-labels");
+        prompt.System.Should().Contain("concrete example");
+    }
+
+    [Fact]
+    public void BuildFollowUp_IncludesMarkdownFormattingRule()
+    {
+        var prompt = PromptBuilderService.BuildFollowUp(CodeProfile.Empty, AnswerSettings.Default, "q", "a", "f");
+        prompt.System.Should().Contain("fenced");
+    }
+
+    [Fact]
+    public void BuildWithScreenMode_IncludesMarkdownFormattingRule()
+    {
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            CodeProfile.Empty, AnswerSettings.Default, "code on screen",
+            SingleInterviewerLine, ScreenAnalysisMode.ExplainCode);
+        prompt.System.Should().Contain("fenced");
     }
 }

@@ -4,6 +4,7 @@ using AIHelperNET.App.Streaming;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Infrastructure.Common;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
@@ -33,7 +34,24 @@ public partial class App : System.Windows.Application
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            try
+            {
+                await db.Database.MigrateAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Database migration failed at startup");
+                MessageBox.Show(
+                    $"The database could not be upgraded:\n\n{ex.Message}\n\n" +
+                    "This usually means an older database file predates migrations. " +
+                    "Back up and delete it (plus its -wal/-shm siblings), then restart:\n\n" +
+                    AppPaths.DatabaseFile,
+                    "AIHelperNET — database upgrade failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown(1);
+                return;
+            }
         }
 
         await _host.StartAsync();
@@ -65,7 +83,7 @@ public partial class App : System.Windows.Application
         var answerSink = _host.Services.GetRequiredService<AnswerStreamSink>();
         answerSink.SetHandlers(
             onChunk:    (id, type, chunk) => turnVm.OnChunk(id, type, chunk),
-            onComplete: (id, type)        => ConversationTurnViewModel.OnComplete(id, type),
+            onComplete: (id, type)        => turnVm.OnComplete(id, type),
             onError:    (id, err)         => turnVm.OnError(id, err));
 
         // Wire ConversationTurnSinkAdapter → ConversationTurnViewModel
@@ -160,11 +178,9 @@ public partial class App : System.Windows.Application
         var hwnd = new WindowInteropHelper(overlay).Handle;
         hotkeys.Initialize(hwnd);
 
-        hotkeys.Register(HotkeyId.ToggleSession,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Space);
-        hotkeys.Register(HotkeyId.CaptureScreen,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.S);
-        hotkeys.Register(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Q);
-        hotkeys.Register(HotkeyId.CopyAnswer,     ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.C);
-        hotkeys.Register(HotkeyId.ToggleOverlay,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.H);
+        // Register from the single source of truth so the Settings shortcut list can never drift.
+        foreach (var binding in HotkeyDefaults.All)
+            hotkeys.Register(binding.Id, binding.Modifiers, binding.Key);
 
         var sessionVm = _host.Services.GetRequiredService<SessionControlViewModel>();
         var turnVm2   = _host.Services.GetRequiredService<ConversationTurnViewModel>();
