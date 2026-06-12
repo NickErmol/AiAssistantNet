@@ -61,6 +61,10 @@ public partial class App : System.Windows.Application
         // Resolve ConversationTurnViewModel early — referenced in both transcript and answer sink handlers.
         var turnVm = _host.Services.GetRequiredService<ConversationTurnViewModel>();
 
+        // Resolve the SessionControlViewModel singleton early — its screen-analysis mode is
+        // auto-selected from interviewer speech inside the transcript handler below.
+        var sessionVm = _host.Services.GetRequiredService<SessionControlViewModel>();
+
         // Wire TranscriptSink → TranscriptViewModel
         var transcriptSink = _host.Services.GetRequiredService<TranscriptSink>();
         var transcriptVm   = _host.Services.GetRequiredService<TranscriptViewModel>();
@@ -76,6 +80,8 @@ public partial class App : System.Windows.Application
                     .TakeLast(5)
                     .Select(i => i.Text);
                 turnVm.UpdateInterviewerLines(last5);
+                // Pre-select the screen-analysis mode from what the interviewer just asked.
+                sessionVm.AutoSelectScreenMode(item.Text);
             }
         });
 

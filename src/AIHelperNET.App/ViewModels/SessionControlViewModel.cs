@@ -53,6 +53,17 @@ public sealed partial class SessionControlViewModel(
     /// <summary>Gets the active session identifier, or <see langword="null"/> when stopped.</summary>
     public SessionId? ActiveSessionId { get; private set; }
 
+    /// <summary>Pre-selects <see cref="ScreenAnalysisMode"/> from the interviewer's latest line
+    /// using <see cref="ScreenModeClassifier"/>. A confident match updates the mode (the overlay
+    /// toggle reflects it); a non-match leaves the current selection untouched, so the mode latches
+    /// to the last spoken or manually chosen value and never reverts to General on chit-chat.</summary>
+    /// <param name="interviewerText">The most recent interviewer transcript line.</param>
+    public void AutoSelectScreenMode(string interviewerText)
+    {
+        if (ScreenModeClassifier.Classify(interviewerText) is { } mode)
+            ScreenAnalysisMode = mode;
+    }
+
     /// <summary>Starts or stops the current session.</summary>
     [RelayCommand]
     private async Task ToggleSessionAsync()
