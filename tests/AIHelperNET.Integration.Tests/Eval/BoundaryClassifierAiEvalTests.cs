@@ -5,6 +5,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Common;
+using FluentAssertions;
 using FluentResults;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -29,6 +30,20 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task RealHaiku_OverGarbled_ProducesReport()
+    {
+        var apiKey = Environment.GetEnvironmentVariable(KeyEnvVar);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            output.WriteLine($"Skipped: set {KeyEnvVar} to an Anthropic API key to run the garbled eval.");
+            return;
+        }
+        await RunEvalAsync(apiKey, CorpusLoader.Load("boundary-garbled.json"),
+            "Real Haiku — GARBLED (ASR degradation)", "ai-eval-garbled", minAccuracy: 0.80,
+            forbidFoldLabels: true);
+    }
+
+    [Fact]
     public async Task RealHaiku_OverHoldout_ProducesReport()
     {
         var apiKey = Environment.GetEnvironmentVariable(KeyEnvVar);
@@ -38,10 +53,12 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
             return;
         }
         await RunEvalAsync(apiKey, CorpusLoader.Load("boundary-holdout.json"),
-            "Real Haiku — HELD-OUT (generalization)", "ai-eval-holdout");
+            "Real Haiku — HELD-OUT (generalization)", "ai-eval-holdout", minAccuracy: 0.90);
     }
 
-    private async Task RunEvalAsync(string apiKey, IReadOnlyList<CorpusEntry> corpus, string title, string reportPrefix)
+    private async Task RunEvalAsync(
+        string apiKey, IReadOnlyList<CorpusEntry> corpus, string title, string reportPrefix,
+        double minAccuracy = 0.0, bool forbidFoldLabels = false)
     {
         var classifier = new QuestionBoundaryClassifier(
             new HttpClient(),
@@ -83,6 +100,21 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
         var reportPath = Path.Combine(AppPaths.DiagnosticsDir, $"{reportPrefix}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt");
         await File.WriteAllTextAsync(reportPath, report);
         output.WriteLine($"Report written to {reportPath}");
+
+        if (minAccuracy > 0.0)
+            matrix.Accuracy.Should().BeGreaterThanOrEqualTo(minAccuracy,
+                $"{title}: Haiku accuracy regressed below the guarded floor");
+
+        if (forbidFoldLabels)
+        {
+            // Garbled input must never be confidently routed as a fold (QuestionContinued /
+            // AdditionalRequirement) — that is the text-side of the corruption bug.
+            var foldMisses = misses.Where(m =>
+                m.Contains("got QuestionContinued", StringComparison.Ordinal) ||
+                m.Contains("got AdditionalRequirement", StringComparison.Ordinal)).ToList();
+            foldMisses.Should().BeEmpty(
+                $"{title}: garbled items were classified as fold labels: {string.Join("; ", foldMisses)}");
+        }
     }
 
     /// <summary>Minimal <see cref="ISecretStore"/> that yields a fixed key from the environment.</summary>
