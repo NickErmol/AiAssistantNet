@@ -116,15 +116,18 @@ previously selected mode.
   - Negative cases: conceptual / chit-chat lines → `null`
     (e.g. "tell me about your experience", "what is a primary key").
   - Case-insensitivity: "WRITE A SQL" → `SolveCodingTask`.
-- **`SessionControlViewModel` test** (`AIHelperNET.App.Tests`):
-  - A matching line sets `ScreenAnalysisMode`.
-  - A `null`-classifying line leaves a previously-set mode unchanged.
+- **App-layer wiring** (`SessionControlViewModel.AutoSelectScreenMode` + `App.xaml.cs`)
+  is a trivial 2-line latch over the tested classifier. It is **not** unit-tested in
+  isolation: `SessionControlViewModel`'s constructor pulls in concrete heavy services
+  (`SessionRunner` → `TranscriptPipelineService`) that aren't substitutable, so a VM unit
+  test would be disproportionately costly. The latch (`if (mode is not null) ... = mode`)
+  carries no logic the pure classifier tests don't already cover; it is verified by manual
+  smoke (speak a trigger → toggle flips; speak chit-chat → toggle unchanged).
 
 ## Files touched
 
 - **New:** `src/AIHelperNET.Application/Answers/ScreenModeClassifier.cs`
 - **New:** `tests/AIHelperNET.Application.Tests/Answers/ScreenModeClassifierTests.cs`
-- **New:** test in `tests/AIHelperNET.App.Tests` for `AutoSelectScreenMode`
 - **Edit:** `src/AIHelperNET.App/ViewModels/SessionControlViewModel.cs` (add method)
 - **Edit:** `src/AIHelperNET.App/App.xaml.cs` (resolve `SessionControlViewModel`, call in
   the `Other` branch)
