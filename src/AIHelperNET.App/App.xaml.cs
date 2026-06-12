@@ -201,6 +201,9 @@ public partial class App : System.Windows.Application
                 case HotkeyId.CopyAnswer:
                     turnVm2.CopyLatestCommand.Execute(turnVm2.Turns.FirstOrDefault());
                     break;
+                case HotkeyId.AnswerLatestQuestion:
+                    _ = turnVm2.AnswerLatestQuestionCommand.ExecuteAsync(null);
+                    break;
                 case HotkeyId.ToggleOverlay:
                     if (overlay.IsVisible)
                         overlay.Hide();
