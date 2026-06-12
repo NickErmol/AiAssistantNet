@@ -8,6 +8,9 @@
     <NoWarn>$(NoWarn);CS1591;CA1001;CA1305</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="AIHelperNET.App.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\AIHelperNET.Application\AIHelperNET.Application.csproj" />
     <ProjectReference Include="..\AIHelperNET.Domain\AIHelperNET.Domain.csproj" />
     <ProjectReference Include="..\AIHelperNET.Infrastructure\AIHelperNET.Infrastructure.csproj" />

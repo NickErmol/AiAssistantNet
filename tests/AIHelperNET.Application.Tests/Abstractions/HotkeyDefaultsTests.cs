@@ -19,7 +19,8 @@ public class HotkeyDefaultsTests
     [InlineData(HotkeyId.CaptureScreen,  "Ctrl+Shift+S")]
     [InlineData(HotkeyId.GenerateAnswer, "Ctrl+Shift+Q")]
     [InlineData(HotkeyId.CopyAnswer,     "Ctrl+Shift+C")]
-    [InlineData(HotkeyId.ToggleOverlay,  "Ctrl+Shift+H")]
+    [InlineData(HotkeyId.ToggleOverlay,        "Ctrl+Shift+H")]
+    [InlineData(HotkeyId.AnswerLatestQuestion, "Ctrl+Shift+Z")]
     public void Gesture_FormatsModifiersThenKey(HotkeyId id, string expected)
     {
         var binding = HotkeyDefaults.All.Single(b => b.Id == id);

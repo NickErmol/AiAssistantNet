@@ -12,7 +12,9 @@ public enum HotkeyId
     /// <summary>Copy the current answer to clipboard.</summary>
     CopyAnswer = 4,
     /// <summary>Show or hide the overlay window.</summary>
-    ToggleOverlay = 5
+    ToggleOverlay = 5,
+    /// <summary>Derive and answer the latest question from recent transcript + captures.</summary>
+    AnswerLatestQuestion = 6
 }
 
 /// <summary>Win32 modifier key flags for hotkey registration.</summary>
@@ -42,5 +44,7 @@ public enum VirtualKey : uint
     /// <summary>C key.</summary>
     C = 0x43,
     /// <summary>H key.</summary>
-    H = 0x48
+    H = 0x48,
+    /// <summary>Z key.</summary>
+    Z = 0x5A
 }

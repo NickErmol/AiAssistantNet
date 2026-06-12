@@ -40,6 +40,7 @@ public static class HotkeyDefaults
         new(HotkeyId.CaptureScreen,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.S,     "Capture screen"),
         new(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Q,     "Generate answer"),
         new(HotkeyId.CopyAnswer,     ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.C,     "Copy answer"),
-        new(HotkeyId.ToggleOverlay,  ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.H,     "Show / hide overlay"),
+        new(HotkeyId.ToggleOverlay,          ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.H,     "Show / hide overlay"),
+        new(HotkeyId.AnswerLatestQuestion,   ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.Z,     "Answer latest question"),
     ];
 }
