@@ -96,7 +96,7 @@ public sealed class LatestQuestionExtractor(
 
     /// <summary>Parses the Anthropic response envelope into a <see cref="LatestQuestionResult"/>;
     /// returns <see cref="LatestQuestionResult.None"/> on any malformed output.</summary>
-    public static LatestQuestionResult ParseResult(string json)
+    private static LatestQuestionResult ParseResult(string json)
     {
         try
         {
