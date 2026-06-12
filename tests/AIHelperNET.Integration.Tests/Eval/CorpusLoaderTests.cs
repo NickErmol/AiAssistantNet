@@ -28,10 +28,10 @@ public class CorpusLoaderTests
     }
 
     [Fact]
-    public void LoadHoldout_ReturnsTwelveNovelEntries()
+    public void LoadHoldout_ReturnsAllEntries()
     {
         var entries = CorpusLoader.Load("boundary-holdout.json");
-        entries.Should().HaveCount(12);
+        entries.Should().HaveCount(24);
         entries.Should().OnlyHaveUniqueItems(e => e.Id);
         entries.Should().OnlyContain(e => !string.IsNullOrWhiteSpace(e.LatestItem.Text));
         entries.Select(e => e.ExpectedLabel).Distinct().Count().Should().BeGreaterThanOrEqualTo(6);
