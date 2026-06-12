@@ -1,5 +1,3 @@
-using System;
-
 namespace AIHelperNET.Application.Answers;
 
 /// <summary>Maps interviewer speech to a <see cref="ScreenAnalysisMode"/> using deterministic

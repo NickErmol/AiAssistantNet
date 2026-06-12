@@ -41,6 +41,11 @@ public class ScreenModeClassifierTests
             .Should().Be(ScreenAnalysisMode.DebugError);
 
     [Fact]
+    public void Classify_DebugAndCodingPhrases_PrefersDebugByOrder()
+        => ScreenModeClassifier.Classify("fix the code, then write a function")
+            .Should().Be(ScreenAnalysisMode.DebugError);
+
+    [Fact]
     public void Classify_ExplainTheCode_PrefersExplainOverCoding()
         => ScreenModeClassifier.Classify("explain the code on screen")
             .Should().Be(ScreenAnalysisMode.ExplainCode);
