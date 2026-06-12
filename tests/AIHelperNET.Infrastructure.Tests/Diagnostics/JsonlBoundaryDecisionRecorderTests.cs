@@ -26,6 +26,7 @@ public class JsonlBoundaryDecisionRecorderTests : IDisposable
         AiConfidence: 0.80,
         Agreed: false,
         EffectiveConfidence: 0.40,
+        AsrConfidence: 0.95,
         Route: "AppendToActiveTurn",
         FinalLabel: BoundaryLabel.NewQuestion,
         TextClip: "how would you handle invalidation");
@@ -45,6 +46,7 @@ public class JsonlBoundaryDecisionRecorderTests : IDisposable
         using var doc = JsonDocument.Parse(lines[0]);
         doc.RootElement.GetProperty("FinalLabel").GetString().Should().Be("NewQuestion");
         doc.RootElement.GetProperty("Route").GetString().Should().Be("AppendToActiveTurn");
+        doc.RootElement.GetProperty("AsrConfidence").GetDouble().Should().Be(0.95);
     }
 
     [Fact]

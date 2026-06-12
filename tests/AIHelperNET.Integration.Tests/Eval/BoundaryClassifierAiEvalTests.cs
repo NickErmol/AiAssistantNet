@@ -5,6 +5,7 @@ using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Common;
+using FluentAssertions;
 using FluentResults;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -29,6 +30,27 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task RealHaiku_OverGarbled_ProducesReport()
+    {
+        var apiKey = Environment.GetEnvironmentVariable(KeyEnvVar);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            output.WriteLine($"Skipped: set {KeyEnvVar} to an Anthropic API key to run the garbled eval.");
+            return;
+        }
+        // Report-only — NO accuracy/label assertion. The 2026-06-12 run showed there is no
+        // reliable text-only "correct" label for garbled input: Haiku recovers intent from some
+        // garble (e.g. mangled "schema for a movie booking system" -> TaskComplete, correct) and
+        // mislabels others, INCLUDING emitting a fold label (g-rate-limit -> QuestionContinued)
+        // with no way to know the transcript was garbage. That inconsistency is precisely why the
+        // deterministic AsrConfidenceGate (which reads ASR confidence, not the words) is the real
+        // protection — see AsrConfidenceGateTests + the pipeline drop tests. This corpus documents
+        // the classifier's unreliability on degraded input; it is not a model-quality guard.
+        await RunEvalAsync(apiKey, CorpusLoader.Load("boundary-garbled.json"),
+            "Real Haiku — GARBLED (ASR degradation, report-only)", "ai-eval-garbled");
+    }
+
+    [Fact]
     public async Task RealHaiku_OverHoldout_ProducesReport()
     {
         var apiKey = Environment.GetEnvironmentVariable(KeyEnvVar);
@@ -38,10 +60,12 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
             return;
         }
         await RunEvalAsync(apiKey, CorpusLoader.Load("boundary-holdout.json"),
-            "Real Haiku — HELD-OUT (generalization)", "ai-eval-holdout");
+            "Real Haiku — HELD-OUT (generalization)", "ai-eval-holdout", minAccuracy: 0.90);
     }
 
-    private async Task RunEvalAsync(string apiKey, IReadOnlyList<CorpusEntry> corpus, string title, string reportPrefix)
+    private async Task RunEvalAsync(
+        string apiKey, IReadOnlyList<CorpusEntry> corpus, string title, string reportPrefix,
+        double minAccuracy = 0.0)
     {
         var classifier = new QuestionBoundaryClassifier(
             new HttpClient(),
@@ -83,6 +107,10 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
         var reportPath = Path.Combine(AppPaths.DiagnosticsDir, $"{reportPrefix}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt");
         await File.WriteAllTextAsync(reportPath, report);
         output.WriteLine($"Report written to {reportPath}");
+
+        if (minAccuracy > 0.0)
+            matrix.Accuracy.Should().BeGreaterThanOrEqualTo(minAccuracy,
+                $"{title}: Haiku accuracy regressed below the guarded floor");
     }
 
     /// <summary>Minimal <see cref="ISecretStore"/> that yields a fixed key from the environment.</summary>

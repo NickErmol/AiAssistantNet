@@ -21,6 +21,7 @@ public sealed record BoundaryDecisionRecord(
     double? AiConfidence,
     bool Agreed,
     double EffectiveConfidence,
+    double AsrConfidence,
     string Route,
     BoundaryLabel FinalLabel,
     string TextClip);

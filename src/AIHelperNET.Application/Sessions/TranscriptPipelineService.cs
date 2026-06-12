@@ -31,6 +31,7 @@ public sealed partial class TranscriptPipelineService(
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly RegenDebouncer _regenDebouncer = new(timeProvider ?? TimeProvider.System);
     private readonly BoundarySplitGuard _splitGuard = new();
+    private readonly AsrConfidenceGate _asrGate = new();
     private readonly ConcurrentDictionary<ConversationTurnId, DateTimeOffset> _lastActivityAt = new();
     private DateTimeOffset? _collectionStartedAt;
     private const int MaxCollectionSeconds = 8;
@@ -241,7 +242,17 @@ public sealed partial class TranscriptPipelineService(
             guard = _splitGuard.Evaluate(effectiveConfidence, live, since);
         }
 
-        var cmd = RouteLabel(session, item, result, activeTurn, guard);
+        // ASR-confidence fold-guard: a low-confidence (garbled) item that would fold into the live
+        // turn is dropped as untrusted noise rather than silently corrupting that turn. A
+        // guard-demoted NewQuestion folds via append, so it is gated as a continuation.
+        var foldCandidate =
+            result.Classification == BoundaryLabel.NewQuestion && guard == SplitDecision.AppendToActiveTurn
+                ? BoundaryLabel.QuestionContinued
+                : result.Classification;
+        var liveTurn = activeTurn is not null && !IsTerminal(activeTurn.Status);
+        var asrDropped = _asrGate.ShouldDrop(item.Confidence, foldCandidate, liveTurn);
+
+        var cmd = asrDropped ? null : RouteLabel(session, item, result, activeTurn, guard);
 
         // Stamp recency for whichever turn is now active (covers create/append/fragment cases).
         if (session.ActiveTurn is { } nowActive)
@@ -252,7 +263,7 @@ public sealed partial class TranscriptPipelineService(
             var guardStr = guard.HasValue ? guard.Value.ToString() : "-";
             Log.BoundaryRouted(logger, item.Speaker, activeTurnStatus,
                 heuristic.Classification, heuristic.Confidence, aiLabel, aiConfidence,
-                agreed, effectiveConfidence, guardStr,
+                agreed, effectiveConfidence, guardStr, item.Confidence,
                 result.Classification, result.Confidence,
                 item.Text[..Math.Min(60, item.Text.Length)]);
         }
@@ -271,7 +282,8 @@ public sealed partial class TranscriptPipelineService(
             AiConfidence: aiConfidence,
             Agreed: agreed,
             EffectiveConfidence: effectiveConfidence,
-            Route: guard?.ToString() ?? result.Classification.ToString(),
+            AsrConfidence: item.Confidence,
+            Route: asrDropped ? "AsrDropped" : (guard?.ToString() ?? result.Classification.ToString()),
             FinalLabel: result.Classification,
             TextClip: item.Text[..Math.Min(120, item.Text.Length)]));
 
@@ -748,11 +760,11 @@ public sealed partial class TranscriptPipelineService(
         [LoggerMessage(Level = LogLevel.Information,
             Message = "BoundaryRoute: speaker={Speaker} staleStatus={Status} " +
                       "heuristic={Heuristic}({HeuristicConf:F2}) ai={AiLabel}({AiConf}) " +
-                      "agreed={Agreed} eff={Effective:F2} guard={Guard} -> {Label} ({Confidence:F2}) text='{Text}'")]
+                      "agreed={Agreed} eff={Effective:F2} guard={Guard} asr={Asr:F2} -> {Label} ({Confidence:F2}) text='{Text}'")]
         internal static partial void BoundaryRouted(
             ILogger logger, Speaker speaker, ConversationTurnStatus? status,
             BoundaryLabel heuristic, double heuristicConf, BoundaryLabel? aiLabel, double? aiConf,
-            bool agreed, double effective, string guard,
+            bool agreed, double effective, string guard, double asr,
             BoundaryLabel label, double confidence, string text);
 
         [LoggerMessage(Level = LogLevel.Information,
