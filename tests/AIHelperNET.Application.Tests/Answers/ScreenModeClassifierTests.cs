@@ -12,6 +12,7 @@ public class ScreenModeClassifierTests
     [InlineData("Now implement an LRU cache")]
     [InlineData("solve this task in 20 minutes")]
     [InlineData("write a function that reverses a string")]
+    [InlineData("can you write a sequel to list the students")] // Whisper mis-transcribes "SQL"
     public void Classify_CodingPhrases_ReturnsSolveCodingTask(string text)
         => ScreenModeClassifier.Classify(text).Should().Be(ScreenAnalysisMode.SolveCodingTask);
 

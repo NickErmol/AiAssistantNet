@@ -27,9 +27,10 @@ public static class ScreenModeClassifier
         }),
         (ScreenAnalysisMode.SolveCodingTask, new[]
         {
-            "write a sql", "write sql", "write a query", "write the query", "write a code",
-            "write code", "write a function", "write a method", "write a script", "implement",
-            "solve this task", "solve the task", "code this",
+            // "sequel" mirrors "sql" because Whisper routinely transcribes spoken "SQL" as "sequel".
+            "write a sql", "write sql", "write a sequel", "write sequel", "write a query",
+            "write the query", "write a code", "write code", "write a function", "write a method",
+            "write a script", "implement", "solve this task", "solve the task", "code this",
         }),
     ];
 
