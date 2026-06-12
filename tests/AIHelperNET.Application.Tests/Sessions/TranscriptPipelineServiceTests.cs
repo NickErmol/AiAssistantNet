@@ -975,6 +975,79 @@ public class TranscriptPipelineServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    // ── AsrConfidenceGate integration tests ─────────────────────────────────
+
+    [Fact]
+    public async Task BoundaryPath_LowAsrConfidenceContinuation_IsDropped_NotFolded()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain write amplification.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain write amplification.", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+        var originalQuestion = turn.InitialQuestionText;
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        classifier
+            .ClassifyAsync(Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BoundaryClassificationResult(
+                BoundaryLabel.QuestionContinued, 0.72,
+                ShouldGenerateAnswer: false, ShouldRefineExistingAnswer: true,
+                ShouldCreateNewTurn: false,
+                NormalizedQuestionText: "welcome through how you would add cash in",
+                Reason: "test")));
+
+        var (svc, mediator, _, uow, _, recorder) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var garbled = TranscriptItem.Create(
+            Speaker.Other, "welcome through how you would add cash in without service day of data",
+            T0.AddSeconds(1), 0.30f);
+        await svc.ProcessAsync(session, garbled, uow, CancellationToken.None);
+
+        turn.InitialQuestionText.Should().Be(originalQuestion);
+        session.ConversationTurns.Should().HaveCount(1);
+
+        await Task.Delay(150);
+        await mediator.DidNotReceive().Send(Arg.Any<GenerateAnswerCommand>(), Arg.Any<CancellationToken>());
+
+        recorder.Received().Record(Arg.Is<BoundaryDecisionRecord>(r => r.Route == "AsrDropped"));
+    }
+
+    [Fact]
+    public async Task BoundaryPath_HighAsrConfidenceContinuation_StillFolds()
+    {
+        var session = MakeSession();
+        var transcriptSink = Substitute.For<ITranscriptSink>();
+
+        var q = DetectedQuestion.Create("Explain write amplification.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        var turn = session.AddConversationTurn(q.Id, "Explain write amplification.", T0).Value;
+        turn.TransitionTo(ConversationTurnStatus.PreliminaryReady);
+
+        var classifier = Substitute.For<IQuestionBoundaryClassifier>();
+        classifier
+            .ClassifyAsync(Arg.Any<ConversationTurnStatus?>(), Arg.Any<IReadOnlyList<TranscriptItem>>(),
+                Arg.Any<TranscriptItem>(), Arg.Any<Speaker>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BoundaryClassificationResult(
+                BoundaryLabel.QuestionContinued, 0.72,
+                ShouldGenerateAnswer: false, ShouldRefineExistingAnswer: true,
+                ShouldCreateNewTurn: false,
+                NormalizedQuestionText: "and how does it affect SSD lifespan",
+                Reason: "test")));
+
+        var (svc, _, _, uow, _, recorder) = MakeSvcWithBoundary(transcriptSink, classifier);
+
+        var clean = TranscriptItem.Create(
+            Speaker.Other, "and how does it affect SSD lifespan over time", T0.AddSeconds(1), 0.90f);
+        await svc.ProcessAsync(session, clean, uow, CancellationToken.None);
+
+        turn.InitialQuestionText.Should().Contain("SSD lifespan");
+        recorder.DidNotReceive().Record(Arg.Is<BoundaryDecisionRecord>(r => r.Route == "AsrDropped"));
+    }
+
     // ── BoundarySplitGuard integration tests ────────────────────────────────
 
     private static IQuestionBoundaryClassifier NewQuestionClassifier(double confidence, string normalized)
