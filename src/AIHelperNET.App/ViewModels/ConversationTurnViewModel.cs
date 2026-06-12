@@ -267,6 +267,9 @@ public sealed partial class ConversationTurnViewModel(
     private CancellationTokenSource? _screenGenCts;
     private int _screenGenInFlight;
 
+    private readonly List<(string Ocr, DateTimeOffset At)> _recentCaptures = [];
+    private bool _answerLatestInFlight;
+
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
     private bool CanDecrease() => AnswerFontSize > SaveAnswerFontSizeHandler.Min;
 
@@ -354,6 +357,7 @@ public sealed partial class ConversationTurnViewModel(
         _screenGenCts = null;
         _screenGroupTurnId = null;
         _screenAccumulator.Reset();
+        _recentCaptures.Clear();
         Turns.Clear();
         ActiveSessionId = null;
     }
@@ -364,6 +368,44 @@ public sealed partial class ConversationTurnViewModel(
     {
         if (turn is null || ActiveSessionId is not { } sid) return;
         await mediator.Send(new RegenerateAnswerCommand(sid, turn.Id));
+    }
+
+    /// <summary>Records a capture's OCR in the last-2 ring buffer used by Answer-latest-question.</summary>
+    private void RecordCapture(string ocr, DateTimeOffset at)
+    {
+        _recentCaptures.Add((ocr, at));
+        if (_recentCaptures.Count > 2) _recentCaptures.RemoveAt(0);
+    }
+
+    internal void RecordCaptureForTest(string ocr, DateTimeOffset at) => RecordCapture(ocr, at);
+
+    internal IReadOnlyList<(string Ocr, DateTimeOffset At)> RecentCaptureSnapshot() => _recentCaptures.ToList();
+
+    private static string FormatAge(TimeSpan age) =>
+        age.TotalSeconds < 90
+            ? $"{Math.Max(0, (int)age.TotalSeconds)}s ago"
+            : $"{(int)age.TotalMinutes}m ago";
+
+    /// <summary>Answers the latest question derived from recent transcript + the last ≤2 captures.
+    /// Ignored if a previous Answer-latest-question run is still in flight (v1 simplicity).</summary>
+    [RelayCommand]
+    private async Task AnswerLatestQuestionAsync()
+    {
+        if (ActiveSessionId is not { } sid) return;
+        if (_answerLatestInFlight) return;
+        _answerLatestInFlight = true;
+        try
+        {
+            var now = clock.GetUtcNow();
+            var captures = _recentCaptures
+                .Select(c => new RecentCapture(FormatAge(now - c.At), c.Ocr))
+                .ToList();
+            await mediator.Send(new AnswerLatestQuestionCommand(sid, captures));
+        }
+        finally
+        {
+            _answerLatestInFlight = false;
+        }
     }
 
     /// <summary>Pages the given turn's card to the next older answer version.</summary>
@@ -428,6 +470,8 @@ public sealed partial class ConversationTurnViewModel(
 
         var ocrResult = await mediator.Send(new CaptureScreenCommand());
         if (ocrResult.IsFailed) return;
+
+        RecordCapture(ocrResult.Value, clock.GetUtcNow());
 
         string[] interviewerLines = sessionControl.IncludeInterviewerContext
             ? _lastInterviewerLines
