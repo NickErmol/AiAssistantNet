@@ -56,3 +56,48 @@ public class SettingsViewModelTokenTests
             Arg.Any<CancellationToken>());
     }
 }
+
+/// <summary>Verifies the SettingsViewModel maps the Answer-latest window on load and persists it into
+/// the correct DTO field on save.</summary>
+public class SettingsViewModelWindowTests
+{
+    private static AppSettingsDto Settings(int windowSeconds) => new AppSettingsDto(
+        AiBackend.Claude, WhisperModelSize.Medium, AnswerSettings.Default, CodeProfile.Empty, null, null)
+        with { LatestQuestionWindowSeconds = windowSeconds };
+
+    [Fact]
+    public async Task LoadAsync_MapsLatestQuestionWindowSeconds()
+    {
+        var mediator = Substitute.For<IMediator>();
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GetSettingsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result<AppSettingsDto>>(Result.Ok(Settings(90))));
+        mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
+#pragma warning restore CA2012
+        var vm = new SettingsViewModel(mediator);
+
+        await vm.LoadAsync();
+
+        vm.LatestQuestionWindowSeconds.Should().Be(90);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsLatestQuestionWindowSeconds_IntoCorrectField()
+    {
+        var mediator = Substitute.For<IMediator>();
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GetSettingsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result<AppSettingsDto>>(Result.Ok(Settings(120))));
+        mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result>(Result.Ok()));
+#pragma warning restore CA2012
+        var vm = new SettingsViewModel(mediator) { LatestQuestionWindowSeconds = 200 };
+
+        await vm.SaveSettingsAsync();
+
+        await mediator.Received(1).Send(
+            Arg.Is<SaveSettingsCommand>(c => c.Settings.LatestQuestionWindowSeconds == 200),
+            Arg.Any<CancellationToken>());
+    }
+}

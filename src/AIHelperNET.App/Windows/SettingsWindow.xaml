@@ -162,6 +162,30 @@
                                    HorizontalAlignment="Center"
                                    Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                    FontSize="{DynamicResource Font.XS}" Margin="0,0,0,8"/>
+                        <TextBlock Text="Answer-latest window (seconds)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="30"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                            <Slider Grid.Column="1"
+                                    Minimum="30" Maximum="300"
+                                    SmallChange="10" LargeChange="30"
+                                    TickFrequency="10" IsSnapToTickEnabled="True"
+                                    AutomationProperties.AutomationId="Settings_LatestQuestionWindow"
+                                    Value="{Binding LatestQuestionWindowSeconds}"/>
+                            <TextBlock Grid.Column="2" Text="300"
+                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                       FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
+                        </Grid>
+                        <TextBlock Text="{Binding LatestQuestionWindowSeconds, StringFormat='{}{0} s'}"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                   FontSize="{DynamicResource Font.XS}" Margin="0,0,0,8"/>
                         <TextBlock Text="Complexity"     Style="{StaticResource FieldLabel}"/>
                         <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerComplexities}}"
                                   DisplayMemberPath="Display"

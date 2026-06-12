@@ -69,6 +69,7 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
 
     // ── Answer settings ───────────────────────────────────────────
     [ObservableProperty] private int _maxAnswerTokens = 800;
+    [ObservableProperty] private int _latestQuestionWindowSeconds = 120;
 
     // ── Load ──────────────────────────────────────────────────────
     [RelayCommand]
@@ -83,8 +84,9 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
-        MaxAnswerTokens          = s.MaxAnswerTokens;
-        ActiveBackend            = s.ActiveBackend;
+        MaxAnswerTokens               = s.MaxAnswerTokens;
+        LatestQuestionWindowSeconds   = s.LatestQuestionWindowSeconds;
+        ActiveBackend                 = s.ActiveBackend;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
         BackendFramework    = s.CodeProfile.BackendFramework    ?? string.Empty;
@@ -149,7 +151,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
             current?.AnswerFontSize ?? 12,
             WhisperLanguage,
             OverlayOpacity,
-            MaxAnswerTokens)
+            MaxAnswerTokens,
+            LatestQuestionWindowSeconds)
         {
             Presets = [.. Presets]
         };
