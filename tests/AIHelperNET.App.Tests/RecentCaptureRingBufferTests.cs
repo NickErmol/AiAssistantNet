@@ -27,4 +27,15 @@ public class RecentCaptureRingBufferTests
         snap[0].Ocr.Should().Be("two");
         snap[1].Ocr.Should().Be("three");
     }
+
+    [Fact]
+    public void Clear_EmptiesTheRingBuffer()
+    {
+        var vm = NewVm();
+        vm.RecordCaptureForTest("one", DateTimeOffset.UnixEpoch);
+
+        vm.Clear();
+
+        vm.RecentCaptureSnapshot().Should().BeEmpty();
+    }
 }

@@ -268,6 +268,7 @@ public sealed partial class ConversationTurnViewModel(
     private int _screenGenInFlight;
 
     private readonly List<(string Ocr, DateTimeOffset At)> _recentCaptures = [];
+    // All RelayCommand handlers run on the WPF dispatcher thread, so this guard needs no lock.
     private bool _answerLatestInFlight;
 
     private bool CanIncrease() => AnswerFontSize < SaveAnswerFontSizeHandler.Max;
@@ -384,7 +385,7 @@ public sealed partial class ConversationTurnViewModel(
     private static string FormatAge(TimeSpan age) =>
         age.TotalSeconds < 90
             ? $"{Math.Max(0, (int)age.TotalSeconds)}s ago"
-            : $"{(int)age.TotalMinutes}m ago";
+            : $"{Math.Max(0, (int)age.TotalMinutes)}m ago";
 
     /// <summary>Answers the latest question derived from recent transcript + the last ≤2 captures.
     /// Ignored if a previous Answer-latest-question run is still in flight (v1 simplicity).</summary>
