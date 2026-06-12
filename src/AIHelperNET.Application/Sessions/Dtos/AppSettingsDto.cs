@@ -14,6 +14,8 @@ namespace AIHelperNET.Application.Sessions.Dtos;
 /// <param name="WhisperLanguage">Whisper transcription language code, or "auto" for auto-detection.</param>
 /// <param name="OverlayOpacity">Overlay window opacity in range [0.2, 1.0].</param>
 /// <param name="MaxAnswerTokens">Maximum tokens for a generated audio answer, in range [200, 4000].</param>
+/// <param name="LatestQuestionWindowSeconds">Look-back window (seconds) the Answer-latest-question
+/// hotkey scans for the most recent question, in range [30, 300].</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
     WhisperModelSize WhisperModel,
@@ -24,7 +26,8 @@ public sealed record AppSettingsDto(
     int AnswerFontSize = 12,
     string WhisperLanguage = "auto",
     double OverlayOpacity = 0.75,
-    int MaxAnswerTokens = 800)
+    int MaxAnswerTokens = 800,
+    int LatestQuestionWindowSeconds = 120)
 {
     /// <summary>Default answer-token cap used when unset/legacy.</summary>
     public const int DefaultMaxAnswerTokens = 800;
@@ -33,15 +36,25 @@ public sealed record AppSettingsDto(
     /// <summary>Maximum allowed answer-token cap.</summary>
     public const int MaxAnswerTokensLimit = 4000;
 
+    /// <summary>Default Answer-latest-question look-back window, in seconds.</summary>
+    public const int DefaultLatestQuestionWindowSeconds = 120;
+    /// <summary>Minimum Answer-latest-question look-back window, in seconds.</summary>
+    public const int MinLatestQuestionWindowSeconds = 30;
+    /// <summary>Maximum Answer-latest-question look-back window, in seconds.</summary>
+    public const int MaxLatestQuestionWindowSeconds = 300;
+
     /// <summary>Named setting presets for quick profile switching.</summary>
     public IReadOnlyList<ProfilePreset> Presets { get; init; } = [];
 
-    /// <summary>Returns a copy with <see cref="MaxAnswerTokens"/> coerced into the valid range:
-    /// missing/non-positive → default 800; otherwise clamped to [200, 4000].</summary>
+    /// <summary>Returns a copy with <see cref="MaxAnswerTokens"/> and <see cref="LatestQuestionWindowSeconds"/>
+    /// coerced into their valid ranges: missing/non-positive → defaults; otherwise clamped.</summary>
     public AppSettingsDto Normalized() => this with
     {
         MaxAnswerTokens = MaxAnswerTokens <= 0
             ? DefaultMaxAnswerTokens
-            : Math.Clamp(MaxAnswerTokens, MinAnswerTokens, MaxAnswerTokensLimit)
+            : Math.Clamp(MaxAnswerTokens, MinAnswerTokens, MaxAnswerTokensLimit),
+        LatestQuestionWindowSeconds = LatestQuestionWindowSeconds <= 0
+            ? DefaultLatestQuestionWindowSeconds
+            : Math.Clamp(LatestQuestionWindowSeconds, MinLatestQuestionWindowSeconds, MaxLatestQuestionWindowSeconds)
     };
 }

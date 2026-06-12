@@ -30,4 +30,20 @@ public class AppSettingsDtoTests
     [Fact]
     public void Normalized_CoercesMissingOrZeroToDefault()
         => (Base() with { MaxAnswerTokens = 0 }).Normalized().MaxAnswerTokens.Should().Be(800);
+
+    [Fact]
+    public void Normalized_ClampsLatestQuestionWindow_IntoRange()
+    {
+        var tooLow  = Base() with { LatestQuestionWindowSeconds = 5 };
+        var tooHigh = Base() with { LatestQuestionWindowSeconds = 9999 };
+        var zero    = Base() with { LatestQuestionWindowSeconds = 0 };
+
+        tooLow.Normalized().LatestQuestionWindowSeconds.Should().Be(AppSettingsDto.MinLatestQuestionWindowSeconds);
+        tooHigh.Normalized().LatestQuestionWindowSeconds.Should().Be(AppSettingsDto.MaxLatestQuestionWindowSeconds);
+        zero.Normalized().LatestQuestionWindowSeconds.Should().Be(AppSettingsDto.DefaultLatestQuestionWindowSeconds);
+    }
+
+    [Fact]
+    public void LatestQuestionWindowSeconds_DefaultsTo120()
+        => Base().LatestQuestionWindowSeconds.Should().Be(120);
 }
