@@ -30,7 +30,7 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator);
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier());
 
         await vm.LoadAsync();
 
@@ -47,7 +47,7 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator) { MaxAnswerTokens = 1500 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier()) { MaxAnswerTokens = 1500 };
 
         await vm.SaveSettingsAsync();
 
@@ -75,7 +75,7 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator);
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier());
 
         await vm.LoadAsync();
 
@@ -92,12 +92,27 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator) { LatestQuestionWindowSeconds = 200 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier()) { LatestQuestionWindowSeconds = 200 };
 
         await vm.SaveSettingsAsync();
 
         await mediator.Received(1).Send(
             Arg.Is<SaveSettingsCommand>(c => c.Settings.LatestQuestionWindowSeconds == 200),
             Arg.Any<CancellationToken>());
+    }
+}
+
+/// <summary>No-op applier for VM tests; records the last applied set and can be told which IDs to "fail".</summary>
+internal sealed class StubHotkeyApplier : AIHelperNET.App.Hotkeys.IHotkeyApplier
+{
+    public IReadOnlyList<HotkeyBinding>? LastApplied;
+    public int ApplyCalls;
+    public IReadOnlyList<HotkeyId> Failures = [];
+
+    public IReadOnlyList<HotkeyId> Apply(IReadOnlyList<HotkeyBinding> bindings)
+    {
+        ApplyCalls++;
+        LastApplied = bindings;
+        return Failures;
     }
 }

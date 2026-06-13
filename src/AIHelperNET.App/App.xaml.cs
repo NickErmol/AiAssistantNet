@@ -1,14 +1,17 @@
 using System.Windows;
 using System.Windows.Interop;
+using AIHelperNET.App.Hotkeys;
 using AIHelperNET.App.Streaming;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.App.Windows;
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Infrastructure.Common;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
 using AIHelperNET.Infrastructure.Transcription;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -184,9 +187,12 @@ public partial class App : System.Windows.Application
         var hwnd = new WindowInteropHelper(overlay).Handle;
         hotkeys.Initialize(hwnd);
 
-        // Register from the single source of truth so the Settings shortcut list can never drift.
-        foreach (var binding in HotkeyDefaults.All)
-            hotkeys.Register(binding.Id, binding.Modifiers, binding.Key);
+        // Register the effective set (defaults merged with any saved user overrides).
+        var settingsResult = _host.Services.GetRequiredService<IMediator>()
+            .Send(new GetSettingsQuery()).AsTask().GetAwaiter().GetResult();
+        var overrides = settingsResult.IsSuccess ? settingsResult.Value.HotkeyOverrides : [];
+        _host.Services.GetRequiredService<IHotkeyApplier>()
+            .Apply(HotkeyDefaults.Resolve(overrides));
 
         var sessionVm = _host.Services.GetRequiredService<SessionControlViewModel>();
         var turnVm2   = _host.Services.GetRequiredService<ConversationTurnViewModel>();
