@@ -20,7 +20,7 @@ public sealed record HotkeyBinding(
             if (Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
             if (Modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
             if (Modifiers.HasFlag(ModifierKeys.Win)) parts.Add("Win");
-            parts.Add(Key.ToString());
+            parts.Add(HotkeyKeys.Display(Key));
             return string.Join("+", parts);
         }
     }
