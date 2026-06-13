@@ -27,4 +27,19 @@ public class HotkeyResolveTests
         resolved.Where(b => b.Id != HotkeyId.GenerateAnswer)
             .Should().BeEquivalentTo(HotkeyDefaults.All.Where(b => b.Id != HotkeyId.GenerateAnswer));
     }
+
+    [Fact]
+    public void Resolve_DuplicateOverrideIds_KeepsFirst()
+    {
+        var overrides = new[]
+        {
+            new HotkeyOverride(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl | ModifierKeys.Alt, VirtualKey.G),
+            new HotkeyOverride(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.X),
+        };
+
+        var resolved = HotkeyDefaults.Resolve(overrides);
+
+        var changed = resolved.Single(b => b.Id == HotkeyId.GenerateAnswer);
+        changed.Key.Should().Be(VirtualKey.G); // first wins
+    }
 }

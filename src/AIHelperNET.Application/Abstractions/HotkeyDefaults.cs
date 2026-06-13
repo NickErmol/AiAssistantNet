@@ -53,9 +53,9 @@ public static class HotkeyDefaults
 
     /// <summary>The effective bindings = <see cref="All"/> with any matching <see cref="HotkeyOverride.Id"/>
     /// replaced by the override's chord. Descriptions always come from the defaults.</summary>
-    /// <param name="overrides">User chord overrides; empty or null ⇒ pure defaults.</param>
+    /// <param name="overrides">User chord overrides; empty or <see langword="null"/> ⇒ pure defaults.</param>
     /// <returns>The merged effective bindings.</returns>
-    public static IReadOnlyList<HotkeyBinding> Resolve(IReadOnlyList<HotkeyOverride> overrides)
+    public static IReadOnlyList<HotkeyBinding> Resolve(IReadOnlyList<HotkeyOverride>? overrides)
     {
         if (overrides is null || overrides.Count == 0) return All;
         var map = overrides.GroupBy(o => o.Id).ToDictionary(g => g.Key, g => g.First());
