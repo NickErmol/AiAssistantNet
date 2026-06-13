@@ -151,4 +151,48 @@ public class InterviewScenarioTests
         var s = ByName[name];
         ScreenModeClassifier.Classify(s.InterviewerSpeech).Should().Be(s.ExpectedMode);
     }
+
+    private static string ModeFragment(ScreenAnalysisMode mode) => mode switch
+    {
+        ScreenAnalysisMode.SolveCodingTask => "provide the solution FIRST",
+        ScreenAnalysisMode.DebugError      => "root cause and fix FIRST",
+        ScreenAnalysisMode.ExplainCode     => "what the code does in one sentence FIRST",
+        ScreenAnalysisMode.SystemDesign    => "recommended approach FIRST",
+        _                                  => "senior software engineer",
+    };
+
+    [Theory]
+    [MemberData(nameof(ModeScenarioNames))]
+    public void BuildWithScreenMode_IsWellFormed(string name)
+    {
+        var s = ByName[name];
+        var mode = s.ExpectedMode!.Value;
+
+        var prompt = PromptBuilderService.BuildWithScreenMode(
+            s.Profile,
+            AnswerSettings.Default,
+            s.ScreenOcr,
+            new[] { s.InterviewerSpeech },
+            mode);
+
+        // Mode-specific instruction is in the system prompt.
+        prompt.System.Should().Contain(ModeFragment(mode));
+
+        // Captured screen is fenced as data under the OCR label, and is present verbatim.
+        prompt.User.Should().Contain("On-screen content (OCR):");
+        prompt.User.Should().Contain(s.ScreenOcr);
+
+        // Interviewer instruction is carried into the prompt.
+        prompt.User.Should().Contain(s.InterviewerSpeech);
+
+        // Screen analysis floors output at 2000 tokens regardless of length setting.
+        prompt.MaxTokens.Should().BeGreaterThanOrEqualTo(2000);
+
+        // A populated candidate stack surfaces in the system prompt (the .NET / Angular scenarios).
+        if (s.Profile != CodeProfile.Empty)
+        {
+            prompt.System.Should().Contain("Candidate stack (use this in code examples only):");
+            prompt.System.Should().Contain(s.Profile.ProgrammingLanguage!);
+        }
+    }
 }
