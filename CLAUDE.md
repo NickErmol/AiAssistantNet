@@ -47,7 +47,9 @@ App            — WPF, ViewModels, sink wiring, MS Generic Host (composition ro
 ## Code map
 
 Load-bearing files only — where to look first, not an exhaustive listing. Paths relative to
-`src/`. When in doubt, `Glob`/`Grep`; this map points you at the right neighborhood.
+`src/`. When in doubt, `Glob`/`Grep`; this map points you at the right neighborhood. For the
+*dynamic* flow (how a spoken question becomes an answer card), see
+`docs/architecture/request-lifecycle.md`.
 
 **Domain** (`AIHelperNET.Domain/`)
 - `Sessions/Session.cs` — the aggregate root (turns, questions, answers, mode/state). Start here
