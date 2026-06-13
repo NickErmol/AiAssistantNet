@@ -1,3 +1,4 @@
+using AIHelperNET.App.Hotkeys;
 using AIHelperNET.App.Services;
 using AIHelperNET.App.Streaming;
 using AIHelperNET.App.ViewModels;
@@ -23,6 +24,9 @@ public static class DependencyInjection
 
         // Session pipeline runner
         services.AddSingleton<SessionRunner>();
+
+        // Hotkey applier
+        services.AddSingleton<IHotkeyApplier, HotkeyApplier>();
 
         // ViewModels
         services.AddSingleton<SessionControlViewModel>();
