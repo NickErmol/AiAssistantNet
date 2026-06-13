@@ -107,6 +107,24 @@ public class SettingsViewModelHotkeyTests
     }
 
     [Fact]
+    public async Task CancelRecording_ClearsRecordingState_WithoutChangingChord()
+    {
+        var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier());
+        await vm.LoadAsync();
+
+        var gen = vm.HotkeyRows.Single(r => r.Id == HotkeyId.GenerateAnswer);
+        var before = gen.Gesture;
+        vm.StartRecordingCommand.Execute(gen);
+        gen.IsRecording.Should().BeTrue();
+
+        vm.CancelRecording();
+
+        gen.IsRecording.Should().BeFalse();
+        vm.IsAnyRowRecording.Should().BeFalse();
+        gen.Gesture.Should().Be(before); // chord unchanged
+    }
+
+    [Fact]
     public async Task ResetRow_RestoresDefault_ResetAll_RestoresEverything()
     {
         var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier());

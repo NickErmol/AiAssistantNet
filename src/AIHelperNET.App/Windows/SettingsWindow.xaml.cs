@@ -50,6 +50,8 @@ public sealed partial class SettingsWindow : Window
     {
         if (!_vm.IsAnyRowRecording) return;
 
+        if (e.Key == Key.Escape) { _vm.CancelRecording(); e.Handled = true; return; }
+
         var key = e.Key == Key.System ? e.SystemKey : e.Key; // Alt chords arrive as Key.System
         if (KeyGestureCapture.IsModifierKey(key)) { e.Handled = true; return; } // wait for the real key
 

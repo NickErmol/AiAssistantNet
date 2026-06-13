@@ -311,6 +311,12 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
         foreach (var row in HotkeyRows) row.SetChord(defaults[row.Id].Modifiers, defaults[row.Id].Key);
     }
 
+    /// <summary>Called by the window's key handler to abort recording (Escape) without changing the chord.</summary>
+    public void CancelRecording()
+    {
+        foreach (var row in HotkeyRows) row.IsRecording = false;
+    }
+
     /// <summary>Called by the window's key handler when a complete chord is captured.</summary>
     /// <param name="mods">The captured modifier flags.</param>
     /// <param name="key">The captured key.</param>
