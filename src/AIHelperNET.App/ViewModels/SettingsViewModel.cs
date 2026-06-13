@@ -1,5 +1,6 @@
 // src/AIHelperNET.App/ViewModels/SettingsViewModel.cs
 using System.Collections.ObjectModel;
+using AIHelperNET.App.Hotkeys;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Dtos;
@@ -12,13 +13,14 @@ using Mediator;
 namespace AIHelperNET.App.ViewModels;
 
 /// <summary>Backing ViewModel for the tabs of SettingsWindow.</summary>
-public sealed partial class SettingsViewModel(IMediator mediator) : ObservableObject
+public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier hotkeyApplier) : ObservableObject
 {
     // ── Shortcuts tab ─────────────────────────────────────────────
-    /// <summary>The read-only list of global keyboard shortcuts shown in the Shortcuts tab.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
-        Justification = "Bound via WPF {Binding}; must be an instance member of the DataContext.")]
-    public IReadOnlyList<HotkeyBinding> Hotkeys => HotkeyDefaults.All;
+    /// <summary>Editable shortcut rows, one per action, shown in the Shortcuts tab.</summary>
+    public ObservableCollection<HotkeyRowViewModel> HotkeyRows { get; } = [];
+
+    /// <summary>The last successfully-registered effective set, used to revert on an OS conflict.</summary>
+    private IReadOnlyList<HotkeyBinding> _lastGoodBindings = HotkeyDefaults.All;
 
     // ── API Key tab ───────────────────────────────────────────────
     [ObservableProperty] private string _apiKeyInput = string.Empty;
@@ -108,6 +110,11 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         Presets.Clear();
         foreach (var p in s.Presets) Presets.Add(p);
 
+        var effective = HotkeyDefaults.Resolve(s.HotkeyOverrides);
+        _lastGoodBindings = effective;
+        HotkeyRows.Clear();
+        foreach (var b in effective) HotkeyRows.Add(HotkeyRowViewModel.FromBinding(b));
+
         await RefreshKeyStatusAsync();
     }
 
@@ -138,6 +145,44 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         var existing = await mediator.Send(new GetSettingsQuery());
         var current  = existing.IsSuccess ? existing.Value : null;
 
+        IReadOnlyList<HotkeyOverride> hotkeyOverridesToSave;
+        if (HotkeyRows.Count > 0)
+        {
+            var proposed = HotkeyRows.Select(r => r.ToBinding()).ToList();
+
+            var errors = HotkeyValidator.Validate(proposed);
+            if (errors.Count > 0)
+            {
+                foreach (var row in HotkeyRows)
+                    row.ErrorMessage = errors.TryGetValue(row.Id, out var msg) ? msg : null;
+                StatusMessage = "Fix the highlighted shortcut conflicts, then Save.";
+                return;
+            }
+            foreach (var row in HotkeyRows) row.ErrorMessage = null;
+
+            var failed = hotkeyApplier.Apply(proposed);
+            if (failed.Count > 0)
+            {
+                foreach (var row in HotkeyRows)
+                    if (failed.Contains(row.Id))
+                        row.ErrorMessage = "Already in use by Windows or another app — pick a different chord.";
+                hotkeyApplier.Apply(_lastGoodBindings); // revert so no action is left unregistered
+                StatusMessage = "Some shortcuts are in use by another app — not saved.";
+                return;
+            }
+
+            _lastGoodBindings = proposed;
+            var defaults = HotkeyDefaults.All.ToDictionary(b => b.Id);
+            hotkeyOverridesToSave = proposed
+                .Where(b => b.Modifiers != defaults[b.Id].Modifiers || b.Key != defaults[b.Id].Key)
+                .Select(b => new HotkeyOverride(b.Id, b.Modifiers, b.Key))
+                .ToList();
+        }
+        else
+        {
+            hotkeyOverridesToSave = current?.HotkeyOverrides ?? [];
+        }
+
         var dto = new AppSettingsDto(
             ActiveBackend,
             WhisperModel,
@@ -154,7 +199,8 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
             MaxAnswerTokens,
             LatestQuestionWindowSeconds)
         {
-            Presets = [.. Presets]
+            Presets = [.. Presets],
+            HotkeyOverrides = [.. hotkeyOverridesToSave]
         };
 
         await mediator.Send(new SaveSettingsCommand(dto));
@@ -228,5 +274,54 @@ public sealed partial class SettingsViewModel(IMediator mediator) : ObservableOb
         if (StatusMessage == string.Empty || StatusMessage.StartsWith("API key is", StringComparison.Ordinal))
             StatusMessage = (hasKey.IsSuccess && hasKey.Value)
                 ? "API key is stored ✓" : "No API key stored — enter one above.";
+    }
+
+    // ── Shortcut editing ──────────────────────────────────────────
+    /// <summary>True while any row is capturing a key press.</summary>
+    public bool IsAnyRowRecording => HotkeyRows.Any(r => r.IsRecording);
+
+    [RelayCommand]
+    private void StartRecording(HotkeyRowViewModel? row)
+    {
+        if (row is null) return;
+        foreach (var r in HotkeyRows) r.IsRecording = false;
+        row.ErrorMessage = null;
+        row.IsRecording = true;
+    }
+
+    [RelayCommand]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
+        Justification = "[RelayCommand] requires an instance method; static methods cannot be decorated.")]
+    private void ResetRow(HotkeyRowViewModel? row)
+    {
+        if (row is null) return;
+        var d = HotkeyDefaults.All.Single(b => b.Id == row.Id);
+        row.SetChord(d.Modifiers, d.Key);
+    }
+
+    [RelayCommand]
+    private void ResetAllHotkeys()
+    {
+        var defaults = HotkeyDefaults.All.ToDictionary(b => b.Id);
+        foreach (var row in HotkeyRows) row.SetChord(defaults[row.Id].Modifiers, defaults[row.Id].Key);
+    }
+
+    /// <summary>Called by the window's key handler when a complete chord is captured.</summary>
+    /// <param name="mods">The captured modifier flags.</param>
+    /// <param name="key">The captured key.</param>
+    public void ApplyRecordedChord(ModifierKeys mods, VirtualKey key)
+    {
+        var row = HotkeyRows.FirstOrDefault(r => r.IsRecording);
+        if (row is null) return;
+        row.SetChord(mods, key);
+        row.IsRecording = false;
+    }
+
+    /// <summary>Called by the window's key handler when an unsupported key is pressed while recording.</summary>
+    /// <param name="message">The error message to show on the recording row.</param>
+    public void SetRecordingError(string message)
+    {
+        var row = HotkeyRows.FirstOrDefault(r => r.IsRecording);
+        if (row is not null) row.ErrorMessage = message;
     }
 }
