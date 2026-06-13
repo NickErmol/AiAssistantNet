@@ -166,13 +166,16 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
                 foreach (var row in HotkeyRows)
                     if (failed.Contains(row.Id))
                         row.ErrorMessage = "Already in use by Windows or another app — pick a different chord.";
-                hotkeyApplier.Apply(_lastGoodBindings); // revert so no action is left unregistered
-                StatusMessage = "Some shortcuts are in use by another app — not saved.";
+                var revertFailed = hotkeyApplier.Apply(_lastGoodBindings); // revert so no action is left unregistered
+                StatusMessage = revertFailed.Count > 0
+                    ? "Some shortcuts are in use by another app — not saved, and some may be inactive until restart."
+                    : "Some shortcuts are in use by another app — not saved.";
                 return;
             }
 
             _lastGoodBindings = proposed;
             var defaults = HotkeyDefaults.All.ToDictionary(b => b.Id);
+            // proposed rows come from HotkeyDefaults.Resolve, so every b.Id is present in HotkeyDefaults.All.
             hotkeyOverridesToSave = proposed
                 .Where(b => b.Modifiers != defaults[b.Id].Modifiers || b.Key != defaults[b.Id].Key)
                 .Select(b => new HotkeyOverride(b.Id, b.Modifiers, b.Key))
@@ -180,6 +183,8 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
         }
         else
         {
+            // No rows means Save was called before LoadAsync populated them (not reachable via the UI,
+            // which always loads first) — preserve whatever overrides are already persisted.
             hotkeyOverridesToSave = current?.HotkeyOverrides ?? [];
         }
 
