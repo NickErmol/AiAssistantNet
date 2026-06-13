@@ -5,7 +5,8 @@
         Title="AIHelper — Settings" Width="560" Height="600"
         WindowStartupLocation="Manual" ResizeMode="NoResize"
         Background="{DynamicResource Brush.Background.Window}"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <DockPanel Margin="12">
         <Button DockPanel.Dock="Bottom"
@@ -249,31 +250,50 @@
                                Foreground="{DynamicResource Brush.Foreground.Muted}"
                                FontSize="{DynamicResource Font.XS}" Margin="0,0,0,10"
                                TextWrapping="Wrap"/>
-                    <ItemsControl ItemsSource="{Binding Hotkeys}">
+                    <ItemsControl ItemsSource="{Binding HotkeyRows}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,0,0,6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding Description}"
-                                               Foreground="{DynamicResource Brush.Foreground.Primary}"
-                                               FontSize="{DynamicResource Font.SM}"
-                                               VerticalAlignment="Center"/>
-                                    <Border Grid.Column="1"
-                                            Background="{DynamicResource Brush.Background.Panel}"
-                                            BorderBrush="{DynamicResource Brush.Border}"
-                                            BorderThickness="1" CornerRadius="3" Padding="6,2">
-                                        <TextBlock Text="{Binding Gesture}"
-                                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
-                                                   FontFamily="Consolas"
-                                                   FontSize="{DynamicResource Font.SM}"/>
-                                    </Border>
-                                </Grid>
+                                <StackPanel Margin="0,0,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Description}"
+                                                   Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                                   FontSize="{DynamicResource Font.SM}"
+                                                   VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <CheckBox Content="Ctrl"  IsChecked="{Binding Ctrl}"  VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <CheckBox Content="Shift" IsChecked="{Binding Shift}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <CheckBox Content="Alt"   IsChecked="{Binding Alt}"   VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <CheckBox Content="Win"   IsChecked="{Binding Win}"   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <ComboBox ItemsSource="{Binding KeyChoices}"
+                                                      SelectedValue="{Binding SelectedKey}"
+                                                      SelectedValuePath="Key" DisplayMemberPath="Display"
+                                                      Width="64" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Button Content="Record"
+                                                    Command="{Binding DataContext.StartRecordingCommand,
+                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <Button Content="Reset"
+                                                    Command="{Binding DataContext.ResetRowCommand,
+                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#E06C75"
+                                               FontSize="{DynamicResource Font.XS}" Margin="0,2,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button Content="Reset all to defaults"
+                            Command="{Binding ResetAllHotkeysCommand}"
+                            HorizontalAlignment="Left" Margin="0,4,0,0"/>
                 </StackPanel>
             </TabItem>
         </TabControl>

@@ -1,5 +1,7 @@
 // src/AIHelperNET.App/Windows/SettingsWindow.xaml.cs
 using System.Windows;
+using System.Windows.Input;
+using AIHelperNET.App.Hotkeys;
 using AIHelperNET.App.ViewModels;
 using NAudio.CoreAudioApi;
 
@@ -42,6 +44,21 @@ public sealed partial class SettingsWindow : Window
     {
         e.Cancel = true;
         Hide();
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_vm.IsAnyRowRecording) return;
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key; // Alt chords arrive as Key.System
+        if (KeyGestureCapture.IsModifierKey(key)) { e.Handled = true; return; } // wait for the real key
+
+        if (KeyGestureCapture.TryTranslate(key, Keyboard.Modifiers, out var mods, out var vk))
+            _vm.ApplyRecordedChord(mods, vk);
+        else
+            _vm.SetRecordingError("Unsupported key — pick a letter, digit, F-key, or Space.");
+
+        e.Handled = true;
     }
 }
 
