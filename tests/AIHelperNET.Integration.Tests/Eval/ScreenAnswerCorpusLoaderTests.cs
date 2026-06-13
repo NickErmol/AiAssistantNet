@@ -11,9 +11,12 @@ public class ScreenAnswerCorpusLoaderTests
     {
         var corpus = ScreenAnswerCorpusLoader.Load();
 
-        corpus.Should().HaveCount(11);
+        corpus.Should().HaveCount(10);
         corpus.Select(s => s.Id).Should().Contain(
             ["sql-student-location-access", "csharp-super-manager", "angular-counter-component"]);
+        corpus.Select(s => s.Id).Should().NotContain("chitchat-no-task",
+            "the chit-chat control was dropped — it exercised a General screen-mode path that never " +
+            "fires for non-screen-task chit-chat in production");
 
         var sql = corpus.Single(s => s.Id == "sql-student-location-access");
         sql.Mode.Should().Be(ScreenAnalysisMode.SolveCodingTask);

@@ -20,14 +20,21 @@ namespace AIHelperNET.Integration.Tests.Eval;
 /// generates the answer card with the production model, enforces deterministic quality gates, and
 /// scores correctness with a Haiku judge. Self-skips (passes trivially) when no Anthropic key is in
 /// Windows Credential Manager, so CI and offline runs stay green. LiveLlm-tagged — excluded from
-/// fast runs. Judge scores are report-only for now (baseline — floor, like the boundary eval).</summary>
+/// fast runs. Both tiers are enforced when a key is present: the deterministic gates, and the Haiku
+/// judge mean against a held-out floor (the same baseline→floor approach as the boundary eval).</summary>
 [Trait("Category", "LiveLlm")]
 public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
 {
     private const string JudgeModel = "claude-haiku-4-5-20251001";
 
+    /// <summary>Held-out floor for the judge mean. Observed 0.91–0.95 across baseline runs; the floor
+    /// is 0.80 to leave headroom for the judge's run-to-run variance on free-form cards (the SQL
+    /// scenario in particular swings PASS↔PARTIAL on COUNT vs COUNT(DISTINCT)). It still catches a
+    /// real regression — three-plus scenarios breaking drops the mean below 0.80.</summary>
+    private const double MinJudgeMean = 0.80;
+
     [Fact]
-    public async Task GeneratesCards_GatesPass_AndJudgeScoresAreReported()
+    public async Task GeneratesCards_GatesPass_AndJudgeMeanMeetsFloor()
     {
         var secrets = new WindowsCredentialSecretStore();
         if (!secrets.HasApiKey())
@@ -78,7 +85,8 @@ public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
 
         var meanScore = scores.Count > 0 ? scores.Average() : 0.0;
         report.AppendLine(CultureInfo.InvariantCulture,
-            $"\nJudge mean score: {meanScore:P0} over {scores.Count} graded turns (report-only).");
+            $"\nJudge mean score: {meanScore:P0} over {scores.Count} graded turns " +
+            $"(enforced floor {MinJudgeMean:P0}).");
         report.AppendLine(CultureInfo.InvariantCulture,
             $"Deterministic gate failures: {gateFailures.Count}");
 
@@ -93,6 +101,10 @@ public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
         gateFailures.Should().BeEmpty(
             "deterministic gates (no truncation, code present where required, required substrings) " +
             "are reliable regression guards");
+
+        meanScore.Should().BeGreaterThanOrEqualTo(MinJudgeMean,
+            "the Haiku judge mean over the screen-task scenarios regressed below the held-out floor " +
+            "(observed 0.91–0.95); see the per-turn verdicts in the diagnostics report");
     }
 
     private static async Task GradeTurnAsync(
@@ -109,7 +121,7 @@ public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
         if (missing.Count > 0)
             gateFailures.Add($"{id}: missing required substrings [{string.Join(", ", missing)}]");
 
-        // LLM-as-judge (report-only).
+        // LLM-as-judge (scored; the mean is enforced against MinJudgeMean at the end).
         var verdict = await JudgeAsync(http, opts, apiKey, criteria, card.Text);
         scores.Add(verdict.Score);
 
