@@ -81,9 +81,13 @@ dotnet test tests/AIHelperNET.Integration.Tests \
   --filter "FullyQualifiedName~ScreenAnswerCardLiveTests" \
   --nologo -l "console;verbosity=detailed"
 ```
-Generates each card with the production model and grades it with Haiku. Deterministic gates
-(no truncation, code present where required, required substrings) are enforced; the judge mean
-score is report-only — see the `screen-answer-eval-*.txt` report in the diagnostics dir.
+Generates each card with the production model and grades it with Haiku. Both tiers are enforced:
+the deterministic gates (no truncation, code present where required, required substrings) **and**
+the Haiku judge mean against a held-out floor (**asserts ≥ 0.80**; observed 0.91–0.95 over the
+screen-task scenarios — the floor sits below that to absorb the judge's run-to-run variance on
+free-form cards). See the `screen-answer-eval-*.txt` report in the diagnostics dir for the per-turn
+verdicts. Like any LLM-judged floor, a failure means "investigate the report," not necessarily a
+code bug.
 
 ## Reading the result
 

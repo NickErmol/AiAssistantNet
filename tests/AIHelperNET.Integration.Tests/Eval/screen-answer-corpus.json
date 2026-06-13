@@ -114,16 +114,5 @@
     "requiredSubstrings": [],
     "expectedCriteria": "Explains that OnPush change detection only re-checks the component when an @Input reference changes (or an event/observable fires), not every cycle, so inputs should be treated immutably.",
     "followUp": null
-  },
-  {
-    "id": "chitchat-no-task",
-    "mode": "General",
-    "profile": { "language": null, "backend": null, "frontend": null },
-    "interviewerSpeech": "tell me about your experience with databases",
-    "screenOcr": "",
-    "requireCode": false,
-    "requiredSubstrings": [],
-    "expectedCriteria": "A brief, sensible spoken answer about database experience. This is a non-screen-task control; no code is expected.",
-    "followUp": null
   }
 ]
