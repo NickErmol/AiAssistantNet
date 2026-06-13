@@ -1,0 +1,129 @@
+[
+  {
+    "id": "sql-student-location-access",
+    "mode": "SolveCodingTask",
+    "profile": { "language": null, "backend": null, "frontend": null },
+    "interviewerSpeech": "write a SQL to get the students who has an access to the location more than 2",
+    "screenOcr": "Student Table\nID Name Age\n1 A 20\n2 B 21\n3 C 23\n4 D 24\nLocations\nId Name\n1 Library\n2 FoodCourt\n3 Auditorium\nStudentLocAccess\nId StudId LocationId\n1 1 1\n2 1 2\n3 2 1\n4 3 1\n5 3 2\n6 3 3",
+    "requireCode": true,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Correct SQL returning students who can access more than 2 distinct locations. With the given data only student C (id 3, three locations) qualifies. Must group/count locations per student and filter to COUNT > 2.",
+    "followUp": {
+      "speech": "now select only distinct values",
+      "priorAnswer": "SELECT s.Name FROM Student s JOIN StudentLocAccess a ON a.StudId = s.ID GROUP BY s.ID, s.Name HAVING COUNT(a.LocationId) > 2;",
+      "requireCode": true,
+      "requiredSubstrings": ["DISTINCT"],
+      "expectedCriteria": "Updated SQL that de-duplicates the result set using SELECT DISTINCT (or an equivalent), still returning student C."
+    }
+  },
+  {
+    "id": "sql-find-main-manager",
+    "mode": "SolveCodingTask",
+    "profile": { "language": null, "backend": null, "frontend": null },
+    "interviewerSpeech": "write a SQL to find the main manager",
+    "screenOcr": "Employees\nA B C D E X Y\nEmployeeManager\nA->B\nB->C\nC->D\nX->E\nE->Y\nY->X",
+    "requireCode": true,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Correct SQL identifying the top of the management chain A->B->C->D, which is D. Must not infinite-loop on the X->E->Y->X cycle. Returning D as the main manager is correct.",
+    "followUp": null
+  },
+  {
+    "id": "csharp-super-manager",
+    "mode": "SolveCodingTask",
+    "profile": { "language": null, "backend": null, "frontend": null },
+    "interviewerSpeech": "write a C# method to return the super manager",
+    "screenOcr": "DB Table: Employees\nEmployeeId | FullName\nA | Adam\nB | Bryan\nC | Celie\nD | Dany\nE | Edward\nX | Xing\nZ | Zang\nDB Table: EmployeeManagerRelation\nEmployeeId | ManagerId\nA | B\nB | C\nC | D\nX | E\nE | Y\nY | X  (circular/break)",
+    "requireCode": true,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Working C# method that walks the manager chain to its top and returns the super manager; Input A returns D. Must detect and break the Y->X cycle (e.g. a visited set) to avoid infinite recursion.",
+    "followUp": null
+  },
+  {
+    "id": "dotnet-minimal-api",
+    "mode": "SolveCodingTask",
+    "profile": { "language": "C#", "backend": "ASP.NET Core", "frontend": null },
+    "interviewerSpeech": "implement a minimal API endpoint that returns an order by id",
+    "screenOcr": "public record Order(int Id, decimal Total);\n// GET /orders/{id} -> 404 when missing",
+    "requireCode": true,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Working ASP.NET Core minimal API endpoint mapping GET /orders/{id} that returns the order and a 404 when it is missing.",
+    "followUp": null
+  },
+  {
+    "id": "dotnet-async-deadlock",
+    "mode": "DebugError",
+    "profile": { "language": "C#", "backend": "ASP.NET Core", "frontend": null },
+    "interviewerSpeech": "can you fix the bug, why is this request deadlocking",
+    "screenOcr": "public string Get() => GetAsync().Result; // blocks on async in ASP.NET context",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Identifies the root cause: blocking on an async call with .Result deadlocks in a synchronization context. Fix is to await GetAsync() (make the method async) or otherwise avoid sync-over-async.",
+    "followUp": null
+  },
+  {
+    "id": "dotnet-explain-linq",
+    "mode": "ExplainCode",
+    "profile": { "language": "C#", "backend": "ASP.NET Core", "frontend": null },
+    "interviewerSpeech": "explain this code for me",
+    "screenOcr": "var top = orders.GroupBy(o => o.CustomerId)\n    .Select(g => new { g.Key, Total = g.Sum(x => x.Total) })\n    .OrderByDescending(t => t.Total).Take(3);",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Explains that the LINQ groups orders by customer, sums each customer's total, orders descending by total, and takes the top 3.",
+    "followUp": null
+  },
+  {
+    "id": "dotnet-design-checkout",
+    "mode": "SystemDesign",
+    "profile": { "language": "C#", "backend": "ASP.NET Core", "frontend": null },
+    "interviewerSpeech": "how would you design this checkout service",
+    "screenOcr": "Requirements: checkout service, 10k rps, idempotent payments, audit trail",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Outlines a sensible checkout-service design covering idempotent payments, scaling toward ~10k rps, and an audit trail; states a recommended approach first.",
+    "followUp": null
+  },
+  {
+    "id": "angular-counter-component",
+    "mode": "SolveCodingTask",
+    "profile": { "language": "TypeScript", "backend": null, "frontend": "Angular" },
+    "interviewerSpeech": "implement an Angular counter component",
+    "screenOcr": "// CounterComponent: a count signal with increment() and decrement()",
+    "requireCode": true,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Working Angular counter component exposing a count plus increment() and decrement() that change it.",
+    "followUp": null
+  },
+  {
+    "id": "angular-rxjs-leak",
+    "mode": "DebugError",
+    "profile": { "language": "TypeScript", "backend": null, "frontend": "Angular" },
+    "interviewerSpeech": "fix the bug in this RxJS subscription, it leaks",
+    "screenOcr": "ngOnInit() { this.svc.data$.subscribe(d => this.data = d); } // never unsubscribed",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Identifies the unsubscribed subscription as a memory leak and fixes it (takeUntil + destroy subject, the async pipe, or unsubscribe in ngOnDestroy).",
+    "followUp": null
+  },
+  {
+    "id": "angular-explain-onpush",
+    "mode": "ExplainCode",
+    "profile": { "language": "TypeScript", "backend": null, "frontend": "Angular" },
+    "interviewerSpeech": "explain this code, what does OnPush do here",
+    "screenOcr": "@Component({ changeDetection: ChangeDetectionStrategy.OnPush })\nexport class ListComponent { @Input() items: Item[] = []; }",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "Explains that OnPush change detection only re-checks the component when an @Input reference changes (or an event/observable fires), not every cycle, so inputs should be treated immutably.",
+    "followUp": null
+  },
+  {
+    "id": "chitchat-no-task",
+    "mode": "General",
+    "profile": { "language": null, "backend": null, "frontend": null },
+    "interviewerSpeech": "tell me about your experience with databases",
+    "screenOcr": "",
+    "requireCode": false,
+    "requiredSubstrings": [],
+    "expectedCriteria": "A brief, sensible spoken answer about database experience. This is a non-screen-task control; no code is expected.",
+    "followUp": null
+  }
+]
