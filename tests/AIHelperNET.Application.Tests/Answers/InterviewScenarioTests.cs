@@ -195,4 +195,27 @@ public class InterviewScenarioTests
             prompt.System.Should().Contain(s.Profile.ProgrammingLanguage!);
         }
     }
+
+    [Theory]
+    [MemberData(nameof(FollowUpScenarioNames))]
+    public void BuildScreenFollowUp_CarriesRequirementAndPriorAnswer(string name)
+    {
+        var s = ByName[name];
+
+        var prompt = PromptBuilderService.BuildScreenFollowUp(
+            s.Profile,
+            AnswerSettings.Default,
+            s.ScreenOcr,
+            s.ExpectedMode!.Value,
+            additions: new[] { s.FollowUpSpeech! },
+            recentTranscript: Array.Empty<string>(),
+            priorAnswer: s.PriorAnswer);
+
+        prompt.User.Should().Contain("On-screen task (OCR):");
+        prompt.User.Should().Contain(s.ScreenOcr);
+        prompt.User.Should().Contain("Interviewer requirements (most recent last):");
+        prompt.User.Should().Contain(s.FollowUpSpeech!);
+        prompt.User.Should().Contain("Your previous answer:");
+        prompt.User.Should().Contain(s.PriorAnswer!);
+    }
 }
