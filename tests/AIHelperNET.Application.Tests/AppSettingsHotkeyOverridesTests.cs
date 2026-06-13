@@ -52,6 +52,28 @@ public class AppSettingsHotkeyOverridesTests
     }
 
     [Fact]
+    public void Normalized_DropsModifierlessOverride()
+    {
+        var dto = Base() with
+        {
+            HotkeyOverrides = [new HotkeyOverride(HotkeyId.GenerateAnswer, ModifierKeys.None, VirtualKey.G)]
+        };
+
+        dto.Normalized().HotkeyOverrides.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Normalized_AllValid_PreservesSameListReference()
+    {
+        var dto = Base() with
+        {
+            HotkeyOverrides = [new HotkeyOverride(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl, VirtualKey.G)]
+        };
+
+        dto.Normalized().HotkeyOverrides.Should().BeSameAs(dto.HotkeyOverrides);
+    }
+
+    [Fact]
     public void MissingField_DefaultsToEmpty()
     {
         const string json = """{"activeBackend":0,"whisperModel":2,"micDeviceId":null,"loopbackDeviceId":null}""";

@@ -74,6 +74,7 @@ public sealed record AppSettingsDto(
         {
             if (!Enum.IsDefined(o.Id)) continue;              // unknown action
             if (((uint)o.Modifiers & ~modMask) != 0) continue; // stray modifier bits
+            if (o.Modifiers == ModifierKeys.None) continue;   // a global hotkey needs at least one modifier
             if (!Enum.IsDefined(o.Key)) continue;             // unknown key
             if (!seen.Add(o.Id)) continue;                    // keep first per action
             result.Add(o);
