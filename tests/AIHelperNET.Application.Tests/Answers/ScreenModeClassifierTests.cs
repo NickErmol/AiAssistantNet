@@ -13,6 +13,7 @@ public class ScreenModeClassifierTests
     [InlineData("solve this task in 20 minutes")]
     [InlineData("write a function that reverses a string")]
     [InlineData("can you write a sequel to list the students")] // Whisper mis-transcribes "SQL"
+    [InlineData("write a C# method to return the super manager")] // real docx Task 3 phrasing
     public void Classify_CodingPhrases_ReturnsSolveCodingTask(string text)
         => ScreenModeClassifier.Classify(text).Should().Be(ScreenAnalysisMode.SolveCodingTask);
 
