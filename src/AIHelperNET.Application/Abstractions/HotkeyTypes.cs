@@ -149,10 +149,10 @@ public static class HotkeyKeys
     /// <returns>The display label.</returns>
     public static string Display(VirtualKey key)
     {
-        var name = key.ToString();
-        return name.Length == 2 && name[0] == 'D' && char.IsDigit(name[1])
-            ? name[1].ToString()
-            : name;
+        // Digit keys (VK 0x30–0x39) display as the bare character ("5"); everything else uses the enum name.
+        return key is >= (VirtualKey)0x30 and <= (VirtualKey)0x39
+            ? ((char)(uint)key).ToString()
+            : key.ToString();
     }
 
     /// <summary>All bindable keys, ordered for the dropdown: A–Z, 0–9, F1–F12, Space.</summary>

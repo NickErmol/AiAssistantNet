@@ -25,6 +25,20 @@ public class HotkeyKeysTests
             VirtualKey.F1, VirtualKey.F12, VirtualKey.Space]);
         keys.Should().OnlyHaveUniqueItems();
         keys.Count.Should().Be(26 + 10 + 12 + 1); // A-Z, 0-9, F1-F12, Space
+        keys.Should().OnlyContain(k => Enum.IsDefined(k));
+    }
+
+    [Fact]
+    public void Selectable_IsOrdered_LettersThenDigitsThenFKeysThenSpace()
+    {
+        var keys = HotkeyKeys.Selectable.Select(c => c.Key).ToList();
+        keys[0].Should().Be(VirtualKey.A);
+        keys[25].Should().Be(VirtualKey.Z);
+        keys[26].Should().Be(VirtualKey.D0);
+        keys[35].Should().Be(VirtualKey.D9);
+        keys[36].Should().Be(VirtualKey.F1);
+        keys[47].Should().Be(VirtualKey.F12);
+        keys[48].Should().Be(VirtualKey.Space);
     }
 
     [Fact]
