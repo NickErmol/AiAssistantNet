@@ -284,7 +284,12 @@
                                                     VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
-                                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#E06C75"
+                                    <TextBlock Text="Press the shortcut keys…"
+                                               Foreground="{DynamicResource Brush.Semantic.Active}"
+                                               FontSize="{DynamicResource Font.XS}" Margin="0,2,0,0"
+                                               Visibility="{Binding IsRecording,
+                                                   Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource Brush.Semantic.Error}"
                                                FontSize="{DynamicResource Font.XS}" Margin="0,2,0,0"
                                                TextWrapping="Wrap"/>
                                 </StackPanel>
