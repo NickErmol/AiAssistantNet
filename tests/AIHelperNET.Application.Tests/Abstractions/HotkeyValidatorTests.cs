@@ -39,4 +39,28 @@ public class HotkeyValidatorTests
         errors[HotkeyId.GenerateAnswer].Should().Contain("Copy");
         errors[HotkeyId.CopyAnswer].Should().Contain("Generate");
     }
+
+    [Fact]
+    public void ThreeWayDuplicate_FlagsAllThree()
+    {
+        var chord = (ModifierKeys.Ctrl | ModifierKeys.Shift, VirtualKey.G);
+        var bindings = new[]
+        {
+            new HotkeyBinding(HotkeyId.GenerateAnswer, chord.Item1, chord.Item2, "Generate"),
+            new HotkeyBinding(HotkeyId.CopyAnswer,     chord.Item1, chord.Item2, "Copy"),
+            new HotkeyBinding(HotkeyId.CaptureScreen,  chord.Item1, chord.Item2, "Capture")
+        };
+
+        var errors = HotkeyValidator.Validate(bindings);
+
+        errors.Should().ContainKeys(HotkeyId.GenerateAnswer, HotkeyId.CopyAnswer, HotkeyId.CaptureScreen);
+    }
+
+    [Fact]
+    public void DuplicateRecordWithSameId_DoesNotThrow()
+    {
+        var dup = new HotkeyBinding(HotkeyId.GenerateAnswer, ModifierKeys.Ctrl, VirtualKey.G, "Generate");
+        var act = () => HotkeyValidator.Validate([dup, dup]);
+        act.Should().NotThrow();
+    }
 }

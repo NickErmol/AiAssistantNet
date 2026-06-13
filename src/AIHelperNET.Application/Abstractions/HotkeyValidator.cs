@@ -17,13 +17,15 @@ public static class HotkeyValidator
             if (b.Modifiers == ModifierKeys.None)
                 errors[b.Id] = "Add a modifier (Ctrl, Shift, Alt, or Win).";
 
-        // Rule 2: no two actions may share the same chord.
+        // Rule 2: no two actions may share the same chord. (A more specific duplicate message here may
+        // overwrite a Rule 1 "add a modifier" message for the same action — that is intentional.)
         foreach (var group in bindings.GroupBy(b => (b.Modifiers, b.Key)).Where(g => g.Count() > 1))
         {
             var members = group.ToList();
             foreach (var b in members)
             {
-                var other = members.First(m => m.Id != b.Id);
+                var other = members.FirstOrDefault(m => m.Id != b.Id);
+                if (other is null) continue; // duplicate record sharing the same Id — nothing to cross-reference
                 errors[b.Id] = $"Same shortcut as “{other.Description}”.";
             }
         }
