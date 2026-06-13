@@ -46,8 +46,12 @@ public sealed record AppSettingsDto(
     /// <summary>Named setting presets for quick profile switching.</summary>
     public IReadOnlyList<ProfilePreset> Presets { get; init; } = [];
 
+    /// <summary>User overrides of the default global-hotkey chords. Empty ⇒ all defaults.</summary>
+    public IReadOnlyList<HotkeyOverride> HotkeyOverrides { get; init; } = [];
+
     /// <summary>Returns a copy with <see cref="MaxAnswerTokens"/> and <see cref="LatestQuestionWindowSeconds"/>
-    /// coerced into their valid ranges: missing/non-positive → defaults; otherwise clamped.</summary>
+    /// coerced into their valid ranges: missing/non-positive → defaults; otherwise clamped.
+    /// Also strips invalid or duplicate-id entries from <see cref="HotkeyOverrides"/>.</summary>
     public AppSettingsDto Normalized() => this with
     {
         MaxAnswerTokens = MaxAnswerTokens <= 0
@@ -55,6 +59,28 @@ public sealed record AppSettingsDto(
             : Math.Clamp(MaxAnswerTokens, MinAnswerTokens, MaxAnswerTokensLimit),
         LatestQuestionWindowSeconds = LatestQuestionWindowSeconds <= 0
             ? DefaultLatestQuestionWindowSeconds
-            : Math.Clamp(LatestQuestionWindowSeconds, MinLatestQuestionWindowSeconds, MaxLatestQuestionWindowSeconds)
+            : Math.Clamp(LatestQuestionWindowSeconds, MinLatestQuestionWindowSeconds, MaxLatestQuestionWindowSeconds),
+        HotkeyOverrides = NormalizeOverrides(HotkeyOverrides)
     };
+
+    private static IReadOnlyList<HotkeyOverride> NormalizeOverrides(IReadOnlyList<HotkeyOverride> raw)
+    {
+        if (raw is null or { Count: 0 }) return [];
+
+        const uint modMask = (uint)(ModifierKeys.Alt | ModifierKeys.Ctrl | ModifierKeys.Shift | ModifierKeys.Win);
+        var seen = new HashSet<HotkeyId>();
+        var result = new List<HotkeyOverride>(raw.Count);
+        foreach (var o in raw)
+        {
+            if (!Enum.IsDefined(o.Id)) continue;              // unknown action
+            if (((uint)o.Modifiers & ~modMask) != 0) continue; // stray modifier bits
+            if (!Enum.IsDefined(o.Key)) continue;             // unknown key
+            if (!seen.Add(o.Id)) continue;                    // keep first per action
+            result.Add(o);
+        }
+
+        // Return the original list unchanged when nothing was filtered — preserves reference
+        // equality so that record structural comparison in tests stays stable.
+        return result.Count == raw.Count ? raw : result;
+    }
 }
