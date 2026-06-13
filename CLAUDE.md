@@ -61,7 +61,7 @@ Load-bearing files only — where to look first, not an exhaustive listing. Path
   routing → turn lifecycle. Singleton; per-session reset is a known sharp edge.
 - `Sessions/Commands/` + `Queries/` + `Answers/Commands/` — all CQRS handlers (one file each).
 - `Answers/PromptBuilderService.cs` — builds the 4-part answer prompt; the prompt-injection fence
-  lives here (see security rule). `Answers/AnswerMarkdownParser` — parses the card.
+  lives here (see security rule). `Answers/Markdown/AnswerMarkdownParser.cs` — parses the card.
 - `Answers/Screen*.cs` — screen-capture flow (`ScreenModeClassifier`, `ScreenCaptureAccumulator`,
   `ScreenFollowUpRouter`, `ScreenTaskContextStore`).
 - `Sessions/AsrConfidenceGate.cs`, `BoundarySplitGuard.cs`, `SegmentAccumulator.cs` — pipeline guards.
