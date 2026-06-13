@@ -44,6 +44,46 @@ App            — WPF, ViewModels, sink wiring, MS Generic Host (composition ro
 `ITranscriptSink`, `IAnswerStreamSink`, `IAudioCaptureService`, `ITranscriptionService`,
 `IAnswerProvider`, `ISessionRepository`, `IUnitOfWork`, `ISettingsStore`, `ISecretStore`.
 
+## Code map
+
+Load-bearing files only — where to look first, not an exhaustive listing. Paths relative to
+`src/`. When in doubt, `Glob`/`Grep`; this map points you at the right neighborhood.
+
+**Domain** (`AIHelperNET.Domain/`)
+- `Sessions/Session.cs` — the aggregate root (turns, questions, answers, mode/state). Start here
+  for any domain-state question. Siblings: `ConversationTurn`, `DetectedQuestion`,
+  `GeneratedAnswer`, `AnswerVersion`, `TranscriptItem`; enums alongside (`*Status`, `*Mode`, `Speaker`).
+- `Questions/QuestionBoundaryDetector.cs` + `QuestionDetector.cs` — heuristic boundary/question logic.
+- `Common/DomainResult.cs` — the never-throw result type. `Ids/*` — strongly-typed Guid wrappers.
+
+**Application** (`AIHelperNET.Application/`)
+- `Sessions/TranscriptPipelineService.cs` — **the hub**: VAD windows → transcription → boundary
+  routing → turn lifecycle. Singleton; per-session reset is a known sharp edge.
+- `Sessions/Commands/` + `Queries/` + `Answers/Commands/` — all CQRS handlers (one file each).
+- `Answers/PromptBuilderService.cs` — builds the 4-part answer prompt; the prompt-injection fence
+  lives here (see security rule). `Answers/AnswerMarkdownParser` — parses the card.
+- `Answers/Screen*.cs` — screen-capture flow (`ScreenModeClassifier`, `ScreenCaptureAccumulator`,
+  `ScreenFollowUpRouter`, `ScreenTaskContextStore`).
+- `Sessions/AsrConfidenceGate.cs`, `BoundarySplitGuard.cs`, `SegmentAccumulator.cs` — pipeline guards.
+- `Abstractions/` — all port interfaces + `HotkeyDefaults`/`HotkeyTypes` (hotkey config source).
+- `Sessions/Dtos/AppSettingsDto.cs` — the settings shape (+ `Normalized()`). `SessionMapper` — Mapperly.
+
+**Infrastructure** (`AIHelperNET.Infrastructure/`)
+- `AI/ClaudeAnswerProvider.cs` + `ClaudeSse.cs` — Claude HTTP/SSE; `OllamaAnswerProvider` — local.
+  `Haiku*`/`*Classifier`/`LatestQuestionExtractor` — the small-model helpers (each strips ```json fences).
+- `Audio/NAudioCaptureService.cs`, `SileroVadDetector.cs`, `VadWindowAccumulator.cs` — capture + VAD.
+- `Transcription/WhisperTranscriptionService.cs` + `WhisperModelProvider.cs` — Whisper.net (Vulkan).
+- `Persistence/AppDbContext.cs` (+ `Migrations/`, `SessionRepository`, `JsonSettingsStore`).
+- `Hotkeys/GlobalHotkeyService.cs` — Win32 `RegisterHotKey`. `Security/WindowsCredentialSecretStore.cs`
+  — the **only** place secrets touch disk. `Ocr/*` — screen grab + Windows OCR. `Common/AppPaths.cs` — data root.
+
+**App** (`AIHelperNET.App/`)
+- `App.xaml.cs` — composition root: host startup, `MigrateAsync`, sink/handler wiring, `WireHotkeys`.
+- `Streaming/TranscriptSink.cs` + `AnswerStreamSink.cs` — the UI-marshalling singletons.
+- `ViewModels/` — `SessionControlViewModel`, `TranscriptViewModel`, `SettingsViewModel`,
+  `HistoryViewModel`, `ConversationTurnViewModel`. `Windows/` — `MainOverlayWindow`, `SettingsWindow`.
+- `Controls/MarkdownPresenter.cs` — renders the answer card. `DependencyInjection.cs` — App-layer DI.
+
 ## Conventions
 
 - **Add a handler:** implement `ICommandHandler<TCommand>` / `IQueryHandler<TQuery, TResult>` —
@@ -54,7 +94,10 @@ App            — WPF, ViewModels, sink wiring, MS Generic Host (composition ro
 - **Object mapping** uses Riok.Mapperly source-gen (`[Mapper]` partials) — don't hand-roll mappers.
 - **EF entity change ⇒ ship a migration in the same commit** (the `MigrationTests` parity guard fails
   the build otherwise). Use the `add-ef-migration` skill.
-- **Gitflow:** `feature/*` → `develop` → `release/*` → `master`. Never commit directly to `master`.
+- **Gitflow:** `feature/*` → `develop` → `master` (release PRs go develop→master directly; `release/*`
+  is not used in practice). **`master` is production** (tags `v1.x` live there); **`origin/main` is a
+  stale init-commit artifact — ignore it** despite any tooling that defaults to `main`. Never commit
+  directly to `master`.
 - Layering is enforced by **NetArchTest** rules in the integration tests — don't add a reference that
   points a layer outward.
 
