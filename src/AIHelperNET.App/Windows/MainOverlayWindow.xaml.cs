@@ -84,6 +84,9 @@ public partial class MainOverlayWindow : Window
         _stealthActive = enable && SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
         if (!_stealthActive) SetWindowDisplayAffinity(hwnd, WDA_NONE);
 
+        // Keep the settings window in lockstep with the overlay's stealth state.
+        _settingsWindow.SetStealth(_stealthActive);
+
         if (StealthBtn is not null)
             StealthBtn.Content = _stealthActive ? "👁" : "🎥";
 
@@ -101,12 +104,20 @@ public partial class MainOverlayWindow : Window
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
-        // Center the settings window over the overlay so it opens on the overlay's monitor
-        // (CenterScreen put it on the primary display). Positioning manually rather than via
-        // Owner avoids reparenting the window — Owner would drop it from the desktop's
-        // top-level window list and tie its z-order/minimize to the overlay.
-        _settingsWindow.Left = Left + (ActualWidth  - _settingsWindow.Width)  / 2;
-        _settingsWindow.Top  = Top  + (ActualHeight - _settingsWindow.Height) / 2;
+        // Dock the settings window to the right of the overlay, top-aligned, so the two sit
+        // side by side instead of overlapping (the overlay's z-order would otherwise hide it).
+        // Positioning manually rather than via Owner avoids reparenting the window — Owner would
+        // drop it from the desktop's top-level window list and tie its z-order/minimize to the
+        // overlay. Falls back to the left side when there isn't room on the right.
+        const double gap = 8;
+        var rightEdge = SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth;
+
+        var left = Left + ActualWidth + gap;
+        if (left + _settingsWindow.Width > rightEdge)
+            left = Left - _settingsWindow.Width - gap;
+
+        _settingsWindow.Left = left;
+        _settingsWindow.Top  = Top;
         _settingsWindow.Show();
         _settingsWindow.Activate();
     }
