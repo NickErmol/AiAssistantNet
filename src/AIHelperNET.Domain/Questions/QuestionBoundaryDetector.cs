@@ -18,13 +18,6 @@ public sealed class QuestionBoundaryDetector
         "is", "are", "should"
     };
 
-    private static readonly HashSet<string> Imperatives = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "explain", "describe", "write", "implement", "design", "compare",
-        "optimize", "refactor", "debug", "walk", "tell", "give", "show",
-        "analyze", "fix", "build", "create", "outline", "discuss"
-    };
-
     private static readonly string[] FillerPhrases =
     [
         "okay", "ok", "right", "sure", "great", "thanks", "thank you",
@@ -171,7 +164,7 @@ public sealed class QuestionBoundaryDetector
             {
                 var isQuestion = normalized.EndsWith('?')
                     || (Interrogatives.Contains(firstWord) && words.Length >= 6)
-                    || (Imperatives.Contains(firstWord) && words.Length >= 4);
+                    || (QuestionLexicon.ImperativeVerbs.Contains(firstWord) && words.Length >= 4);
 
                 if (isQuestion)
                 {
@@ -225,7 +218,7 @@ public sealed class QuestionBoundaryDetector
         // Handles phrases like "You tell me about X", "You explain how Y works"
         if (words.Length >= 5
             && words[0].Trim(',', '.', '?', '!').Equals("you", StringComparison.OrdinalIgnoreCase)
-            && Imperatives.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
+            && QuestionLexicon.ImperativeVerbs.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
         {
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.TaskComplete,
@@ -238,7 +231,7 @@ public sealed class QuestionBoundaryDetector
         }
 
         // Rule 10: TaskComplete — imperative first word with ≥4 words
-        if (Imperatives.Contains(firstWord) && words.Length >= 4)
+        if (QuestionLexicon.ImperativeVerbs.Contains(firstWord) && words.Length >= 4)
         {
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.TaskComplete,

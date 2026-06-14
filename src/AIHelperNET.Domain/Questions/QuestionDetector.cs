@@ -12,12 +12,6 @@ public sealed class QuestionDetector
         "will","do","does","did","is","are","should"
     };
 
-    private static readonly HashSet<string> ImperativeVerbs = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "explain","describe","write","implement","design","compare","optimize",
-        "refactor","debug","walk","tell","give","show"
-    };
-
     // Whisper hallucination phrases that start with interrogative words and would otherwise pass.
     // Compared after stripping punctuation and lowercasing.
     private static readonly HashSet<string> NoisePhrases = new(StringComparer.OrdinalIgnoreCase)
@@ -65,7 +59,7 @@ public sealed class QuestionDetector
             return false;
         if (text.EndsWith('?')) return true;
         var first = FirstWord(text);
-        return Interrogatives.Contains(first) || ImperativeVerbs.Contains(first);
+        return Interrogatives.Contains(first) || QuestionLexicon.ImperativeVerbs.Contains(first);
     }
 
     private static bool IsNoisePhrase(string text)
