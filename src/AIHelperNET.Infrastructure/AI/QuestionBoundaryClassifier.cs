@@ -34,10 +34,11 @@ public sealed class QuestionBoundaryClassifier(
         Labels — read these definitions carefully; the names alone are NOT enough:
         - QuestionComplete: text_to_classify is itself a complete, answerable QUESTION — a direct
           interrogative such as "what is dependency injection?", "how do the SOLID principles apply?",
-          "when would you add an index?". A bare technical TOPIC stated as a prompt to explain it
-          ("N+1 queries", "change detection and OnPush", "Func vs Expression<Func>") is also
-          QuestionComplete — the interviewer is asking you to explain that topic. A direct question
-          or a stated topic is QuestionComplete, NOT QuestionStarted.
+          "when would you add an index?". A bare technical TOPIC stated by the interviewer (Other) as
+          a prompt to explain it ("N+1 queries", "change detection and OnPush", "Func vs Expression<Func>")
+          is also QuestionComplete — the interviewer is asking you to explain that topic. A bare topic
+          from the candidate (Me) mid-answer is NOT a question. A direct question or an Other-stated
+          topic is QuestionComplete, NOT QuestionStarted.
         - TaskComplete: text_to_classify is a complete, answerable imperative/coding TASK — an instruction
           verb such as "write...", "design...", "implement...", "explain...", "reverse a linked list".
           An imperative task is TaskComplete, NOT QuestionStarted.
@@ -80,6 +81,7 @@ public sealed class QuestionBoundaryClassifier(
         - latest:"N+1 queries" status:null -> QuestionComplete (a bare technical topic stated as a request to explain it)
         - latest:"why does this code print 42" status:null -> QuestionComplete (code-grounded explain-this question)
         - recent:["explain the actor model"] latest(Other):"go a bit deeper" status:PreliminaryReady -> QuestionContinued (refinement nudge on the same topic)
+        - recent:["explain the actor model"] latest(Other):"go a bit deeper" status:CollectingQuestion -> QuestionContinued (refinement nudge while still collecting; AdditionalRequirement only after PreliminaryReady)
         - latest:"suppose we're building an ecommerce checkout flow" status:null -> QuestionStarted (incomplete setup)
         - recent:["design a rate limiter for our gateway"] latest(Other):"and how would it handle sudden bursts" status:PreliminaryReady -> QuestionContinued (Other extends same topic; not a clarification, not new)
         - recent:["design the notification service"] latest(Other):"also it needs to stay under 100ms p99" status:PreliminaryReady -> AdditionalRequirement (new constraint on an answered task)
