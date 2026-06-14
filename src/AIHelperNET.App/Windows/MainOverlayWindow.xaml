@@ -7,8 +7,8 @@
         Width="600" Height="640"
         MinWidth="320" MinHeight="320"
         WindowStyle="None"
-        Background="{DynamicResource Brush.Background.Window}"
-        Opacity="0.75"
+        AllowsTransparency="True"
+        Background="{DynamicResource Glass.Window}"
         Topmost="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False">
@@ -16,7 +16,7 @@
     <DockPanel>
         <!-- Title bar -->
         <Border DockPanel.Dock="Top"
-                Background="{DynamicResource Brush.Background.TitleBar}"
+                Background="{DynamicResource Glass.TitleBar}"
                 Padding="8,4"
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid>
@@ -104,7 +104,7 @@
                 Width="{Binding SessionControl.IsSidebarVisible,
                     Converter={StaticResource BoolToWidthConverter},
                     ConverterParameter='120'}"
-                Background="{DynamicResource Brush.Background.Sidebar}"
+                Background="{DynamicResource Glass.Sidebar}"
                 BorderBrush="{DynamicResource Brush.Border}"
                 BorderThickness="0,0,1,0"
                 Padding="8">
@@ -297,7 +297,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Transcript panel -->
-                <Border Grid.Row="0" Background="{DynamicResource Brush.Background.Panel}"
+                <Border Grid.Row="0" Background="{DynamicResource Glass.Panel}"
                         DataContext="{Binding Transcript}">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top"
@@ -337,14 +337,14 @@
                 <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" Height="4"/>
 
                 <!-- Answer/turn panel -->
-                <Border Grid.Row="2" Background="{DynamicResource Brush.Background.Panel}">
+                <Border Grid.Row="2" Background="{DynamicResource Glass.Panel}">
                     <ScrollViewer Margin="8">
                         <ItemsControl ItemsSource="{Binding ConversationTurn.Turns}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,0,0,8"
                                             AutomationProperties.AutomationId="TurnCard"
-                                            Background="{DynamicResource Brush.Background.Card}"
+                                            Background="{DynamicResource Glass.Card}"
                                             BorderBrush="{DynamicResource Brush.Border}"
                                             BorderThickness="1"
                                             CornerRadius="4"
