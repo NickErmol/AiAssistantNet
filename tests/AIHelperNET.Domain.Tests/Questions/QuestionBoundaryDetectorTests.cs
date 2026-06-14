@@ -422,4 +422,111 @@ public sealed class QuestionBoundaryDetectorTests
         result.Classification.Should().Be(BoundaryLabel.ClarificationOfCurrentQuestion);
         result.Classification.Should().NotBe(BoundaryLabel.TaskComplete);
     }
+
+    // ── Imperative-question-starters: new verbs at start → TaskComplete ─────────
+    [Theory]
+    [InlineData("List the SOLID principles for me")]
+    [InlineData("Define the term idempotency clearly")]
+    [InlineData("Summarize the actor model briefly")]
+    [InlineData("Compare REST and gRPC tradeoffs")]
+    [InlineData("Review this authentication approach")]
+    [InlineData("Generate a regex for emails")]
+    public void NewImperativeVerb_ReturnsTaskComplete(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+        result.ShouldCreateNewTurn.Should().BeTrue();
+    }
+
+    // ── Short (2-word) imperative command → TaskComplete (not Unrelated) ────────
+    [Theory]
+    [InlineData("Define recursion")]
+    [InlineData("List exceptions")]
+    [InlineData("Name three algorithms")]
+    public void ShortImperative_ReturnsTaskComplete(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+    }
+
+    // ── Multi-word imperative phrase "break down" → TaskComplete ────────────────
+    [Fact]
+    public void BreakDown_ReturnsTaskComplete()
+    {
+        var result = _sut.Evaluate(
+            "Break down the authentication flow", Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+    }
+
+    // ── "please"/"kindly" prefix stripped → underlying imperative → TaskComplete ─
+    [Theory]
+    [InlineData("Please explain the garbage collector")]
+    [InlineData("Kindly summarize the CAP theorem")]
+    [InlineData("Please define recursion")]
+    public void PleaseImperative_ReturnsTaskComplete(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.TaskComplete);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+    }
+
+    // ── "could you"/"can you" forms generate an answer (label may be QuestionComplete
+    //     via the interrogative Rule 9 when ≥6 words — both paths answer). ──────────
+    [Theory]
+    [InlineData("Could you list the SOLID principles")]
+    [InlineData("Can you describe the actor model")]
+    public void CouldYouImperative_GeneratesAnswer(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.ShouldGenerateAnswer.Should().BeTrue();
+        result.ShouldCreateNewTurn.Should().BeTrue();
+    }
+
+    // ── Negatives still filtered ────────────────────────────────────────────────
+    [Theory]
+    [InlineData("Got it")]
+    [InlineData("Thanks")]
+    [InlineData("Okay sounds good")]
+    public void Acknowledgement_StaysUnrelated(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+    }
+
+    // ── Phase 2b: short technical topic → low-confidence Unrelated (reaches AI) ─
+    [Theory]
+    [InlineData("N+1 queries")]
+    [InlineData("Func vs Expression<Func>")]
+    [InlineData("Change detection OnPush")]
+    public void ShortTechnicalTopic_LowConfidenceUnrelated_ForAiClassifier(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeLessThan(0.7,
+            "AI classifier must be invoked to judge whether a short technical topic implies a request");
+    }
+
+    // ── Phase 2b: plain short non-topic stays high-confidence Unrelated ─────────
+    [Theory]
+    [InlineData("What?")]
+    [InlineData("The weather today")]
+    public void ShortPlainPhrase_StaysHighConfidenceUnrelated(string text)
+    {
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeGreaterThan(0.90);
+    }
+
+    // ── Phase 2b: a bare technical topic from the candidate (Me) is a mid-answer aside —
+    //     it stays high-confidence Unrelated and does NOT defer to the AI classifier. ──
+    [Fact]
+    public void ShortTechnicalTopic_FromMe_StaysHighConfidenceUnrelated()
+    {
+        var result = _sut.Evaluate("N+1 queries", Speaker.Me, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeGreaterThan(0.90);
+    }
 }

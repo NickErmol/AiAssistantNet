@@ -18,13 +18,6 @@ public sealed class QuestionBoundaryDetector
         "is", "are", "should"
     };
 
-    private static readonly HashSet<string> Imperatives = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "explain", "describe", "write", "implement", "design", "compare",
-        "optimize", "refactor", "debug", "walk", "tell", "give", "show",
-        "analyze", "fix", "build", "create", "outline", "discuss"
-    };
-
     private static readonly string[] FillerPhrases =
     [
         "okay", "ok", "right", "sure", "great", "thanks", "thank you",
@@ -91,11 +84,18 @@ public sealed class QuestionBoundaryDetector
         var normalized = text.Trim();
         var normalizedLower = normalized.ToLowerInvariant();
 
-        // Rule 2: Word count < 4 → Unrelated
+        // Rule 2: Word count < 4 → Unrelated, UNLESS it begins with an imperative command.
+        // A short fragment from the interviewer (Other) that looks like a technical topic
+        // ("N+1 queries", "Func vs Expression<Func>") may be an implicit "explain this" — emit
+        // low confidence so the pipeline (confidence < 0.7) defers to the AI classifier. A bare
+        // topic from the candidate (Me) is a mid-answer aside, so it stays high-confidence
+        // Unrelated and never burns an AI call.
         var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length < 4)
+        if (words.Length < 4 && !QuestionLexicon.StartsWithImperative(normalized))
         {
-            return Unrelated(normalized, 0.95, "Fewer than 4 words");
+            return speaker == Speaker.Other && LooksLikeTechnicalTopic(normalized)
+                ? Unrelated(normalized, 0.50, "Short technical topic — deferring to AI classifier")
+                : Unrelated(normalized, 0.95, "Fewer than 4 words");
         }
 
         // Rule 3: Filler list match → Unrelated
@@ -171,7 +171,7 @@ public sealed class QuestionBoundaryDetector
             {
                 var isQuestion = normalized.EndsWith('?')
                     || (Interrogatives.Contains(firstWord) && words.Length >= 6)
-                    || (Imperatives.Contains(firstWord) && words.Length >= 4);
+                    || (QuestionLexicon.ImperativeVerbs.Contains(firstWord) && words.Length >= 4);
 
                 if (isQuestion)
                 {
@@ -225,7 +225,7 @@ public sealed class QuestionBoundaryDetector
         // Handles phrases like "You tell me about X", "You explain how Y works"
         if (words.Length >= 5
             && words[0].Trim(',', '.', '?', '!').Equals("you", StringComparison.OrdinalIgnoreCase)
-            && Imperatives.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
+            && QuestionLexicon.ImperativeVerbs.Contains(words[1].ToLowerInvariant().Trim('.', '?', '!')))
         {
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.TaskComplete,
@@ -237,8 +237,11 @@ public sealed class QuestionBoundaryDetector
                 Reason: $"Indirect imperative 'you {words[1].ToLowerInvariant().Trim('.', '?', '!')}'");
         }
 
-        // Rule 10: TaskComplete — imperative first word with ≥4 words
-        if (Imperatives.Contains(firstWord) && words.Length >= 4)
+        // Rule 10: TaskComplete — imperative command (verb or phrase, politeness-stripped)
+        // with ≥2 words. The 2-word floor lets short commands ("Define recursion") through;
+        // the interrogative gates above keep their ≥4/≥6 floors.
+        if (QuestionLexicon.StartsWithImperative(normalized)
+            && QuestionLexicon.StrippedWordCount(normalized) >= 2)
         {
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.TaskComplete,
@@ -247,7 +250,7 @@ public sealed class QuestionBoundaryDetector
                 ShouldRefineExistingAnswer: false,
                 ShouldCreateNewTurn: true,
                 NormalizedQuestionText: normalized,
-                Reason: "Imperative verb start with sufficient word count");
+                Reason: "Imperative command start with sufficient word count");
         }
 
         // Rule 11: Duplicate detection via Jaccard similarity
@@ -293,6 +296,31 @@ public sealed class QuestionBoundaryDetector
 
     private static string FirstWord(string text) =>
         text.Split(' ')[0].ToLowerInvariant().Trim('.', '?', '!');
+
+    /// <summary>
+    /// Heuristic sniff for a short fragment that reads like a technical topic worth explaining:
+    /// code punctuation, a "vs"/"versus" token, a mixed alphanumeric token ("N+1", "IPv4"),
+    /// or an internal capital ("OnPush", "PascalCase"). Used only to LOWER confidence so the
+    /// AI classifier is consulted — never to assert a question on its own.
+    /// </summary>
+    private static bool LooksLikeTechnicalTopic(string text)
+    {
+        if (text.IndexOfAny(['<', '>', '(', ')', '{', '}', '[', ']', ':', '+', '/', '#']) >= 0)
+            return true;
+
+        foreach (var token in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var bare = token.Trim('.', ',', '?', '!');
+            if (bare.Equals("vs", StringComparison.OrdinalIgnoreCase)
+                || bare.Equals("versus", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (bare.Any(char.IsDigit) && bare.Any(char.IsLetter))
+                return true;
+            if (bare.Length > 1 && bare.Skip(1).Any(char.IsUpper))
+                return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// Detects if text starts with a filler phrase, using word-boundary awareness for single-word fillers.

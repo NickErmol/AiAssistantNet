@@ -107,4 +107,16 @@ public class QuestionDetectorTests
     {
         _sut.Evaluate(text, []).IsQuestion.Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData("Define recursion")]
+    [InlineData("List exceptions")]
+    [InlineData("Break down the auth flow")]
+    [InlineData("Please explain the GC")]
+    [InlineData("Summarize the CAP theorem")]
+    public void Evaluate_ImperativeCommand_DetectsAsQuestion(string text)
+    {
+        var result = _sut.Evaluate(text, []);
+        result.IsQuestion.Should().BeTrue();
+    }
 }
