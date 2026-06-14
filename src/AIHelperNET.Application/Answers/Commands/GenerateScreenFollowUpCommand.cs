@@ -3,6 +3,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using FluentResults;
 using Mediator;
+using Microsoft.Extensions.Logging;
 
 namespace AIHelperNET.Application.Answers.Commands;
 
@@ -25,7 +26,7 @@ public sealed record GenerateScreenFollowUpCommand(
     IReadOnlyList<string> RecentTranscript) : IRequest<Result>;
 
 /// <summary>Handles <see cref="GenerateScreenFollowUpCommand"/>.</summary>
-public sealed class GenerateScreenFollowUpHandler(
+public sealed partial class GenerateScreenFollowUpHandler(
     ISessionRepository repository,
     IAnswerProviderResolver providerResolver,
     ISettingsStore settingsStore,
@@ -33,7 +34,8 @@ public sealed class GenerateScreenFollowUpHandler(
     IConversationTurnSink turnSink,
     IUnitOfWork unitOfWork,
     ScreenTaskContextStore screenStore,
-    TimeProvider clock) : IRequestHandler<GenerateScreenFollowUpCommand, Result>
+    TimeProvider clock,
+    ILogger<GenerateScreenFollowUpHandler> logger) : IRequestHandler<GenerateScreenFollowUpCommand, Result>
 {
     private const int PriorAnswerCap = 1200;
 
@@ -100,11 +102,19 @@ public sealed class GenerateScreenFollowUpHandler(
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
+            Log.GenerationFailed(logger, ex, turn.Id.Value);
             await streamSink.OnErrorAsync(turn.Id, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 
         repository.Update(session);
         return await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Warning,
+            Message = "Screen follow-up answer failed for turn {TurnId}; surfaced friendly error to user")]
+        internal static partial void GenerationFailed(ILogger logger, Exception ex, Guid turnId);
     }
 }

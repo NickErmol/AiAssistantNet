@@ -7,6 +7,7 @@ using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
 using FluentResults;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -60,7 +61,8 @@ public class GenerateScreenFollowUpHandlerTests
         var store = new ScreenTaskContextStore();
 
         var handler = new GenerateScreenFollowUpHandler(
-            repo, resolver, settings, streamSink, turnSink, uow, store, TimeProvider.System);
+            repo, resolver, settings, streamSink, turnSink, uow, store, TimeProvider.System,
+            NullLogger<GenerateScreenFollowUpHandler>.Instance);
         return (handler, turnSink, streamSink, store, provider);
     }
 

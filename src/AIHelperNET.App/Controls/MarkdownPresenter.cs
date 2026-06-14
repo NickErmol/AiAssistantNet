@@ -123,23 +123,16 @@ public sealed class MarkdownPresenter : ContentControl
             Text = c.Code,
             FontFamily = MonoFont,
             FontSize = BaseFontSize,
-            TextWrapping = TextWrapping.NoWrap
+            TextWrapping = TextWrapping.Wrap
         };
         tb.SetResourceReference(TextBlock.ForegroundProperty, "Brush.Foreground.Primary");
-
-        var scroll = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Content = tb
-        };
 
         var border = new Border
         {
             Padding = new Thickness(8),
             Margin = new Thickness(0, 2, 0, 6),
             CornerRadius = new CornerRadius(3),
-            Child = scroll
+            Child = tb
         };
         border.SetResourceReference(Border.BackgroundProperty, "Brush.Markdown.CodeBackground");
         return border;

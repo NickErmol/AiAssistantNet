@@ -8,6 +8,7 @@ using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
 using FluentResults;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -60,7 +61,8 @@ public class GenerateAnswerHandlerTests
         var feedback = new TurnStatusFeedback();
 
         var handler = new GenerateAnswerHandler(
-            repo, resolver, settings, streamSink, uow, TimeProvider.System, feedback);
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, feedback,
+            NullLogger<GenerateAnswerHandler>.Instance);
 
         return (handler, feedback, repo, session, turn);
     }
@@ -135,7 +137,8 @@ public class GenerateAnswerHandlerTests
         uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
 
         var handler = new GenerateAnswerHandler(
-            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback());
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback(),
+            NullLogger<GenerateAnswerHandler>.Instance);
 
         await handler.Handle(
             new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.RefinedAfterClarification),
@@ -192,7 +195,8 @@ public class GenerateAnswerHandlerTests
         uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
 
         var handler = new GenerateAnswerHandler(
-            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback());
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback(),
+            NullLogger<GenerateAnswerHandler>.Instance);
 
         await handler.Handle(
             new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary),

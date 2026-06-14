@@ -3,6 +3,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using FluentResults;
 using Mediator;
+using Microsoft.Extensions.Logging;
 
 namespace AIHelperNET.Application.Answers.Commands;
 
@@ -20,13 +21,14 @@ public sealed record RegenerateAnswerWithScreenCommand(
     string[] InterviewerLines) : IRequest<Result>;
 
 /// <summary>Handles <see cref="RegenerateAnswerWithScreenCommand"/>.</summary>
-public sealed class RegenerateAnswerWithScreenHandler(
+public sealed partial class RegenerateAnswerWithScreenHandler(
     ISessionRepository repository,
     IAnswerProviderResolver providerResolver,
     ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : IRequestHandler<RegenerateAnswerWithScreenCommand, Result>
+    TimeProvider clock,
+    ILogger<RegenerateAnswerWithScreenHandler> logger) : IRequestHandler<RegenerateAnswerWithScreenCommand, Result>
 {
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(RegenerateAnswerWithScreenCommand request, CancellationToken cancellationToken)
@@ -77,11 +79,19 @@ public sealed class RegenerateAnswerWithScreenHandler(
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
+            Log.GenerationFailed(logger, ex, request.TurnId.Value);
             await streamSink.OnErrorAsync(request.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 
         repository.Update(session);
         return await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Warning,
+            Message = "Screen-regenerated answer failed for turn {TurnId}; surfaced friendly error to user")]
+        internal static partial void GenerationFailed(ILogger logger, Exception ex, Guid turnId);
     }
 }

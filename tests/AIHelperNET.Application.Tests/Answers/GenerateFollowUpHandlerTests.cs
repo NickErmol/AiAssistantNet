@@ -4,6 +4,7 @@ using AIHelperNET.Application.Sessions.Dtos;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Xunit;
@@ -65,7 +66,8 @@ public class GenerateFollowUpHandlerTests
         providerResolver.Resolve(Arg.Any<AiBackend>()).Returns(provider);
 
         var handler = new GenerateFollowUpHandler(
-            repo, providerResolver, settingsStore, streamSink, uow, clock);
+            repo, providerResolver, settingsStore, streamSink, uow, clock,
+            NullLogger<GenerateFollowUpHandler>.Instance);
 
         var cmd = new GenerateFollowUpCommand(session.Id, turn.Id, "Can you elaborate?");
 
