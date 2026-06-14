@@ -1,8 +1,25 @@
 # Glass overlay transparency — design
 
 **Date:** 2026-06-14
-**Status:** Approved design, pending spec review
+**Status:** ⚠️ SUPERSEDED — glass approach reverted; see "Outcome" below.
 **Scope:** `AIHelperNET.App` (WPF overlay) only. No Domain/Application/Infrastructure changes.
+
+## Outcome (2026-06-15)
+
+The glass approach was built, reviewed, and **reverted** because it failed the hard
+stealth gate. `AllowsTransparency="True"` makes the overlay a **layered window**, which
+makes `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)` return **false** — stealth
+capture-exclusion silently stops working. Proven via logs: `stealth=true` succeeded the day
+before; with `AllowsTransparency` it was `stealth=false` on every attempt (incl. startup),
+then `stealth=true` again after the revert.
+
+**Conclusion:** on WPF/Windows you can have at most two of {see-through, crisp text, working
+stealth}. Stealth is the priority, so crisp-text glass is off the table. We pivoted to
+**stealth-safe transparency**: the relabeled "Transparency" slider drives `Window.Opacity`
+(DWM-composited, keeps stealth) — the whole overlay fades, text included. Also added
+`ShowInTaskbar="False"` to the Settings window. The `OverlayGlass` helper was removed.
+
+The sections below describe the original (abandoned) glass design and are kept for the record.
 
 ## Goal
 
