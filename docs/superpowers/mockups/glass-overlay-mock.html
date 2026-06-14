@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AIHelperNET — Glass overlay mockups</title>
+<style>
+  :root{
+    --win:#21213A; --panel:#17172E; --sidebar:#131328; --card:#1C2238;
+    --titlebar:#141428; --fg:#EAEAEA; --fg2:#AAAAAA; --muted:#666;
+    --accent:#4F8EF7; --q:#FFCC44; --active:#44FF88; --code:#11141C; --inlinecode:#CE9178;
+    --sublabel:#9CDCFE; --border:#2A2A3A;
+  }
+  *{box-sizing:border-box; font-family:'Segoe UI',sans-serif;}
+  body{margin:0; background:#0b0b12; color:var(--fg);}
+  /* faux shared screen behind the overlay: a code editor / video call */
+  .desktop{
+    position:relative; min-height:100vh; padding:24px;
+    background:
+      linear-gradient(135deg,#1e2a44 0%, #2a1e3a 55%, #102030 100%);
+    overflow:hidden;
+  }
+  .desktop::before{
+    content:""; position:absolute; inset:0;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 26px, rgba(255,255,255,.03) 26px 27px),
+      radial-gradient(circle at 75% 30%, rgba(79,142,247,.18), transparent 40%);
+    pointer-events:none;
+  }
+  .fake-code{position:absolute; left:40px; top:90px; font-family:Consolas,monospace; font-size:14px; line-height:1.6; color:#5e7aa8; opacity:.7;}
+  .fake-code .k{color:#c586c0;} .fake-code .s{color:#ce9178;} .fake-code .f{color:#dcdcaa;}
+  h1{font-size:18px; margin:0 0 4px;} .sub{color:var(--fg2); font-size:13px; margin:0 0 20px;}
+  .controls{position:relative; z-index:5; display:flex; gap:32px; flex-wrap:wrap; align-items:center; margin-bottom:18px;
+            background:rgba(0,0,0,.35); padding:12px 16px; border-radius:10px; backdrop-filter:blur(2px);}
+  .controls label{font-size:13px; color:var(--fg2);}
+  input[type=range]{vertical-align:middle;}
+  .row{position:relative; z-index:4; display:flex; gap:40px; flex-wrap:wrap;}
+  .col{flex:1; min-width:340px;}
+  .col > .tag{display:inline-block; font-size:12px; letter-spacing:.5px; color:var(--accent);
+              border:1px solid var(--accent); border-radius:6px; padding:2px 8px; margin-bottom:10px;}
+
+  /* ── the overlay window ── */
+  .overlay{width:380px; border-radius:12px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.55);
+           border:1px solid var(--border); display:flex; flex-direction:column;}
+  .titlebar{display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:13px; color:var(--fg2);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--active);}
+  .body{display:flex; min-height:300px;}
+  .sidebar{width:46px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:12px 0; font-size:18px; color:var(--fg2);}
+  .content{flex:1; padding:12px; display:flex; flex-direction:column; gap:10px;}
+  .qline{color:var(--q); font-size:12px;}
+  .card{border-radius:10px; padding:12px; font-size:13px; line-height:1.55;}
+  .card h4{margin:0 0 6px; color:var(--sublabel); font-size:12px; text-transform:uppercase; letter-spacing:.5px;}
+  .card b{color:#fff;}
+  .card code{background:var(--code); color:var(--inlinecode); padding:1px 5px; border-radius:4px; font-family:Consolas,monospace; font-size:12px;}
+  .card ul{margin:6px 0 0; padding-left:18px;} .card li{margin:3px 0;}
+
+  /* The two scope variants set backgrounds via CSS vars driven by JS opacity */
+</style>
+</head>
+<body>
+<div class="desktop">
+  <div class="fake-code">
+    <div><span class="k">public async</span> <span class="f">Task</span>&lt;IActionResult&gt; <span class="f">GetUser</span>(<span class="k">int</span> id){</div>
+    <div>&nbsp;&nbsp;<span class="k">var</span> user = <span class="k">await</span> _repo.<span class="f">FindAsync</span>(id);</div>
+    <div>&nbsp;&nbsp;<span class="k">if</span> (user <span class="k">is null</span>) <span class="k">return</span> <span class="f">NotFound</span>();</div>
+    <div>&nbsp;&nbsp;<span class="k">return</span> <span class="f">Ok</span>(user);</div>
+    <div>}</div>
+  </div>
+
+  <h1>AIHelperNET — “transparent overlay” options</h1>
+  <p class="sub">The blurry code behind is a stand-in for whatever's on your screen during the interview. Drag the slider to see how see-through each option gets.</p>
+
+  <div class="controls">
+    <div><label>Glass strength &nbsp;<input id="op" type="range" min="0" max="100" value="55"> <span id="opv">55%</span> opaque</label></div>
+    <div style="color:var(--muted);font-size:12px;">0% = fully see-through &nbsp;•&nbsp; 100% = solid (today's look)</div>
+  </div>
+
+  <div class="row">
+    <!-- Option A: whole overlay glass -->
+    <div class="col">
+      <span class="tag">Option A — Whole overlay glass</span>
+      <div class="overlay" id="ovA">
+        <div class="titlebar"><span class="dot"></span> AIHelper &nbsp;•&nbsp; Listening…</div>
+        <div class="body">
+          <div class="sidebar"><div>🎙️</div><div>🖥️</div><div>🕘</div><div>⚙️</div></div>
+          <div class="content">
+            <div class="qline">Q: How would you prevent N+1 queries in EF Core?</div>
+            <div class="card">
+              <h4>Answer</h4>
+              <b>N+1</b> happens when one query loads a list, then a query fires per item.
+              <ul>
+                <li>I would use <code>.Include()</code> / projection to <code>Select</code> a DTO.</li>
+                <li>Batch with <code>AsSplitQuery()</code> when joins fan out.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:8px;">Everything floats — title bar, sidebar icons and the card all let the screen through. Most striking, but the chrome/icons get harder to read at low opacity.</p>
+    </div>
+
+    <!-- Option B: answer area only -->
+    <div class="col">
+      <span class="tag">Option B — Answer area only</span>
+      <div class="overlay" id="ovB">
+        <div class="titlebar" id="bTitle"><span class="dot"></span> AIHelper &nbsp;•&nbsp; Listening…</div>
+        <div class="body">
+          <div class="sidebar" id="bSide"><div>🎙️</div><div>🖥️</div><div>🕘</div><div>⚙️</div></div>
+          <div class="content">
+            <div class="qline">Q: How would you prevent N+1 queries in EF Core?</div>
+            <div class="card" id="bCard">
+              <h4>Answer</h4>
+              <b>N+1</b> happens when one query loads a list, then a query fires per item.
+              <ul>
+                <li>I would use <code>.Include()</code> / projection to <code>Select</code> a DTO.</li>
+                <li>Batch with <code>AsSplitQuery()</code> when joins fan out.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:8px;">Title bar + sidebar stay solid and easy to click; only the answer card goes glass. Safer, chrome stays usable.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const hex = (h)=>({r:parseInt(h.substr(1,2),16),g:parseInt(h.substr(3,2),16),b:parseInt(h.substr(5,2),16)});
+  const rgba=(h,a)=>{const c=hex(h);return `rgba(${c.r},${c.g},${c.b},${a})`;};
+  const C={win:'#21213A',panel:'#17172E',sidebar:'#131328',card:'#1C2238',titlebar:'#141428'};
+  const op=document.getElementById('op'), opv=document.getElementById('opv');
+  function apply(){
+    const a=op.value/100; opv.textContent=op.value+'%';
+    // Option A: every surface uses the alpha
+    const A=document.getElementById('ovA');
+    A.style.background=rgba(C.win,a);
+    A.querySelector('.titlebar').style.background=rgba(C.titlebar,a);
+    A.querySelector('.sidebar').style.background=rgba(C.sidebar,a);
+    A.querySelector('.card').style.background=rgba(C.card,a);
+    // Option B: chrome solid, only card uses alpha
+    const B=document.getElementById('ovB');
+    B.style.background=rgba(C.win,Math.max(a,0.92));
+    document.getElementById('bTitle').style.background=C.titlebar;
+    document.getElementById('bSide').style.background=C.sidebar;
+    document.getElementById('bCard').style.background=rgba(C.card,a);
+  }
+  op.addEventListener('input',apply); apply();
+</script>
+</body>
+</html>
