@@ -1,21 +1,54 @@
 // src/AIHelperNET.App/Windows/SettingsWindow.xaml.cs
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using AIHelperNET.App.Hotkeys;
 using AIHelperNET.App.ViewModels;
 using NAudio.CoreAudioApi;
 
 namespace AIHelperNET.App.Windows;
 
+[SupportedOSPlatform("windows")]
 public sealed partial class SettingsWindow : Window
 {
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
+
+    private const uint WDA_NONE               = 0x00000000;
+    private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
     private readonly SettingsViewModel _vm;
+    private bool _stealthEnabled = true; // mirrors the overlay's default (stealth on)
 
     public SettingsWindow(SettingsViewModel vm)
     {
         InitializeComponent();
         _vm         = vm;
         DataContext = vm;
+    }
+
+    // Mirror the overlay's stealth state: when stealth is on, exclude the settings window from
+    // screen capture/sharing too (it holds sensitive config — API key field, device names);
+    // when off, let it be captured like a normal window. Driven by the overlay's 👁/🎥 toggle.
+    public void SetStealth(bool enable)
+    {
+        _stealthEnabled = enable;
+        ApplyDisplayAffinity();
+    }
+
+    private void ApplyDisplayAffinity()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return; // not yet shown; OnSourceInitialized applies it later
+        SetWindowDisplayAffinity(hwnd, _stealthEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        ApplyDisplayAffinity();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
