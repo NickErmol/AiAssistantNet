@@ -519,4 +519,14 @@ public sealed class QuestionBoundaryDetectorTests
         result.Classification.Should().Be(BoundaryLabel.Unrelated);
         result.Confidence.Should().BeGreaterThan(0.90);
     }
+
+    // ── Phase 2b: a bare technical topic from the candidate (Me) is a mid-answer aside —
+    //     it stays high-confidence Unrelated and does NOT defer to the AI classifier. ──
+    [Fact]
+    public void ShortTechnicalTopic_FromMe_StaysHighConfidenceUnrelated()
+    {
+        var result = _sut.Evaluate("N+1 queries", Speaker.Me, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeGreaterThan(0.90);
+    }
 }

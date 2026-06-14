@@ -85,13 +85,15 @@ public sealed class QuestionBoundaryDetector
         var normalizedLower = normalized.ToLowerInvariant();
 
         // Rule 2: Word count < 4 → Unrelated, UNLESS it begins with an imperative command.
-        // A short fragment that looks like a technical topic ("N+1 queries", "Func vs
-        // Expression<Func>") may be an implicit "explain this" — emit low confidence so the
-        // pipeline (confidence < 0.7) defers to the AI classifier.
+        // A short fragment from the interviewer (Other) that looks like a technical topic
+        // ("N+1 queries", "Func vs Expression<Func>") may be an implicit "explain this" — emit
+        // low confidence so the pipeline (confidence < 0.7) defers to the AI classifier. A bare
+        // topic from the candidate (Me) is a mid-answer aside, so it stays high-confidence
+        // Unrelated and never burns an AI call.
         var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length < 4 && !QuestionLexicon.StartsWithImperative(normalized))
         {
-            return LooksLikeTechnicalTopic(normalized)
+            return speaker == Speaker.Other && LooksLikeTechnicalTopic(normalized)
                 ? Unrelated(normalized, 0.50, "Short technical topic — deferring to AI classifier")
                 : Unrelated(normalized, 0.95, "Fewer than 4 words");
         }
