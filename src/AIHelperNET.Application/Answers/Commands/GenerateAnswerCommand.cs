@@ -3,6 +3,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using FluentResults;
 using Mediator;
+using Microsoft.Extensions.Logging;
 
 namespace AIHelperNET.Application.Answers.Commands;
 
@@ -18,14 +19,15 @@ public sealed record GenerateAnswerCommand(
     string? ScreenContext = null) : IRequest<Result>;
 
 /// <summary>Handles <see cref="GenerateAnswerCommand"/>.</summary>
-public sealed class GenerateAnswerHandler(
+public sealed partial class GenerateAnswerHandler(
     ISessionRepository repository,
     IAnswerProviderResolver providerResolver,
     ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
     TimeProvider clock,
-    ITurnStatusFeedback feedback) : IRequestHandler<GenerateAnswerCommand, Result>
+    ITurnStatusFeedback feedback,
+    ILogger<GenerateAnswerHandler> logger) : IRequestHandler<GenerateAnswerCommand, Result>
 {
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(GenerateAnswerCommand cmd, CancellationToken cancellationToken)
@@ -134,6 +136,7 @@ public sealed class GenerateAnswerHandler(
         {
             answer.Fail(clock.GetUtcNow());
             feedback.Publish(new TurnStatusEvent(cmd.TurnId, turn.Status));
+            Log.GenerationFailed(logger, ex, cmd.TurnId.Value);
             await streamSink.OnErrorAsync(cmd.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
@@ -143,5 +146,12 @@ public sealed class GenerateAnswerHandler(
         // written. A full-graph Update would mark pipeline-owned columns (clarification IDs,
         // pre-answer status) Modified and clobber them. See Spec 1 §5.5.
         return await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Warning,
+            Message = "Answer generation failed for turn {TurnId}; surfaced friendly error to user")]
+        internal static partial void GenerationFailed(ILogger logger, Exception ex, Guid turnId);
     }
 }

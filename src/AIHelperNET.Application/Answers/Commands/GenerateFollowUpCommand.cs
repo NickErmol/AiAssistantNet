@@ -3,6 +3,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using FluentResults;
 using Mediator;
+using Microsoft.Extensions.Logging;
 
 namespace AIHelperNET.Application.Answers.Commands;
 
@@ -16,13 +17,14 @@ public sealed record GenerateFollowUpCommand(
     string FollowUpText) : IRequest<Result>;
 
 /// <summary>Handles <see cref="GenerateFollowUpCommand"/>.</summary>
-public sealed class GenerateFollowUpHandler(
+public sealed partial class GenerateFollowUpHandler(
     ISessionRepository repository,
     IAnswerProviderResolver providerResolver,
     ISettingsStore settingsStore,
     IAnswerStreamSink streamSink,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : IRequestHandler<GenerateFollowUpCommand, Result>
+    TimeProvider clock,
+    ILogger<GenerateFollowUpHandler> logger) : IRequestHandler<GenerateFollowUpCommand, Result>
 {
     /// <inheritdoc/>
     public async ValueTask<Result> Handle(GenerateFollowUpCommand request, CancellationToken cancellationToken)
@@ -80,11 +82,19 @@ public sealed class GenerateFollowUpHandler(
         catch (Exception ex)
         {
             answer.Fail(clock.GetUtcNow());
+            Log.GenerationFailed(logger, ex, request.TurnId.Value);
             await streamSink.OnErrorAsync(request.TurnId, AnswerErrorMessage.ForUser(ex), cancellationToken);
         }
 #pragma warning restore CA1031
 
         repository.Update(session);
         return await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Warning,
+            Message = "Follow-up answer failed for turn {TurnId}; surfaced friendly error to user")]
+        internal static partial void GenerationFailed(ILogger logger, Exception ex, Guid turnId);
     }
 }
