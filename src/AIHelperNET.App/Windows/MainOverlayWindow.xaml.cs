@@ -3,6 +3,7 @@ using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using AIHelperNET.App.ViewModels;
 using Serilog;
 
@@ -38,6 +39,38 @@ public partial class MainOverlayWindow : Window
     private const uint WDA_NONE             = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+    /// <summary>
+    /// Overlay surface resource keys → the theme brush each derives its color from.
+    /// Rebuilt as translucent <c>Glass.*</c> brushes so the whole overlay reads as glass
+    /// while text/icons (which use <c>Brush.Foreground.*</c>) stay fully opaque.
+    /// </summary>
+    private static readonly (string GlassKey, string ThemeKey)[] GlassSurfaces =
+    {
+        ("Glass.Window",   "Brush.Background.Window"),
+        ("Glass.TitleBar", "Brush.Background.TitleBar"),
+        ("Glass.Sidebar",  "Brush.Background.Sidebar"),
+        ("Glass.Panel",    "Brush.Background.Panel"),
+        ("Glass.Card",     "Brush.Background.Card"),
+    };
+
+    /// <summary>
+    /// Rebuilds the overlay-local <c>Glass.*</c> brushes from the current theme's base colors
+    /// at the given transparency (0.2–1.0). Window-local so the Settings window's theme brushes
+    /// are unaffected. Safe to call repeatedly (on slider change and after a theme toggle).
+    /// </summary>
+    private void ApplyGlassOpacity(double opacity)
+    {
+        foreach (var (glassKey, themeKey) in GlassSurfaces)
+        {
+            if (TryFindResource(themeKey) is not SolidColorBrush baseBrush)
+                continue;
+
+            var brush = new SolidColorBrush(OverlayGlass.WithAlpha(baseBrush.Color, opacity));
+            brush.Freeze();
+            Resources[glassKey] = brush;
+        }
+    }
+
     private readonly SettingsWindow    _settingsWindow;
     private readonly SettingsViewModel _settingsVm;
     private readonly HistoryViewModel  _historyVm;
@@ -56,7 +89,8 @@ public partial class MainOverlayWindow : Window
         _settingsWindow = settingsWindow;
         _settingsVm     = settingsVm;
         _historyVm      = historyVm;
-        _settingsVm.OpacityChanged += opacity => Opacity = opacity;
+        _settingsVm.OpacityChanged += ApplyGlassOpacity;
+        ApplyGlassOpacity(_settingsVm.OverlayOpacity); // seed Glass.* before first render
         HistoryPanelControl.DataContext = _historyVm;
     }
 
@@ -70,7 +104,7 @@ public partial class MainOverlayWindow : Window
         try
         {
             await _settingsVm.LoadAsync();
-            Opacity = _settingsVm.OverlayOpacity;
+            ApplyGlassOpacity(_settingsVm.OverlayOpacity);
         }
         catch (Exception ex)
         {
@@ -123,7 +157,11 @@ public partial class MainOverlayWindow : Window
     }
 
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
-        => ThemeManager.Toggle();
+    {
+        ThemeManager.Toggle();
+        // Theme swap replaces Brush.Background.* — rebuild Glass.* from the new colors.
+        ApplyGlassOpacity(_settingsVm.OverlayOpacity);
+    }
 
     private async void ToggleHistory_Click(object sender, RoutedEventArgs e)
     {
