@@ -84,9 +84,10 @@ public sealed class QuestionBoundaryDetector
         var normalized = text.Trim();
         var normalizedLower = normalized.ToLowerInvariant();
 
-        // Rule 2: Word count < 4 → Unrelated
+        // Rule 2: Word count < 4 → Unrelated, UNLESS it begins with an imperative command
+        // (e.g. "Define recursion") — those are short answerable tasks handled by Rule 10.
         var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length < 4)
+        if (words.Length < 4 && !QuestionLexicon.StartsWithImperative(normalized))
         {
             return Unrelated(normalized, 0.95, "Fewer than 4 words");
         }
@@ -230,8 +231,11 @@ public sealed class QuestionBoundaryDetector
                 Reason: $"Indirect imperative 'you {words[1].ToLowerInvariant().Trim('.', '?', '!')}'");
         }
 
-        // Rule 10: TaskComplete — imperative first word with ≥4 words
-        if (QuestionLexicon.ImperativeVerbs.Contains(firstWord) && words.Length >= 4)
+        // Rule 10: TaskComplete — imperative command (verb or phrase, politeness-stripped)
+        // with ≥2 words. The 2-word floor lets short commands ("Define recursion") through;
+        // the interrogative gates above keep their ≥4/≥6 floors.
+        if (QuestionLexicon.StartsWithImperative(normalized)
+            && QuestionLexicon.StrippedWordCount(normalized) >= 2)
         {
             return new BoundaryClassificationResult(
                 Classification: BoundaryLabel.TaskComplete,
@@ -240,7 +244,7 @@ public sealed class QuestionBoundaryDetector
                 ShouldRefineExistingAnswer: false,
                 ShouldCreateNewTurn: true,
                 NormalizedQuestionText: normalized,
-                Reason: "Imperative verb start with sufficient word count");
+                Reason: "Imperative command start with sufficient word count");
         }
 
         // Rule 11: Duplicate detection via Jaccard similarity
