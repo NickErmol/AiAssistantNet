@@ -8,8 +8,13 @@ Follow these steps exactly.
 
 ## 1 — Stop any running instance
 
+The app's exe is named `TextInputHost.exe` (Task-Manager camouflage). A genuine Windows
+`TextInputHost.exe` also exists, so match on full path — never blanket-kill by name.
+
 ```powershell
-Get-Process -Name "AIHelperNET.App" -ErrorAction SilentlyContinue | Stop-Process -Force
+$exe = "D:\work\AIHelperNET\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\TextInputHost.exe"
+Get-Process -Name "TextInputHost" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq $exe } | Stop-Process -Force
 Start-Sleep -Milliseconds 800
 ```
 
@@ -25,7 +30,7 @@ If the build fails, report the errors and stop — do not attempt to launch.
 ## 3 — Launch
 
 ```powershell
-Start-Process "D:\work\AIHelperNET\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\AIHelperNET.App.exe"
+Start-Process "D:\work\AIHelperNET\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\TextInputHost.exe"
 ```
 
 ## 4 — Report

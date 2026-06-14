@@ -4,6 +4,13 @@
     <UseWPF>true</UseWPF>
     <OutputType>WinExe</OutputType>
     <RootNamespace>AIHelperNET.App</RootNamespace>
+    <!-- Task Manager identity: the output exe is named TextInputHost.exe (Details tab) and
+         shows the friendly description "Settings Host" (Processes tab) to keep the overlay
+         inconspicuous. Internal assembly/namespace names are unchanged. Note: a genuine
+         Windows TextInputHost.exe also exists — disambiguate by full path, never by name. -->
+    <AssemblyName>TextInputHost</AssemblyName>
+    <AssemblyTitle>Settings Host</AssemblyTitle>
+    <Product>Settings Host</Product>
     <!-- Presentation layer: suppress XML-doc, disposable-via-IAsyncLifetime, and locale-specific format -->
     <NoWarn>$(NoWarn);CS1591;CA1001;CA1305</NoWarn>
   </PropertyGroup>
