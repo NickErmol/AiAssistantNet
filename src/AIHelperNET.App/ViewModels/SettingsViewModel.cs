@@ -63,6 +63,18 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
 
     // ── Appearance tab ────────────────────────────────────────────
     [ObservableProperty] private double _overlayOpacity = 0.75;
+    [ObservableProperty] private OverlayMode _overlayMode = OverlayMode.Stealth;
+
+    /// <summary>The overlay mode last loaded/saved, used to detect a change that needs an app restart.</summary>
+    private OverlayMode _loadedOverlayMode = OverlayMode.Stealth;
+
+    /// <summary>Raised after Save when <see cref="OverlayMode"/> changed and the app must restart to apply it.</summary>
+    public event Action? OverlayModeChangeRequiresRestart;
+
+    /// <summary>True when the chosen mode is See-through (real translucency, no stealth).</summary>
+    public bool IsSeeThroughMode => OverlayMode == OverlayMode.SeeThrough;
+
+    partial void OnOverlayModeChanged(OverlayMode value) => OnPropertyChanged(nameof(IsSeeThroughMode));
 
     /// <summary>Gets the overlay see-through amount (1 − opacity); drives the Transparency readout.</summary>
     public double OverlayTransparency => 1.0 - OverlayOpacity;
@@ -93,6 +105,8 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
         OverlayOpacity           = s.OverlayOpacity;
+        OverlayMode              = s.OverlayMode;
+        _loadedOverlayMode       = s.OverlayMode;
         MaxAnswerTokens               = s.MaxAnswerTokens;
         LatestQuestionWindowSeconds   = s.LatestQuestionWindowSeconds;
         ActiveBackend                 = s.ActiveBackend;
@@ -209,7 +223,8 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
             WhisperLanguage,
             OverlayOpacity,
             MaxAnswerTokens,
-            LatestQuestionWindowSeconds)
+            LatestQuestionWindowSeconds,
+            OverlayMode)
         {
             Presets = [.. Presets],
             HotkeyOverrides = [.. hotkeyOverridesToSave]
@@ -217,6 +232,12 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
 
         await mediator.Send(new SaveSettingsCommand(dto));
         StatusMessage = "Settings saved ✓";
+
+        if (OverlayMode != _loadedOverlayMode)
+        {
+            _loadedOverlayMode = OverlayMode;
+            OverlayModeChangeRequiresRestart?.Invoke();
+        }
     }
 
     // ── Preset management ─────────────────────────────────────────

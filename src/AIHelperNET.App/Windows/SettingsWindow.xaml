@@ -242,6 +242,27 @@
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>
+
+                    <TextBlock Text="MODE" Style="{StaticResource SectionLabel}" Margin="0,16,0,6"/>
+                    <RadioButton GroupName="OverlayMode" Style="{StaticResource RadioBtn}"
+                                 Content="Stealth — hidden from screen capture"
+                                 AutomationProperties.AutomationId="OverlayMode_Stealth"
+                                 IsChecked="{Binding OverlayMode,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Stealth}"/>
+                    <RadioButton GroupName="OverlayMode" Style="{StaticResource RadioBtn}"
+                                 Content="See-through — real translucency"
+                                 AutomationProperties.AutomationId="OverlayMode_SeeThrough"
+                                 IsChecked="{Binding OverlayMode,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=SeeThrough}"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource Font.XS}" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Brush.Semantic.Question}"
+                               Visibility="{Binding IsSeeThroughMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Text="⚠ See-through uses real transparency, so the overlay is NOT hidden from screen sharing or recording. Stealth is unavailable in this mode."/>
+                    <TextBlock Text="Changing mode takes effect after an app restart."
+                               TextWrapping="Wrap" FontSize="{DynamicResource Font.XS}" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Brush.Foreground.Muted}"/>
                 </StackPanel>
             </TabItem>
 

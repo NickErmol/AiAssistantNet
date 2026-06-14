@@ -16,6 +16,7 @@ namespace AIHelperNET.Application.Sessions.Dtos;
 /// <param name="MaxAnswerTokens">Maximum tokens for a generated audio answer, in range [200, 4000].</param>
 /// <param name="LatestQuestionWindowSeconds">Look-back window (seconds) the Answer-latest-question
 /// hotkey scans for the most recent question, in range [30, 300].</param>
+/// <param name="OverlayMode">Overlay render mode (stealth vs see-through). Applied at app startup.</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
     WhisperModelSize WhisperModel,
@@ -27,7 +28,8 @@ public sealed record AppSettingsDto(
     string WhisperLanguage = "auto",
     double OverlayOpacity = 0.75,
     int MaxAnswerTokens = 800,
-    int LatestQuestionWindowSeconds = 120)
+    int LatestQuestionWindowSeconds = 120,
+    OverlayMode OverlayMode = OverlayMode.Stealth)
 {
     /// <summary>Default answer-token cap used when unset/legacy.</summary>
     public const int DefaultMaxAnswerTokens = 800;

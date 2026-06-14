@@ -27,6 +27,22 @@ public sealed partial class SettingsWindow : Window
         InitializeComponent();
         _vm         = vm;
         DataContext = vm;
+        _vm.OverlayModeChangeRequiresRestart += OnOverlayModeChangeRequiresRestart;
+    }
+
+    // The overlay's AllowsTransparency (See-through vs Stealth) is fixed when the window is created,
+    // so a mode change can only take effect on a fresh launch. Offer to restart now.
+    private void OnOverlayModeChangeRequiresRestart()
+    {
+        var choice = MessageBox.Show(this,
+            "The overlay display mode change takes effect after a restart. Restart AIHelper now?",
+            "Restart required", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (choice != MessageBoxResult.Yes) return;
+
+        var exePath = Environment.ProcessPath;
+        if (exePath is not null)
+            System.Diagnostics.Process.Start(exePath);
+        System.Windows.Application.Current.Shutdown();
     }
 
     // Mirror the overlay's stealth state: when stealth is on, exclude the settings window from
