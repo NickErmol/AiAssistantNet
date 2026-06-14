@@ -55,11 +55,14 @@ public sealed class QuestionDetector
 
     private static bool LooksLikeQuestion(string text)
     {
-        if (text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < MinWords)
+        var isImperative = QuestionLexicon.StartsWithImperative(text);
+        // Imperative commands may be as short as 2 words ("Define recursion"); other text
+        // keeps the MinWords floor.
+        var minWords = isImperative ? 2 : MinWords;
+        if (text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < minWords)
             return false;
         if (text.EndsWith('?')) return true;
-        var first = FirstWord(text);
-        return Interrogatives.Contains(first) || QuestionLexicon.ImperativeVerbs.Contains(first);
+        return Interrogatives.Contains(FirstWord(text)) || isImperative;
     }
 
     private static bool IsNoisePhrase(string text)
