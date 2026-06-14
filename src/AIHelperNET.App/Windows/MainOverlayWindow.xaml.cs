@@ -55,7 +55,7 @@ public partial class MainOverlayWindow : Window
 
     /// <summary>
     /// Rebuilds the overlay-local <c>Glass.*</c> brushes from the current theme's base colors
-    /// at the given transparency (0.2–1.0). Window-local so the Settings window's theme brushes
+    /// at the given opacity (0–1; the settings slider constrains it to 0.2–1.0). Window-local so the Settings window's theme brushes
     /// are unaffected. Safe to call repeatedly (on slider change and after a theme toggle).
     /// </summary>
     private void ApplyGlassOpacity(double opacity)

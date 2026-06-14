@@ -208,6 +208,7 @@
                 <TextBlock Style="{StaticResource SectionLabel}" Text="AUDIO LEVELS" Margin="0,10,0,4"/>
                 <TextBlock Text="🎤" FontSize="{DynamicResource Font.XS}"
                            Foreground="{DynamicResource Brush.Foreground.Muted}"/>
+                <!-- Meter troughs stay opaque (Brush.Background.Panel, not Glass.*) so the level bar reads clearly over the glass. -->
                 <ProgressBar Value="{Binding AudioLevel.MicLevel}"
                              Minimum="0" Maximum="1"
                              Height="6" Margin="0,1,0,4"
@@ -215,6 +216,7 @@
                              Foreground="{DynamicResource Brush.Semantic.Active}"/>
                 <TextBlock Text="🔊" FontSize="{DynamicResource Font.XS}"
                            Foreground="{DynamicResource Brush.Foreground.Muted}"/>
+                <!-- Meter troughs stay opaque (Brush.Background.Panel, not Glass.*) so the level bar reads clearly over the glass. -->
                 <ProgressBar Value="{Binding AudioLevel.SystemLevel}"
                              Minimum="0" Maximum="1"
                              Height="6" Margin="0,1,0,0"

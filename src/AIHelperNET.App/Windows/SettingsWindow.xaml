@@ -225,17 +225,19 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="20%"
+                        <TextBlock Grid.Column="0" Text="Solid"
                                    Foreground="{DynamicResource Brush.Foreground.Muted}"
                                    FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                        <!-- Bound to OverlayOpacity (0.2–1.0); reversed so dragging right = more see-through. -->
                         <Slider Grid.Column="1"
                                 Minimum="0.2" Maximum="1.0" SmallChange="0.05"
+                                IsDirectionReversed="True"
                                 Value="{Binding OverlayOpacity}"/>
-                        <TextBlock Grid.Column="2" Text="100%"
+                        <TextBlock Grid.Column="2" Text="See-through"
                                    Foreground="{DynamicResource Brush.Foreground.Muted}"
                                    FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
                     </Grid>
-                    <TextBlock Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}"
+                    <TextBlock Text="{Binding OverlayTransparency, StringFormat='{}{0:P0} transparent'}"
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>

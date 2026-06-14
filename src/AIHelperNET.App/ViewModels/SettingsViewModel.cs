@@ -64,10 +64,17 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
     // ── Appearance tab ────────────────────────────────────────────
     [ObservableProperty] private double _overlayOpacity = 0.75;
 
+    /// <summary>Gets the overlay see-through amount (1 − opacity); drives the Transparency readout.</summary>
+    public double OverlayTransparency => 1.0 - OverlayOpacity;
+
     /// <summary>Raised when opacity changes so MainOverlayWindow can update live.</summary>
     public event Action<double>? OpacityChanged;
 
-    partial void OnOverlayOpacityChanged(double value) => OpacityChanged?.Invoke(value);
+    partial void OnOverlayOpacityChanged(double value)
+    {
+        OpacityChanged?.Invoke(value);
+        OnPropertyChanged(nameof(OverlayTransparency));
+    }
 
     // ── Answer settings ───────────────────────────────────────────
     [ObservableProperty] private int _maxAnswerTokens = 800;
