@@ -119,7 +119,7 @@ public partial class App : System.Windows.Application
 
         ScreenGrabber.StartTracking();
         overlay.Show();
-        WireHotkeys(overlay);
+        await WireHotkeysAsync(overlay);
         PreWarmWhisperModel();
         PreWarmSileroModel();
     }
@@ -179,7 +179,7 @@ public partial class App : System.Windows.Application
         });
     }
 
-    private void WireHotkeys(MainOverlayWindow overlay)
+    private async Task WireHotkeysAsync(MainOverlayWindow overlay)
     {
         var hotkeys = _host.Services.GetRequiredService<IGlobalHotkeyService>() as GlobalHotkeyService;
         if (hotkeys is null) return;
@@ -188,11 +188,15 @@ public partial class App : System.Windows.Application
         hotkeys.Initialize(hwnd);
 
         // Register the effective set (defaults merged with any saved user overrides).
-        var settingsResult = _host.Services.GetRequiredService<IMediator>()
-            .Send(new GetSettingsQuery()).AsTask().GetAwaiter().GetResult();
+        // Must AWAIT — blocking the UI thread here (sync-over-async) deadlocks: the settings-load
+        // continuation can't resume on the blocked dispatcher, so registration never runs.
+        var settingsResult = await _host.Services.GetRequiredService<IMediator>()
+            .Send(new GetSettingsQuery());
         var overrides = settingsResult.IsSuccess ? settingsResult.Value.HotkeyOverrides : [];
-        _host.Services.GetRequiredService<IHotkeyApplier>()
+        var failed = _host.Services.GetRequiredService<IHotkeyApplier>()
             .Apply(HotkeyDefaults.Resolve(overrides));
+        if (failed.Count > 0)
+            Log.Warning("Hotkeys rejected by the OS at startup (in use by another app): {Ids}", failed);
 
         var sessionVm = _host.Services.GetRequiredService<SessionControlViewModel>();
         var turnVm2   = _host.Services.GetRequiredService<ConversationTurnViewModel>();
