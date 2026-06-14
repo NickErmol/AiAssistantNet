@@ -39,7 +39,7 @@ internal static class QuestionLexicon
 
     /// <summary>
     /// Removes a single leading politeness prefix (longest match first) and returns the
-    /// remaining text trimmed. Returns the input unchanged when no prefix matches.
+    /// remaining text trimmed. Returns the input with leading whitespace trimmed when no prefix matches.
     /// </summary>
     internal static string StripPoliteness(string text)
     {
@@ -53,7 +53,9 @@ internal static class QuestionLexicon
                 return trimmed[prefix.Length..].TrimStart(' ', ',');
             }
         }
-        return text;
+        // Return the leading-trimmed text (not the raw input) so downstream FirstWord/word-count
+        // helpers never see a leading-whitespace token when no politeness prefix matched.
+        return trimmed;
     }
 
     /// <summary>
