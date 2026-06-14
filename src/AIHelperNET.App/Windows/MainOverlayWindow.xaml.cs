@@ -3,7 +3,9 @@ using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using AIHelperNET.App.ViewModels;
+using AIHelperNET.Application.Abstractions;
 using Serilog;
 
 namespace AIHelperNET.App.Windows;
@@ -38,10 +40,19 @@ public partial class MainOverlayWindow : Window
     private const uint WDA_NONE             = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+    // Surface brush keys overridden (window-local) with translucent versions in See-through mode,
+    // so the whole overlay reads as glass while text/icons (Brush.Foreground.*) stay opaque.
+    private static readonly string[] GlassSurfaceKeys =
+    {
+        "Brush.Background.Window", "Brush.Background.TitleBar",
+        "Brush.Background.Sidebar", "Brush.Background.Panel", "Brush.Background.Card",
+    };
+
     private readonly SettingsWindow    _settingsWindow;
     private readonly SettingsViewModel _settingsVm;
     private readonly HistoryViewModel  _historyVm;
     private bool _stealthActive;
+    private bool _seeThrough;
     private bool _showingHistory;
 
     /// <summary>Initialises a new instance of <see cref="MainOverlayWindow"/>.</summary>
@@ -56,25 +67,76 @@ public partial class MainOverlayWindow : Window
         _settingsWindow = settingsWindow;
         _settingsVm     = settingsVm;
         _historyVm      = historyVm;
-        _settingsVm.OpacityChanged += opacity => Opacity = opacity;
+        _settingsVm.OpacityChanged += OnOverlayOpacityChanged;
         HistoryPanelControl.DataContext = _historyVm;
     }
 
+    /// <summary>
+    /// Applies the persisted <see cref="OverlayMode"/>. MUST be called before the window is shown —
+    /// <see cref="Window.AllowsTransparency"/> cannot change once the HWND exists. See-through turns on
+    /// real per-pixel transparency (and forfeits stealth); Stealth keeps the window opaque and dims via
+    /// <see cref="UIElement.Opacity"/> (stealth-safe).
+    /// </summary>
+    public void ApplyDisplayMode(OverlayMode mode)
+    {
+        _seeThrough = mode == OverlayMode.SeeThrough;
+        if (_seeThrough)
+        {
+            AllowsTransparency = true; // legal only before the window is shown
+            Opacity = 1.0;             // keep text crisp; see-through comes from translucent surfaces
+            ApplySeeThroughGlass(_settingsVm.OverlayOpacity);
+        }
+        else
+        {
+            Opacity = _settingsVm.OverlayOpacity; // whole-window dim; stealth-safe
+        }
+    }
+
+    // Drives the Transparency slider live: translucent surfaces in See-through mode, whole-window
+    // dim in Stealth mode.
+    private void OnOverlayOpacityChanged(double opacity)
+    {
+        if (_seeThrough) ApplySeeThroughGlass(opacity);
+        else Opacity = opacity;
+    }
+
+    // Overrides the surface brushes with translucent copies of the current theme colors, window-local
+    // so the Settings window keeps its opaque brushes. Rebuilt on slider change and after a theme toggle.
+    private void ApplySeeThroughGlass(double opacity)
+    {
+        foreach (var key in GlassSurfaceKeys)
+        {
+            if (System.Windows.Application.Current?.TryFindResource(key) is SolidColorBrush baseBrush)
+            {
+                var brush = new SolidColorBrush(OverlayGlass.WithAlpha(baseBrush.Color, opacity));
+                brush.Freeze();
+                Resources[key] = brush;
+            }
+        }
+    }
+
     /// <inheritdoc/>
-    protected override async void OnSourceInitialized(EventArgs e)
+    protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        ApplyStealth(enable: true); // stealth on by default; toggle with 🎥 button
 
-        // Load persisted opacity before the window becomes visible
-        try
+        if (_seeThrough)
         {
-            await _settingsVm.LoadAsync();
-            Opacity = _settingsVm.OverlayOpacity;
+            // See-through is a layered window and cannot be stealthed — make that explicit and
+            // disable the toggle so it can't be turned on.
+            var hwnd = new WindowInteropHelper(this).Handle;
+            SetWindowDisplayAffinity(hwnd, WDA_NONE);
+            _settingsWindow.SetStealth(false);
+            if (StealthBtn is not null)
+            {
+                StealthBtn.IsEnabled = false;
+                StealthBtn.ToolTip   = "Stealth is unavailable in See-through mode";
+            }
+            Log.Information("Overlay: see-through mode (stealth unavailable)");
         }
-        catch (Exception ex)
+        else
         {
-            Serilog.Log.Warning(ex, "Failed to restore overlay opacity; using default");
+            ApplyStealth(enable: true); // stealth on by default; toggle with 🎥 button
         }
     }
 
@@ -97,7 +159,10 @@ public partial class MainOverlayWindow : Window
         => DragMove();
 
     private void ToggleStealth_Click(object sender, RoutedEventArgs e)
-        => ApplyStealth(!_stealthActive);
+    {
+        if (_seeThrough) return; // stealth unavailable in see-through mode
+        ApplyStealth(!_stealthActive);
+    }
 
     private void Minimize_Click(object sender, RoutedEventArgs e)
         => Hide();
@@ -123,7 +188,10 @@ public partial class MainOverlayWindow : Window
     }
 
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
-        => ThemeManager.Toggle();
+    {
+        ThemeManager.Toggle();
+        if (_seeThrough) ApplySeeThroughGlass(_settingsVm.OverlayOpacity); // rebuild from new theme colors
+    }
 
     private async void ToggleHistory_Click(object sender, RoutedEventArgs e)
     {

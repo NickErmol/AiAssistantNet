@@ -117,6 +117,13 @@ public partial class App : System.Windows.Application
         var levelVm = _host.Services.GetRequiredService<AudioLevelViewModel>();
         levelVm.Subscribe();
 
+        // Load settings and apply the overlay display mode BEFORE Show() — AllowsTransparency
+        // (See-through mode) cannot change once the window's HWND exists.
+        var settingsVm = _host.Services.GetRequiredService<SettingsViewModel>();
+        try { await settingsVm.LoadAsync(); }
+        catch (Exception ex) { Log.Warning(ex, "Failed to load settings before overlay; using defaults"); }
+        overlay.ApplyDisplayMode(settingsVm.OverlayMode);
+
         ScreenGrabber.StartTracking();
         overlay.Show();
         await WireHotkeysAsync(overlay);

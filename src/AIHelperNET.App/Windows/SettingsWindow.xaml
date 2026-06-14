@@ -4,6 +4,7 @@
         xmlns:local="clr-namespace:AIHelperNET.App.Windows"
         Title="AIHelper — Settings" Width="560" Height="600"
         WindowStartupLocation="Manual" ResizeMode="NoResize"
+        ShowInTaskbar="False"
         Background="{DynamicResource Brush.Background.Window}"
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -218,27 +219,50 @@
             <TabItem Header="Appearance">
                 <StackPanel Margin="8">
                     <TextBlock Text="OVERLAY" Style="{StaticResource SectionLabel}" Margin="0,0,0,8"/>
-                    <TextBlock Text="Opacity" Style="{StaticResource FieldLabel}"/>
+                    <TextBlock Text="Transparency" Style="{StaticResource FieldLabel}"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="20%"
+                        <TextBlock Grid.Column="0" Text="Solid"
                                    Foreground="{DynamicResource Brush.Foreground.Muted}"
                                    FontSize="{DynamicResource Font.XS}" Margin="0,0,6,0"/>
+                        <!-- Bound to OverlayOpacity (0.2–1.0); reversed so dragging right = more see-through. -->
                         <Slider Grid.Column="1"
                                 Minimum="0.2" Maximum="1.0" SmallChange="0.05"
+                                IsDirectionReversed="True"
                                 Value="{Binding OverlayOpacity}"/>
-                        <TextBlock Grid.Column="2" Text="100%"
+                        <TextBlock Grid.Column="2" Text="See-through"
                                    Foreground="{DynamicResource Brush.Foreground.Muted}"
                                    FontSize="{DynamicResource Font.XS}" Margin="6,0,0,0"/>
                     </Grid>
-                    <TextBlock Text="{Binding OverlayOpacity, StringFormat='{}{0:P0}'}"
+                    <TextBlock Text="{Binding OverlayTransparency, StringFormat='{}{0:P0} transparent'}"
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource Brush.Foreground.Secondary}"
                                FontSize="{DynamicResource Font.SM}" Margin="0,4,0,0"/>
+
+                    <TextBlock Text="MODE" Style="{StaticResource SectionLabel}" Margin="0,16,0,6"/>
+                    <RadioButton GroupName="OverlayMode" Style="{StaticResource RadioBtn}"
+                                 Content="Stealth — hidden from screen capture"
+                                 AutomationProperties.AutomationId="OverlayMode_Stealth"
+                                 IsChecked="{Binding OverlayMode,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Stealth}"/>
+                    <RadioButton GroupName="OverlayMode" Style="{StaticResource RadioBtn}"
+                                 Content="See-through — real translucency"
+                                 AutomationProperties.AutomationId="OverlayMode_SeeThrough"
+                                 IsChecked="{Binding OverlayMode,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=SeeThrough}"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource Font.XS}" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Brush.Semantic.Question}"
+                               Visibility="{Binding IsSeeThroughMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Text="⚠ See-through uses real transparency, so the overlay is NOT hidden from screen sharing or recording. Stealth is unavailable in this mode."/>
+                    <TextBlock Text="Changing mode takes effect after an app restart."
+                               TextWrapping="Wrap" FontSize="{DynamicResource Font.XS}" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Brush.Foreground.Muted}"/>
                 </StackPanel>
             </TabItem>
 
