@@ -9,9 +9,11 @@ namespace AIHelperNET.UITests;
 
 public sealed class AppFixture : IAsyncLifetime
 {
+    // The App output exe is named TextInputHost.exe (see AIHelperNET.App.csproj). A real
+    // Windows process of the same name also exists, so we always match on full path below.
     private static readonly string ExePath = Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory,
-            @"..\..\..\..\..\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\AIHelperNET.App.exe"));
+            @"..\..\..\..\..\src\AIHelperNET.App\bin\Debug\net10.0-windows10.0.17763.0\TextInputHost.exe"));
 
     private Application? _app;
 
@@ -22,8 +24,14 @@ public sealed class AppFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        foreach (var p in Process.GetProcessesByName("AIHelperNET.App"))
+        foreach (var p in Process.GetProcessesByName("TextInputHost"))
         {
+            // Only kill OUR build's exe — never the genuine Windows TextInputHost.exe.
+            string? path;
+            try { path = p.MainModule?.FileName; }
+            catch { continue; } // access denied on a protected process => not ours
+            if (!string.Equals(path, ExePath, StringComparison.OrdinalIgnoreCase)) continue;
+
             p.Kill(entireProcessTree: true);
             await Task.WhenAny(p.WaitForExitAsync(), Task.Delay(5000));
         }
