@@ -1,6 +1,7 @@
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Infrastructure.Audio;
+using Serilog;
 using Whisper.net;
 
 namespace AIHelperNET.Infrastructure.Transcription;
@@ -58,6 +59,7 @@ public sealed class WhisperTranscriptionService(
         {
             await _buildLock.WaitAsync(ct);
             WhisperProcessor processor;
+            var buildSw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 processor = factory.CreateBuilder()
@@ -70,10 +72,25 @@ public sealed class WhisperTranscriptionService(
                     .Build();
             }
             finally { _buildLock.Release(); }
+            buildSw.Stop();
 
             await using var _ = (IAsyncDisposable)processor;
 
+            var produced = new List<SegmentData>();
+            var inferSw = System.Diagnostics.Stopwatch.StartNew();
             await foreach (var seg in processor.ProcessAsync(window.Samples, ct))
+                produced.Add(seg);
+            inferSw.Stop();
+
+            var audioSec = TranscriptionMetrics.WindowAudioSeconds(window.Samples.Length);
+            Log.Information(
+                "WhisperTiming model={Model} speaker={Speaker} windowAudioSec={AudioSec:F2} " +
+                "buildMs={BuildMs} inferMs={InferMs} rtf={Rtf:F2}",
+                model, window.Speaker, audioSec,
+                buildSw.ElapsedMilliseconds, inferSw.ElapsedMilliseconds,
+                TranscriptionMetrics.RealtimeFactor(inferSw.ElapsedMilliseconds, audioSec));
+
+            foreach (var seg in produced)
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
                 if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
