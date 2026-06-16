@@ -26,7 +26,8 @@ public sealed class SessionRunner(
         AudioDeviceSelection devices,
         WhisperModelSize model,
         string language,
-        AudioSourceMode audioSource)
+        AudioSourceMode audioSource,
+        IReadOnlySet<string> glossaryDomains)
     {
         _sessionScope = scopeFactory.CreateScope();
         var repo = _sessionScope.ServiceProvider.GetRequiredService<ISessionRepository>();
@@ -42,7 +43,7 @@ public sealed class SessionRunner(
 
         pipeline.Reset();
         _cts          = new CancellationTokenSource();
-        _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, _cts.Token);
+        _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, glossaryDomains, _cts.Token);
     }
 
     /// <summary>Stops audio capture and waits for the pipeline to drain.</summary>
@@ -82,6 +83,7 @@ public sealed class SessionRunner(
         WhisperModelSize model,
         string language,
         AudioSourceMode audioSource,
+        IReadOnlySet<string> glossaryDomains,
         CancellationToken ct)
     {
         Log.Information("SessionRunner: pipeline starting (mode={AudioSource})", audioSource);
@@ -130,7 +132,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, language, ct)
+                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, language, glossaryDomains, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);
@@ -147,7 +149,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, language, ct)
+                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, language, glossaryDomains, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);

@@ -89,12 +89,17 @@ public sealed partial class SessionControlViewModel(
                 IsMicActive                      = AudioSource is AudioSourceMode.MicrophoneOnly or AudioSourceMode.Both;
                 IsSystemAudioActive              = AudioSource is AudioSourceMode.SystemAudioOnly or AudioSourceMode.Both;
 
+                var glossaryDomains = settings is { GlossaryEnabled: true }
+                    ? new HashSet<string>(settings.EnabledGlossaryDomains, StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>();
+
                 await runner.StartAsync(
                     result.Value.Id,
                     new AudioDeviceSelection(settings?.MicDeviceId, settings?.LoopbackDeviceId),
                     settings?.WhisperModel ?? WhisperModelSize.Base,
                     settings?.WhisperLanguage ?? "auto",
-                    AudioSource);
+                    AudioSource,
+                    glossaryDomains);
             }
         }
         else if (ActiveSessionId is { } id)

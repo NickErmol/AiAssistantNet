@@ -100,7 +100,7 @@ public class SessionRunnerAudioE2ETests : IAsyncLifetime
         _host.Classifier.Enqueue(NewQuestion("What is dependency injection?"));
 
         var runner = NewRunner(script);
-        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both);
+        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both, new HashSet<string>());
 
         await runner.WaitForCompletionAsync();                                   // loop fully drained
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 1, AnswerTimeout);
@@ -125,7 +125,7 @@ public class SessionRunnerAudioE2ETests : IAsyncLifetime
         _host.Classifier.Enqueue(NewQuestion("What is dependency injection?"));
 
         var runner = NewRunner(script);
-        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both);
+        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both, new HashSet<string>());
 
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 1, AnswerTimeout);
@@ -158,7 +158,7 @@ public class SessionRunnerAudioE2ETests : IAsyncLifetime
         _host.Classifier.Enqueue(NewQuestion("Now explain CQRS?"));
 
         var runner = NewRunner(script);
-        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both);
+        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.Both, new HashSet<string>());
 
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 2, AnswerTimeout);
@@ -177,7 +177,7 @@ public class SessionRunnerAudioE2ETests : IAsyncLifetime
         // No classifier result enqueued: the Other frame is gated out and never reaches the pipeline.
 
         var runner = NewRunner(script);
-        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.MicrophoneOnly);
+        await runner.StartAsync(session.Id, Devices, WhisperModelSize.Base, "en", AudioSourceMode.MicrophoneOnly, new HashSet<string>());
 
         await runner.WaitForCompletionAsync(); // nothing to transcribe; loop drains immediately
         await runner.StopAsync();

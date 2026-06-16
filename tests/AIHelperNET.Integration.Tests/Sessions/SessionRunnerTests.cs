@@ -70,7 +70,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.Both);
+            WhisperModelSize.Base, "auto", AudioSourceMode.Both, new HashSet<string>());
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -90,7 +90,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.MicrophoneOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.MicrophoneOnly, new HashSet<string>());
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -110,7 +110,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.SystemAudioOnly);
+            WhisperModelSize.Base, "auto", AudioSourceMode.SystemAudioOnly, new HashSet<string>());
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -146,6 +146,7 @@ public class SessionRunnerTests
             IAsyncEnumerable<AudioFrame> frames,
             WhisperModelSize model,
             string language,
+            IReadOnlySet<string> glossaryDomains,
             [EnumeratorCancellation] CancellationToken ct)
         {
             await foreach (var frame in frames.WithCancellation(ct))

@@ -7,13 +7,16 @@ namespace AIHelperNET.Infrastructure.Transcription;
 
 public sealed class WhisperTranscriptionService(
     WhisperModelProvider whisperModels,
-    SileroModelProvider  sileroModels) : ITranscriptionService
+    SileroModelProvider  sileroModels,
+    ITranscriptionGlossaryProvider glossary) : ITranscriptionService
 {
     // Serialises Build() across mic and loopback tasks. Concurrent KV-cache allocation for
     // medium/large models causes both builds to stall indefinitely; sequential builds complete.
     private static readonly SemaphoreSlim _buildLock = new(1, 1);
 
     private const int MinWords = 3;
+    private const int RecentContextSegments = 6;
+    private const int GlossaryWordBudget = 110;
 
     private const string InitialPrompt =
         "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
@@ -29,12 +32,24 @@ public sealed class WhisperTranscriptionService(
         IAsyncEnumerable<AudioFrame> frames,
         WhisperModelSize model,
         string language,
+        IReadOnlySet<string> glossaryDomains,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         var factory = await whisperModels.GetFactoryAsync(model, ct);
         var lang    = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
 
         string? lastEmitted = null;
+        var recent = new Queue<string>(RecentContextSegments);
+
+        string BuildPrompt()
+        {
+            var recentContext = string.Join(' ', recent);
+            var suffix = glossaryDomains.Count == 0
+                ? string.Empty
+                : glossary.BuildPromptSuffix(glossaryDomains, recentContext, GlossaryWordBudget);
+            var basePart = recentContext.Length == 0 ? InitialPrompt : recentContext;
+            return suffix.Length == 0 ? basePart : $"{suffix} {basePart}";
+        }
 
         await foreach (var window in SileroVadDetector.AccumulateSpeechWindows(frames, sileroModels, ct))
         {
@@ -46,7 +61,7 @@ public sealed class WhisperTranscriptionService(
                     .WithLanguage(lang ?? "en")
                     .WithTemperature(0)            // greedy decoding — no random word substitutions
                     .WithNoContext()               // prevent stale KV-cache from previous windows
-                    .WithPrompt(lastEmitted ?? InitialPrompt) // rolling context for vocabulary continuity
+                    .WithPrompt(BuildPrompt())     // rolling context + glossary bias for every window
                     .WithNoSpeechThreshold(0.6f)
                     .WithSingleSegment()
                     .Build();
@@ -63,12 +78,11 @@ public sealed class WhisperTranscriptionService(
                 if (IsKnownHallucination(seg.Text)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
-                lastEmitted = seg.Text.Trim();
-                yield return new TranscriptSegment(
-                    lastEmitted,
-                    window.Speaker,
-                    DateTimeOffset.UtcNow,
-                    seg.Probability);
+                var text = seg.Text.Trim();
+                lastEmitted = text;
+                recent.Enqueue(text);
+                while (recent.Count > RecentContextSegments) recent.Dequeue();
+                yield return new TranscriptSegment(text, window.Speaker, DateTimeOffset.UtcNow, seg.Probability);
             }
         }
     }
