@@ -17,6 +17,7 @@ namespace AIHelperNET.Application.Sessions.Dtos;
 /// <param name="LatestQuestionWindowSeconds">Look-back window (seconds) the Answer-latest-question
 /// hotkey scans for the most recent question, in range [30, 300].</param>
 /// <param name="OverlayMode">Overlay render mode (stealth vs see-through). Applied at app startup.</param>
+/// <param name="GlossaryEnabled">Whether the transcription glossary biases speech-to-text.</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
     WhisperModelSize WhisperModel,
@@ -29,7 +30,8 @@ public sealed record AppSettingsDto(
     double OverlayOpacity = 0.75,
     int MaxAnswerTokens = 800,
     int LatestQuestionWindowSeconds = 120,
-    OverlayMode OverlayMode = OverlayMode.Stealth)
+    OverlayMode OverlayMode = OverlayMode.Stealth,
+    bool GlossaryEnabled = true)
 {
     /// <summary>Default answer-token cap used when unset/legacy.</summary>
     public const int DefaultMaxAnswerTokens = 800;
@@ -51,6 +53,9 @@ public sealed record AppSettingsDto(
     /// <summary>User overrides of the default global-hotkey chords. Empty ⇒ all defaults.</summary>
     public IReadOnlyList<HotkeyOverride> HotkeyOverrides { get; init; } = [];
 
+    /// <summary>Glossary domain keys whose terms bias transcription. Empty ⇒ none.</summary>
+    public IReadOnlyList<string> EnabledGlossaryDomains { get; init; } = [];
+
     /// <summary>Returns a copy with <see cref="MaxAnswerTokens"/> and <see cref="LatestQuestionWindowSeconds"/>
     /// coerced into their valid ranges: missing/non-positive → defaults; otherwise clamped.
     /// Also strips invalid or duplicate-id entries from <see cref="HotkeyOverrides"/>.</summary>
@@ -62,7 +67,8 @@ public sealed record AppSettingsDto(
         LatestQuestionWindowSeconds = LatestQuestionWindowSeconds <= 0
             ? DefaultLatestQuestionWindowSeconds
             : Math.Clamp(LatestQuestionWindowSeconds, MinLatestQuestionWindowSeconds, MaxLatestQuestionWindowSeconds),
-        HotkeyOverrides = NormalizeOverrides(HotkeyOverrides)
+        HotkeyOverrides = NormalizeOverrides(HotkeyOverrides),
+        EnabledGlossaryDomains = NormalizeGlossaryDomains(EnabledGlossaryDomains)
     };
 
     private static IReadOnlyList<HotkeyOverride> NormalizeOverrides(IReadOnlyList<HotkeyOverride> raw)
@@ -85,5 +91,24 @@ public sealed record AppSettingsDto(
         // Return the original list unchanged when nothing was filtered — preserves reference
         // equality so that record structural comparison in tests stays stable.
         return result.Count == raw.Count ? raw : result;
+    }
+
+    private static IReadOnlyList<string> NormalizeGlossaryDomains(IReadOnlyList<string> raw)
+    {
+        if (raw is null) return [];
+        if (raw.Count == 0) return raw;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>(raw.Count);
+        foreach (var d in raw)
+        {
+            if (string.IsNullOrWhiteSpace(d)) continue;
+            var key = d.Trim().ToLowerInvariant();
+            if (seen.Add(key)) result.Add(key);
+        }
+
+        // Preserve the original reference when nothing changed, so record structural
+        // comparison stays stable (mirrors NormalizeOverrides).
+        return result.SequenceEqual(raw) ? raw : result;
     }
 }

@@ -7,10 +7,12 @@ public interface ITranscriptionService
     /// <param name="frames">Source audio frames.</param>
     /// <param name="model">Whisper model size to use.</param>
     /// <param name="language">BCP-47 language code (e.g. "en", "fr") or "auto" for auto-detection.</param>
+    /// <param name="glossaryDomains">Enabled glossary domain keys to bias decoding; empty ⇒ no bias.</param>
     /// <param name="ct">Cancellation token.</param>
     IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
         WhisperModelSize model,
         string language,
+        IReadOnlySet<string> glossaryDomains,
         CancellationToken ct);
 }
