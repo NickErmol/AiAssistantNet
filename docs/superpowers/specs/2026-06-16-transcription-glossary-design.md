@@ -164,3 +164,39 @@ Sequencing: A ∥ B → C → D → E. Steps share `GlossaryDomain`/schema, so B
 - Threading enabled-domains into `TranscribeAsync` depends on the existing call site; implementer
   verifies rather than assumes.
 - Keep the App project unlocked: stop any running overlay before building (MSB3027 file-lock gotcha).
+
+## Manual verification (Tier-C, opt-in)
+
+This procedure exercises the full live path: ASR → glossary-biased prompt → transcript display.
+Requires a working Whisper model download and a loopback-capable audio device.
+
+**Setup**
+
+1. Launch the overlay using the `run-aihelper` skill (stops any existing instance, rebuilds Debug, runs).
+2. Open **Settings → Transcription** (or equivalent).
+3. Enable the **Glossary master toggle**.
+4. Tick the **`.NET / C#`** and **`Azure`** domain checkboxes. Save.
+
+**Play test phrases via TTS → loopback**
+
+Use Windows `System.Speech.Synthesis.SpeechSynthesizer` (or `Add-Type` in PowerShell) to speak the
+phrases through the default render device. The `WasapiLoopbackCapture` sink tags the audio as
+`Speaker.Other`, so the app treats it as an interviewer question (see the
+`reference-drive-app-via-tts-loopback` memory note for the technique).
+
+Phrases to speak:
+- `"Can you explain the N plus one query problem with Entity Framework Core?"`
+- `"How would you store secrets in Azure Key Vault using managed identity?"`
+
+**Expected results**
+
+- The **transcript panel** should display:
+  - `"N plus one query"` and `"Entity Framework Core"` intact (not garbled as *"endless one"* /
+    *"Trench"*).
+  - `"Azure Key Vault"` and `"managed identity"` intact (not garbled as *"EWALT"*).
+- Answer cards for each question should appear (glossary affects ASR only; answer quality validates
+  the whole pipeline).
+
+**Pass criterion:** both domain-specific terms appear verbatim in the live transcript. Any garble
+that was present before the glossary fix reappears when the toggle is disabled — confirming the
+glossary suffix is the causal factor.
