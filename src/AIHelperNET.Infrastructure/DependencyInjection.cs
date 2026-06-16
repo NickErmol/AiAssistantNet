@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddSingleton<WhisperModelProvider>();
         services.AddHttpClient(nameof(SileroModelProvider));
         services.AddSingleton<SileroModelProvider>();
+        services.AddSingleton<ITranscriptionGlossaryProvider, JsonTranscriptionGlossaryProvider>();
         services.AddSingleton<ITranscriptionService, WhisperTranscriptionService>();
 
         // OCR
