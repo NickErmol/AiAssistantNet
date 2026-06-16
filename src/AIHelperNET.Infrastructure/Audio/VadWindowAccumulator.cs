@@ -11,9 +11,9 @@ public sealed class VadWindowAccumulator
     private const float SpeechStartThreshold    = 0.50f;
     private const float SpeechContinueThreshold = 0.35f;
     private const int   StartConfirmCount = 2;   // consecutive chunks ≥ 0.5 required to start
-    private const int   SilenceFlushCount = 12;  // sub-threshold chunks before flush (~375 ms)
+    private const int   SilenceFlushCount = 8;   // sub-threshold chunks before flush (~250 ms)
     public  const int   MinChunks = 8;           // minimum chunks to emit a window (~250 ms)
-    public  const int   MaxChunks = 240;         // force-flush threshold (~7.5 s)
+    public  const int   MaxChunks = 112;         // force-flush threshold (~3.5 s) — chop long speech
 
     private bool          _inSpeech;
     private int           _confirmCount;
