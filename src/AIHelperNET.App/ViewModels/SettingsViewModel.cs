@@ -13,7 +13,10 @@ using Mediator;
 namespace AIHelperNET.App.ViewModels;
 
 /// <summary>Backing ViewModel for the tabs of SettingsWindow.</summary>
-public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier hotkeyApplier) : ObservableObject
+public sealed partial class SettingsViewModel(
+    IMediator mediator,
+    IHotkeyApplier hotkeyApplier,
+    ITranscriptionGlossaryProvider glossary) : ObservableObject
 {
     // ── Shortcuts tab ─────────────────────────────────────────────
     /// <summary>Editable shortcut rows, one per action, shown in the Shortcuts tab.</summary>
@@ -92,6 +95,13 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
     [ObservableProperty] private int _maxAnswerTokens = 800;
     [ObservableProperty] private int _latestQuestionWindowSeconds = 120;
 
+    // ── Glossary (Audio tab) ──────────────────────────────────────
+    /// <summary>Whether the transcription glossary biases speech-to-text.</summary>
+    [ObservableProperty] private bool _glossaryEnabled = true;
+
+    /// <summary>One checkbox row per glossary domain.</summary>
+    public ObservableCollection<GlossaryDomainToggle> GlossaryDomains { get; } = [];
+
     // ── Load ──────────────────────────────────────────────────────
     [RelayCommand]
     public async Task LoadAsync()
@@ -135,6 +145,12 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
         _lastGoodBindings = effective;
         HotkeyRows.Clear();
         foreach (var b in effective) HotkeyRows.Add(HotkeyRowViewModel.FromBinding(b));
+
+        GlossaryEnabled = s.GlossaryEnabled;
+        GlossaryDomains.Clear();
+        var enabledDomains = new HashSet<string>(s.EnabledGlossaryDomains, StringComparer.OrdinalIgnoreCase);
+        foreach (var d in glossary.Domains)
+            GlossaryDomains.Add(new GlossaryDomainToggle(d.Key, d.DisplayName, enabledDomains.Contains(d.Key)));
 
         await RefreshKeyStatusAsync();
     }
@@ -224,10 +240,12 @@ public sealed partial class SettingsViewModel(IMediator mediator, IHotkeyApplier
             OverlayOpacity,
             MaxAnswerTokens,
             LatestQuestionWindowSeconds,
-            OverlayMode)
+            OverlayMode,
+            GlossaryEnabled)
         {
             Presets = [.. Presets],
-            HotkeyOverrides = [.. hotkeyOverridesToSave]
+            HotkeyOverrides = [.. hotkeyOverridesToSave],
+            EnabledGlossaryDomains = GlossaryDomains.Where(d => d.IsEnabled).Select(d => d.Key).ToList()
         };
 
         await mediator.Send(new SaveSettingsCommand(dto));

@@ -2,6 +2,7 @@ using AIHelperNET.App.ViewModels;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Dtos;
+using AIHelperNET.Application.Sessions.Glossary;
 using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
@@ -30,7 +31,7 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier());
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty());
 
         await vm.LoadAsync();
 
@@ -47,7 +48,7 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier()) { MaxAnswerTokens = 1500 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty()) { MaxAnswerTokens = 1500 };
 
         await vm.SaveSettingsAsync();
 
@@ -75,7 +76,7 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier());
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty());
 
         await vm.LoadAsync();
 
@@ -92,13 +93,23 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier()) { LatestQuestionWindowSeconds = 200 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty()) { LatestQuestionWindowSeconds = 200 };
 
         await vm.SaveSettingsAsync();
 
         await mediator.Received(1).Send(
             Arg.Is<SaveSettingsCommand>(c => c.Settings.LatestQuestionWindowSeconds == 200),
             Arg.Any<CancellationToken>());
+    }
+}
+
+internal static class GlossaryStubs
+{
+    internal static ITranscriptionGlossaryProvider Empty()
+    {
+        var g = Substitute.For<ITranscriptionGlossaryProvider>();
+        g.Domains.Returns([]);
+        return g;
     }
 }
 

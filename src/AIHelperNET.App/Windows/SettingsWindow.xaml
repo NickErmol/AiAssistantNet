@@ -94,6 +94,23 @@
                         <ComboBoxItem Content="Russian"     Tag="ru"/>
                         <ComboBoxItem Content="Polish"      Tag="pl"/>
                     </ComboBox>
+                    <StackPanel Margin="0,8,0,0">
+                        <CheckBox Content="Bias transcription with tech glossary"
+                                  IsChecked="{Binding GlossaryEnabled}"
+                                  Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                  AutomationProperties.Name="Enable transcription glossary"/>
+                        <ItemsControl ItemsSource="{Binding GlossaryDomains}" Margin="16,4,0,0"
+                                      IsEnabled="{Binding GlossaryEnabled}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding DisplayName}"
+                                              IsChecked="{Binding IsEnabled}"
+                                              Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                              AutomationProperties.Name="{Binding DisplayName}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
 

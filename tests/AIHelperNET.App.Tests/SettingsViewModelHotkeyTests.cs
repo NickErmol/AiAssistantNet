@@ -2,6 +2,7 @@ using AIHelperNET.App.ViewModels;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Sessions.Commands;
 using AIHelperNET.Application.Sessions.Dtos;
+using AIHelperNET.Application.Sessions.Glossary;
 using AIHelperNET.Application.Sessions.Queries;
 using AIHelperNET.Domain.ValueObjects;
 using FluentAssertions;
@@ -31,6 +32,13 @@ public class SettingsViewModelHotkeyTests
     private static AppSettingsDto BaseSettings() => new(
         AiBackend.Claude, WhisperModelSize.Medium, AnswerSettings.Default, CodeProfile.Empty, null, null);
 
+    private static ITranscriptionGlossaryProvider EmptyGlossary()
+    {
+        var g = Substitute.For<ITranscriptionGlossaryProvider>();
+        g.Domains.Returns([]);
+        return g;
+    }
+
     [Fact]
     public async Task LoadAsync_BuildsOneRowPerAction_WithOverrideApplied()
     {
@@ -39,7 +47,7 @@ public class SettingsViewModelHotkeyTests
             HotkeyOverrides = [new HotkeyOverride(HotkeyId.GenerateAnswer,
                 ModifierKeys.Ctrl | ModifierKeys.Alt, VirtualKey.G)]
         };
-        var vm = new SettingsViewModel(Mocked(settings), new StubHotkeyApplier());
+        var vm = new SettingsViewModel(Mocked(settings), new StubHotkeyApplier(), EmptyGlossary());
 
         await vm.LoadAsync();
 
@@ -53,7 +61,7 @@ public class SettingsViewModelHotkeyTests
     {
         var mediator = Mocked(BaseSettings());
         var applier = new StubHotkeyApplier();
-        var vm = new SettingsViewModel(mediator, applier);
+        var vm = new SettingsViewModel(mediator, applier, EmptyGlossary());
         await vm.LoadAsync();
 
         var copy = vm.HotkeyRows.Single(r => r.Id == HotkeyId.CopyAnswer);
@@ -71,7 +79,7 @@ public class SettingsViewModelHotkeyTests
     {
         var mediator = Mocked(BaseSettings());
         var applier = new StubHotkeyApplier();
-        var vm = new SettingsViewModel(mediator, applier);
+        var vm = new SettingsViewModel(mediator, applier, EmptyGlossary());
         await vm.LoadAsync();
 
         vm.HotkeyRows.Single(r => r.Id == HotkeyId.GenerateAnswer)
@@ -93,7 +101,7 @@ public class SettingsViewModelHotkeyTests
     {
         var mediator = Mocked(BaseSettings());
         var applier = new StubHotkeyApplier { Failures = [HotkeyId.GenerateAnswer] };
-        var vm = new SettingsViewModel(mediator, applier);
+        var vm = new SettingsViewModel(mediator, applier, EmptyGlossary());
         await vm.LoadAsync();
 
         vm.HotkeyRows.Single(r => r.Id == HotkeyId.GenerateAnswer)
@@ -109,7 +117,7 @@ public class SettingsViewModelHotkeyTests
     [Fact]
     public async Task CancelRecording_ClearsRecordingState_WithoutChangingChord()
     {
-        var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier());
+        var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier(), EmptyGlossary());
         await vm.LoadAsync();
 
         var gen = vm.HotkeyRows.Single(r => r.Id == HotkeyId.GenerateAnswer);
@@ -127,7 +135,7 @@ public class SettingsViewModelHotkeyTests
     [Fact]
     public async Task ResetRow_RestoresDefault_ResetAll_RestoresEverything()
     {
-        var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier());
+        var vm = new SettingsViewModel(Mocked(BaseSettings()), new StubHotkeyApplier(), EmptyGlossary());
         await vm.LoadAsync();
 
         var gen = vm.HotkeyRows.Single(r => r.Id == HotkeyId.GenerateAnswer);
