@@ -204,4 +204,13 @@ public partial class MainOverlayWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e)
         => Close();
+
+    // The settings window isn't Owner-tied to the overlay (it lives independently in the desktop's
+    // top-level window list), and it hides instead of closing — so it would linger and keep the app
+    // alive after the overlay closes. Force it shut when the overlay closes.
+    protected override void OnClosed(EventArgs e)
+    {
+        _settingsWindow.ForceClose();
+        base.OnClosed(e);
+    }
 }

@@ -21,6 +21,7 @@ public sealed partial class SettingsWindow : Window
 
     private readonly SettingsViewModel _vm;
     private bool _stealthEnabled = true; // mirrors the overlay's default (stealth on)
+    private bool _forceClose;            // set by ForceClose() to allow a real close (app/overlay shutdown)
 
     public SettingsWindow(SettingsViewModel vm)
     {
@@ -87,10 +88,19 @@ public sealed partial class SettingsWindow : Window
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
         => _vm.ApiKeyInput = ApiKeyBox.Password;
 
+    /// <summary>Closes the window for real (bypassing the hide-on-close guard), used when the
+    /// overlay/app is shutting down so the settings window doesn't linger.</summary>
+    public void ForceClose()
+    {
+        _forceClose = true;
+        Close();
+    }
+
     // Closing a singleton DI window destroys it — subsequent Show() calls would throw.
-    // Hide instead so the instance stays reusable.
+    // Hide instead so the instance stays reusable. ForceClose() bypasses this for real shutdown.
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        if (_forceClose) return;
         e.Cancel = true;
         Hide();
     }

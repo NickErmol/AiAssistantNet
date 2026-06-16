@@ -93,8 +93,8 @@ public sealed class QuestionBoundaryDetector
         var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length < 4 && !QuestionLexicon.StartsWithImperative(normalized))
         {
-            return speaker == Speaker.Other && LooksLikeTechnicalTopic(normalized)
-                ? Unrelated(normalized, 0.50, "Short technical topic — deferring to AI classifier")
+            return speaker == Speaker.Other && LooksLikeTopic(normalized)
+                ? Unrelated(normalized, 0.50, "Short topic — deferring to AI classifier")
                 : Unrelated(normalized, 0.95, "Fewer than 4 words");
         }
 
@@ -298,19 +298,41 @@ public sealed class QuestionBoundaryDetector
         text.Split(' ')[0].ToLowerInvariant().Trim('.', '?', '!');
 
     /// <summary>
-    /// Heuristic sniff for a short fragment that reads like a technical topic worth explaining:
-    /// code punctuation, a "vs"/"versus" token, a mixed alphanumeric token ("N+1", "IPv4"),
-    /// or an internal capital ("OnPush", "PascalCase"). Used only to LOWER confidence so the
-    /// AI classifier is consulted — never to assert a question on its own.
+    /// Backchannel / acknowledgement / function words that carry no topic content. A short
+    /// fragment built only from these (plus <see cref="Interrogatives"/>) is conversational noise,
+    /// not a topic. Used by <see cref="LooksLikeTopic"/> to keep acknowledgements from being
+    /// escalated to the AI classifier.
     /// </summary>
-    private static bool LooksLikeTechnicalTopic(string text)
+    private static readonly HashSet<string> TopicStopwords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "okay", "ok", "oh", "ah", "um", "uh", "hmm", "mhm", "yeah", "yep", "yes", "no", "nope",
+        "nah", "right", "sure", "great", "good", "nice", "cool", "fine", "perfect", "thanks",
+        "thank", "you", "your", "got", "it", "its", "make", "makes", "made", "sense", "sound",
+        "sounds", "alright", "well", "so", "and", "but", "or", "the", "a", "an", "of", "to", "in",
+        "on", "at", "for", "is", "are", "am", "was", "were", "be", "i", "we", "me", "my", "our",
+        "that", "this", "these", "those", "here", "there", "please", "kindly", "gotcha", "totally",
+        "absolutely", "definitely", "agreed", "indeed", "exactly", "see", "correct", "true",
+        "really", "very", "just", "like", "about", "mean", "okay.",
+    };
+
+    /// <summary>
+    /// Heuristic sniff for a short fragment that reads like a topic worth explaining. Matches two
+    /// shapes: (1) a <em>technical</em> token — code punctuation, "vs"/"versus", a mixed
+    /// alphanumeric token ("N+1", "IPv4"), or an internal capital ("OnPush", "PascalCase"); or
+    /// (2) a <em>plain-English</em> noun-phrase topic ("dependency injection", "the event loop")
+    /// — two or more words that aren't pure backchannel/acknowledgement. Used only to LOWER
+    /// confidence so the AI classifier is consulted — never to assert a question on its own.
+    /// </summary>
+    private static bool LooksLikeTopic(string text)
     {
         if (text.IndexOfAny(['<', '>', '(', ')', '{', '}', '[', ']', ':', '+', '/', '#']) >= 0)
             return true;
 
-        foreach (var token in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var contentWords = 0;
+        foreach (var token in tokens)
         {
-            var bare = token.Trim('.', ',', '?', '!');
+            var bare = token.Trim('.', ',', '?', '!', ';', ':');
             if (bare.Equals("vs", StringComparison.OrdinalIgnoreCase)
                 || bare.Equals("versus", StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -318,8 +340,17 @@ public sealed class QuestionBoundaryDetector
                 return true;
             if (bare.Length > 1 && bare.Skip(1).Any(char.IsUpper))
                 return true;
+
+            // A "content word" is a real word (≥3 letters) that isn't a stopword or interrogative.
+            if (bare.Length >= 3 && bare.All(char.IsLetter)
+                && !TopicStopwords.Contains(bare) && !Interrogatives.Contains(bare))
+                contentWords++;
         }
-        return false;
+
+        // Plain-English topic: ≥2 words overall with at least one content word. The 2-word floor
+        // (with the stopword filter) excludes single-word and pure-acknowledgement fragments
+        // ("Okay great", "Got it") so they don't burn an AI call.
+        return tokens.Length >= 2 && contentWords >= 1;
     }
 
     /// <summary>

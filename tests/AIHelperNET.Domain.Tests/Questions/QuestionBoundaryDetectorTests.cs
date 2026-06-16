@@ -251,6 +251,47 @@ public sealed class QuestionBoundaryDetectorTests
         result.Confidence.Should().BeGreaterThan(0.90);
     }
 
+    // ── Rule 2: plain-English bare topic from the interviewer ────────────────
+    [Theory]
+    [InlineData("Dependency injection.")]
+    [InlineData("Garbage collection")]
+    [InlineData("The event loop")]
+    [InlineData("Event sourcing")]
+    public void PlainTopic_FromOther_DefersToAiClassifier(string text)
+    {
+        // A short noun-phrase topic with no technical punctuation/casing still reads as an
+        // implicit "explain this" from the interviewer → low confidence so the AI classifier decides.
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().Be(0.50);
+        result.Reason.Should().ContainEquivalentOf("topic");
+    }
+
+    [Fact]
+    public void PlainTopic_FromMe_StaysHighConfidenceUnrelated()
+    {
+        // A bare topic from the candidate is a mid-answer aside, not a question — never burns an AI call.
+        var result = _sut.Evaluate("Dependency injection.", Speaker.Me, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeGreaterThan(0.90);
+    }
+
+    [Theory]
+    [InlineData("Okay great")]
+    [InlineData("Got it")]
+    [InlineData("Makes sense")]
+    [InlineData("Sounds good")]
+    public void ShortAcknowledgement_FromOther_StaysHighConfidenceUnrelated(string text)
+    {
+        // Pure backchannel/acknowledgement must NOT be treated as a topic — no AI call.
+        var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
+
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().BeGreaterThan(0.90);
+    }
+
     // ── Rule 11: duplicate detection via Jaccard ────────────────────────────
     // The candidate text must NOT trigger Rules 3-10 before reaching Rule 11.
     // A statement-like text (no trailing '?', no interrogative/imperative start)
@@ -509,15 +550,27 @@ public sealed class QuestionBoundaryDetectorTests
             "AI classifier must be invoked to judge whether a short technical topic implies a request");
     }
 
-    // ── Phase 2b: plain short non-topic stays high-confidence Unrelated ─────────
+    // ── Phase 2b: a single-word / interrogative-only fragment stays high-confidence Unrelated ──
+    //     (the noun-phrase widening requires ≥2 words with a content word, so these don't escalate).
     [Theory]
     [InlineData("What?")]
-    [InlineData("The weather today")]
+    [InlineData("Why?")]
     public void ShortPlainPhrase_StaysHighConfidenceUnrelated(string text)
     {
         var result = _sut.Evaluate(text, Speaker.Other, null, NoRecentQuestions);
         result.Classification.Should().Be(BoundaryLabel.Unrelated);
         result.Confidence.Should().BeGreaterThan(0.90);
+    }
+
+    // ── Broad-recall design: ANY short interviewer noun phrase (even non-technical small talk like
+    //     "the weather today") defers to the AI classifier — it cannot be distinguished from a real
+    //     topic heuristically, and the (cheap) AI call correctly rejects the non-question. ──
+    [Fact]
+    public void ShortNonTechnicalNounPhrase_FromOther_DefersToAiClassifier()
+    {
+        var result = _sut.Evaluate("The weather today", Speaker.Other, null, NoRecentQuestions);
+        result.Classification.Should().Be(BoundaryLabel.Unrelated);
+        result.Confidence.Should().Be(0.50);
     }
 
     // ── Phase 2b: a bare technical topic from the candidate (Me) is a mid-answer aside —
