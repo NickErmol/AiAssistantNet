@@ -93,9 +93,11 @@ public sealed record AppSettingsDto(
         return result.Count == raw.Count ? raw : result;
     }
 
-    private static List<string> NormalizeGlossaryDomains(IReadOnlyList<string> raw)
+    private static IReadOnlyList<string> NormalizeGlossaryDomains(IReadOnlyList<string> raw)
     {
-        if (raw is null or { Count: 0 }) return [];
+        if (raw is null) return [];
+        if (raw.Count == 0) return raw;
+
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(raw.Count);
         foreach (var d in raw)
@@ -104,6 +106,9 @@ public sealed record AppSettingsDto(
             var key = d.Trim().ToLowerInvariant();
             if (seen.Add(key)) result.Add(key);
         }
-        return result;
+
+        // Preserve the original reference when nothing changed, so record structural
+        // comparison stays stable (mirrors NormalizeOverrides).
+        return result.SequenceEqual(raw) ? raw : result;
     }
 }

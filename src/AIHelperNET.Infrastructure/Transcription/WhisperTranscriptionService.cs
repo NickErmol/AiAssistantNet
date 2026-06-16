@@ -16,7 +16,8 @@ public sealed class WhisperTranscriptionService(
 
     private const int MinWords = 3;
     private const int RecentContextSegments = 6;
-    private const int GlossaryWordBudget = 110;
+    private const int RecentContextWordCap = 50;
+    private const int GlossaryWordBudget = 90;
 
     private const string InitialPrompt =
         "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
@@ -43,12 +44,14 @@ public sealed class WhisperTranscriptionService(
 
         string BuildPrompt()
         {
-            var recentContext = string.Join(' ', recent);
+            var recentContext = LastWords(string.Join(' ', recent), RecentContextWordCap);
             var suffix = glossaryDomains.Count == 0
                 ? string.Empty
                 : glossary.BuildPromptSuffix(glossaryDomains, recentContext, GlossaryWordBudget);
             var basePart = recentContext.Length == 0 ? InitialPrompt : recentContext;
-            return suffix.Length == 0 ? basePart : $"{suffix} {basePart}";
+            // Glossary goes LAST so it sits closest to the audio and survives Whisper's
+            // tail-truncation of an over-long prompt.
+            return suffix.Length == 0 ? basePart : $"{basePart} {suffix}";
         }
 
         await foreach (var window in SileroVadDetector.AccumulateSpeechWindows(frames, sileroModels, ct))
@@ -89,6 +92,12 @@ public sealed class WhisperTranscriptionService(
 
     private static int WordCount(string text) =>
         text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+
+    private static string LastWords(string text, int maxWords)
+    {
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return words.Length <= maxWords ? text : string.Join(' ', words[^maxWords..]);
+    }
 
     private static bool IsKnownHallucination(string text)
     {
