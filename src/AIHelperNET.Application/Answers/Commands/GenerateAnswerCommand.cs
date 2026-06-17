@@ -145,7 +145,18 @@ public sealed partial class GenerateAnswerHandler(
         // handler actually modified (turn Status, the new AnswerVersion, the GeneratedAnswer) are
         // written. A full-graph Update would mark pipeline-owned columns (clarification IDs,
         // pre-answer status) Modified and clobber them. See Spec 1 §5.5.
-        return await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // The session was torn down (e.g. a pipeline restart) before the answer could be
+            // persisted. The in-memory session is discarded with the old pipeline, so there is
+            // nothing to save and nothing to surface to the user — treat it as a no-op rather than
+            // letting the cancellation bubble up and log as an unhandled error.
+            return Result.Ok();
+        }
     }
 
     private static partial class Log
