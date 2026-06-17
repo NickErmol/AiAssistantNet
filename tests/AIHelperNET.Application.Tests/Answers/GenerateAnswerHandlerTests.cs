@@ -195,6 +195,52 @@ public class GenerateAnswerHandlerTests
         await act.Should().NotThrowAsync();
     }
 
+    /// <summary>
+    /// B5: the preliminary pass is rendered briefly (capped at ~300 tokens) so the first card lands
+    /// sooner; the refined pass keeps the user's full length.
+    /// </summary>
+    [Theory]
+    [InlineData(AnswerVersionType.Preliminary, 300)]
+    [InlineData(AnswerVersionType.RefinedAfterClarification, 2000)]
+    public async Task Handle_PreliminaryPass_CapsMaxTokens(AnswerVersionType versionType, int expectedMaxTokens)
+    {
+        var deepDive = AnswerSettings.Default with { Length = AnswerLength.DeepDive };
+        var session = Session.Create(deepDive, CodeProfile.Empty, T0).Value;
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        session.AddTranscriptItem(TranscriptItem.Create(Speaker.Other, "Explain DI.", T0, 0.9f));
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+
+        var repo = Substitute.For<ISessionRepository>();
+        repo.GetAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result.Ok(session)));
+
+        AnswerPrompt? captured = null;
+        var provider = Substitute.For<IAnswerProvider>();
+        provider.StreamAnswerAsync(Arg.Any<AnswerPrompt>(), Arg.Any<CancellationToken>())
+            .Returns(ci => { captured = ci.ArgAt<AnswerPrompt>(0); return Stream("ok"); });
+        var resolver = Substitute.For<IAnswerProviderResolver>();
+        resolver.Resolve(Arg.Any<AiBackend>()).Returns(provider);
+
+        var settings = Substitute.For<ISettingsStore>();
+        settings.LoadAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AppSettingsDto(
+                AiBackend.Claude, WhisperModelSize.Base, deepDive, CodeProfile.Empty,
+                MicDeviceId: null, LoopbackDeviceId: null) { MaxAnswerTokens = 2000 }));
+        var streamSink = Substitute.For<IAnswerStreamSink>();
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+
+        var handler = new GenerateAnswerHandler(
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback(),
+            NullLogger<GenerateAnswerHandler>.Instance);
+
+        await handler.Handle(new GenerateAnswerCommand(session.Id, turn.Id, versionType), CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.MaxTokens.Should().Be(expectedMaxTokens);
+    }
+
     [Fact]
     public async Task Handle_IncludesLastThreeAnsweredTurnsAsContext()
     {

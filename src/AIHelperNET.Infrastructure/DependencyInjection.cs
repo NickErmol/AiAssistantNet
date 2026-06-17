@@ -28,7 +28,8 @@ public static class DependencyInjection
         // Persistence
         services.AddDbContext<AppDbContext>(o =>
             o.UseSqlite($"Data Source={AppPaths.DatabaseFile}",
-                b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+                b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+             .AddInterceptors(new SqlitePragmaInterceptor()));
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 

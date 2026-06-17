@@ -90,8 +90,8 @@ public sealed class QuestionBoundaryClassifier(
         - recent:["explain how dependency injection works"] latest(Other):"completely different topic, what's your experience with kubernetes?" status:PreliminaryReady -> NewQuestion (explicit shift + new topic)
         - latest:"give me a second to share my screen" status:null -> Unrelated (logistics filler)
 
-        JSON schema (return exactly this shape):
-        {"classification":"<one label above>","confidence":<0.0-1.0>,"normalized_text":"<trimmed text_to_classify>","reason":"<one short sentence>"}
+        JSON schema (return exactly this shape — keep reason to at most 5 words):
+        {"classification":"<one label above>","confidence":<0.0-1.0>,"reason":"<≤5 words>"}
         """;
 
     /// <inheritdoc/>
@@ -129,7 +129,9 @@ public sealed class QuestionBoundaryClassifier(
         var body = JsonSerializer.Serialize(new
         {
             model = HaikuModel,
-            max_tokens = 200,
+            // Output is now tiny (label + confidence + ≤5-word reason; normalized_text dropped),
+            // so a low cap is safe and shortens the hot-path (non-streaming) generation time.
+            max_tokens = 64,
             stream = false,
             system = SystemPrompt,
             messages = new[] { new { role = "user", content = userMessage } }

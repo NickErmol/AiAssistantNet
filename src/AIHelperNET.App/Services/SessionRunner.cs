@@ -43,7 +43,27 @@ public sealed class SessionRunner(
 
         pipeline.Reset();
         _cts          = new CancellationTokenSource();
+
+        // B3: prime the answer provider's network path (DNS/TLS) so the first answer doesn't pay
+        // the handshake. Fire-and-forget; best-effort.
+        _ = WarmUpAnswerProviderAsync(_cts.Token);
+
         _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, glossaryDomains, _cts.Token);
+    }
+
+    private async Task WarmUpAnswerProviderAsync(CancellationToken ct)
+    {
+        try
+        {
+            var sp       = _sessionScope!.ServiceProvider;
+            var settings = await sp.GetRequiredService<ISettingsStore>().LoadAsync(ct);
+            var provider = sp.GetRequiredService<IAnswerProviderResolver>().Resolve(settings.ActiveBackend);
+            await provider.WarmUpAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "SessionRunner: answer-provider warm-up skipped");
+        }
     }
 
     /// <summary>Stops audio capture and waits for the pipeline to drain.</summary>
