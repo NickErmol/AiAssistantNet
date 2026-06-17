@@ -72,6 +72,8 @@ Load-bearing files only — where to look first, not an exhaustive listing. Path
 
 **Infrastructure** (`AIHelperNET.Infrastructure/`)
 - `AI/ClaudeAnswerProvider.cs` + `ClaudeSse.cs` — Claude HTTP/SSE; `OllamaAnswerProvider` — local.
+  The answer model is **user-selectable** (`AnswerModel` enum in Abstractions → `ClaudeModels.Resolve`;
+  provider uses `prompt.Model ?? ClaudeOptions.Model`) — not just the `ClaudeOptions.Model` default.
   `Haiku*`/`*Classifier`/`LatestQuestionExtractor` — the small-model helpers (each strips ```json fences).
 - `Audio/NAudioCaptureService.cs`, `SileroVadDetector.cs`, `VadWindowAccumulator.cs` — capture + VAD.
 - `Transcription/WhisperTranscriptionService.cs` + `WhisperModelProvider.cs` — Whisper.net (Vulkan).
@@ -112,6 +114,11 @@ DB, settings JSON, and logs all live there. Transcripts are sensitive — see th
 design-time factory (`AppDbContextFactory`) lets the EF tooling run against the WPF startup project;
 on failure the app shows a dialog and exits cleanly. Tests/CI use in-memory SQLite so they're
 unaffected. Full workflow lives in the `add-ef-migration` skill.
+
+**SQLite runs in WAL mode** — `SqlitePragmaInterceptor` (wired in Infrastructure DI) sets
+`journal_mode=WAL; synchronous=NORMAL` on every opened connection to speed the per-segment
+transcript writes on the pipeline's serial consumer thread. So `sessions.db-wal`/`-shm` sidecar
+files appear at runtime (expected, not corruption). Tests use in-memory SQLite, unaffected.
 
 **Sink wiring:** `TranscriptSink`/`AnswerStreamSink` are singletons; handlers are set in
 `App.OnStartup` via `sink.SetHandler(...)` *after* the host starts but *before* `overlay.Show()`,
