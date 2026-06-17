@@ -58,8 +58,9 @@ public sealed class ClaudeAnswerProvider(
             request.Headers.Add("anthropic-version", opts.Version);
             request.Headers.Add("Accept", "text/event-stream");
 
+            var model = prompt.Model is { } selected ? ClaudeModels.Resolve(selected) : opts.Model;
             var body = ClaudeSse.BuildRequestJson(
-                opts.Model, prompt.System, prompt.User, prompt.MaxTokens);
+                model, prompt.System, prompt.User, prompt.MaxTokens);
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
             using var response = await http.SendAsync(

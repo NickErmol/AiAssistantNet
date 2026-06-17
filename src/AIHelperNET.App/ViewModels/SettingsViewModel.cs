@@ -31,6 +31,7 @@ public sealed partial class SettingsViewModel(
 
     // ── AI Backend (API Key tab) ──────────────────────────────────
     [ObservableProperty] private AiBackend _activeBackend = AiBackend.Claude;
+    [ObservableProperty] private AnswerModel _answerModel = AnswerModel.Haiku;
 
     // ── Audio tab ─────────────────────────────────────────────────
     [ObservableProperty] private string? _selectedMicDeviceId;
@@ -120,6 +121,7 @@ public sealed partial class SettingsViewModel(
         MaxAnswerTokens               = s.MaxAnswerTokens;
         LatestQuestionWindowSeconds   = s.LatestQuestionWindowSeconds;
         ActiveBackend                 = s.ActiveBackend;
+        AnswerModel                   = s.AnswerModel;
 
         ProgrammingLanguage = s.CodeProfile.ProgrammingLanguage ?? string.Empty;
         BackendFramework    = s.CodeProfile.BackendFramework    ?? string.Empty;
@@ -241,7 +243,8 @@ public sealed partial class SettingsViewModel(
             MaxAnswerTokens,
             LatestQuestionWindowSeconds,
             OverlayMode,
-            GlossaryEnabled)
+            GlossaryEnabled,
+            AnswerModel)
         {
             Presets = [.. Presets],
             HotkeyOverrides = [.. hotkeyOverridesToSave],

@@ -54,4 +54,13 @@ public class AppSettingsDtoTests
     [Fact]
     public void LatestQuestionWindowSeconds_DefaultsTo120()
         => Base().LatestQuestionWindowSeconds.Should().Be(120);
+
+    [Fact]
+    public void Default_AnswerModel_IsHaiku()
+        => Base().AnswerModel.Should().Be(AnswerModel.Haiku);
+
+    [Fact]
+    public void Normalized_PreservesAnswerModel()
+        => (Base() with { AnswerModel = AnswerModel.Sonnet }).Normalized()
+            .AnswerModel.Should().Be(AnswerModel.Sonnet);
 }

@@ -60,6 +60,20 @@
                                  IsChecked="{Binding ActiveBackend,
                                      Converter={StaticResource EnumToBoolConverter},
                                      ConverterParameter=Ollama}"/>
+                    <TextBlock Text="Answer model (Claude)" FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                               Margin="0,16,0,6"/>
+                    <ComboBox ItemsSource="{Binding Source={x:Static local:EnumValues.AnswerModels}}"
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding AnswerModel}"
+                              AutomationProperties.AutomationId="AnswerModelCombo"
+                              Margin="0,0,0,4"/>
+                    <TextBlock Text="Faster models answer sooner; Opus is highest quality."
+                               TextWrapping="Wrap"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Secondary}"/>
                 </StackPanel>
             </TabItem>
 
