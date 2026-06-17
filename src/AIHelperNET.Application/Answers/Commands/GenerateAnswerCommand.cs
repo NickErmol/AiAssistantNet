@@ -1,6 +1,7 @@
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
+using AIHelperNET.Domain.ValueObjects;
 using FluentResults;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -97,12 +98,24 @@ public sealed partial class GenerateAnswerHandler(
         if (start.IsFailed) return Result.Fail(start.Error);
         var answer = start.Value;
 
+        // B5: the PRELIMINARY pass is rendered at a brief length (capped at ShortLength) so the
+        // first card lands sooner as a *complete* short answer rather than a token-truncated one.
+        // The refined / clarified passes carry the user's full length and fill the answer out.
+        const int PreliminaryTokenCap = 300; // == MapLengthToTokens(ShortLength)
+        var isPreliminary = cmd.VersionType == AnswerVersionType.Preliminary;
+        var answerSettings = isPreliminary && session.AnswerSettings.Length > AnswerLength.ShortLength
+            ? session.AnswerSettings with { Length = AnswerLength.ShortLength }
+            : session.AnswerSettings;
+        var effectiveMaxTokens = isPreliminary
+            ? Math.Min(settings.MaxAnswerTokens, PreliminaryTokenCap)
+            : settings.MaxAnswerTokens;
+
         var prompt = PromptBuilderService.Build(
-            session.CodeProfile, session.AnswerSettings, questionText,
+            session.CodeProfile, answerSettings, questionText,
             cmd.ScreenContext,
             recentTranscript,
             recentQA,
-            maxTokens: settings.MaxAnswerTokens);
+            maxTokens: effectiveMaxTokens);
 
         var chunks = new System.Text.StringBuilder();
         try

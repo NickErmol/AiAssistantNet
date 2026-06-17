@@ -16,6 +16,29 @@ public sealed class ClaudeAnswerProvider(
 {
     public AiBackend Backend => AiBackend.Claude;
 
+    /// <summary>
+    /// Primes DNS/TLS/connection to the Anthropic endpoint so the first answer doesn't pay the
+    /// handshake. Sends a header-only GET (no API key needed — any response, even 401, establishes
+    /// the pooled connection that the subsequent POST reuses). Best-effort: never throws.
+    /// </summary>
+    public async Task WarmUpAsync(CancellationToken ct)
+    {
+        try
+        {
+            var opts = options.Value;
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{opts.BaseUrl}/v1/models");
+            request.Headers.Add("anthropic-version", opts.Version);
+            using var response = await http.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+#pragma warning disable CA1031 // best-effort warm-up: offline / no network must not surface
+        catch (Exception)
+        {
+            // Intentionally swallowed — the real answer call will pay the handshake if this failed.
+        }
+#pragma warning restore CA1031
+    }
+
     public async IAsyncEnumerable<string> StreamAnswerAsync(
         AnswerPrompt prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)

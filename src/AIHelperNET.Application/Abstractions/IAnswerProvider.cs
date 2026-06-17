@@ -12,4 +12,11 @@ public interface IAnswerProvider
     /// <param name="prompt">The structured prompt to send.</param>
     /// <param name="ct">Cancellation token.</param>
     IAsyncEnumerable<string> StreamAnswerAsync(AnswerPrompt prompt, CancellationToken ct);
+
+    /// <summary>
+    /// Best-effort priming of the network path (DNS/TLS/connection pool) so the first real answer
+    /// call doesn't pay the handshake. Default is a no-op; providers may override. Must never throw.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    Task WarmUpAsync(CancellationToken ct) => Task.CompletedTask;
 }

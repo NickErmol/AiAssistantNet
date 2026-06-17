@@ -190,6 +190,58 @@ public sealed class QuestionBoundaryClassifierTests
 
         Assert.Equal(BoundaryLabel.NewQuestion, result.Classification);
     }
+
+    // ── 10. B1b: response without normalized_text parses, falls back to original ──
+
+    [Fact]
+    public async Task ClassifyAsync_OmitsNormalizedText_FallsBackToOriginal()
+    {
+        // The trimmed-output prompt no longer asks for normalized_text; the parser must cope.
+        var innerJson = """{"classification":"QuestionComplete","confidence":0.9,"reason":"direct question"}""";
+        var sut = MakeSut(MakeApiResponse(innerJson));
+
+        var result = await sut.ClassifyAsync(
+            null, [], MakeItem("what is dependency injection?"), Speaker.Other, CancellationToken.None);
+
+        Assert.Equal(BoundaryLabel.QuestionComplete, result.Classification);
+        Assert.Equal("what is dependency injection?", result.NormalizedQuestionText);
+    }
+
+    // ── 11. B1b: request caps output tokens to shorten the hot-path call ─────
+
+    [Fact]
+    public async Task ClassifyAsync_RequestCapsMaxTokens()
+    {
+        var capture = new CapturingBoundaryHandler(
+            MakeApiResponse("""{"classification":"Unrelated","confidence":0.9,"reason":"filler"}"""));
+        var http = new HttpClient(capture) { BaseAddress = new Uri("https://api.anthropic.com") };
+        var secrets = Substitute.For<ISecretStore>();
+        var ss = new SecureString();
+        foreach (var c in "fake-key") ss.AppendChar(c);
+        ss.MakeReadOnly();
+        secrets.GetApiKey().Returns(Result.Ok(ss));
+        var sut = new QuestionBoundaryClassifier(http, secrets, Options.Create(new ClaudeOptions()));
+
+        await sut.ClassifyAsync(null, [], MakeItem("thanks"), Speaker.Other, CancellationToken.None);
+
+        Assert.Contains("\"max_tokens\":64", capture.LastRequestBody);
+    }
+}
+
+file sealed class CapturingBoundaryHandler(string body, HttpStatusCode status = HttpStatusCode.OK)
+    : HttpMessageHandler
+{
+    public string LastRequestBody { get; private set; } = "";
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken ct)
+    {
+        LastRequestBody = request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct);
+        return new HttpResponseMessage(status)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        };
+    }
 }
 
 file sealed class BoundaryMockHttpMessageHandler(string body, HttpStatusCode status = HttpStatusCode.OK)
