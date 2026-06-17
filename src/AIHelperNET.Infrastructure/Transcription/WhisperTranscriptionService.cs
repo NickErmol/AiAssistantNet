@@ -16,9 +16,9 @@ public sealed class WhisperTranscriptionService(
     private static readonly SemaphoreSlim _buildLock = new(1, 1);
 
     private const int MinWords = 3;
-    private const int RecentContextSegments = 6;
-    private const int RecentContextWordCap = 50;
-    private const int GlossaryWordBudget = 90;
+    private const int RecentContextSegments = 4;
+    private const int RecentContextWordCap = 30;
+    private const int GlossaryWordBudget = 60;
 
     private const string InitialPrompt =
         "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
