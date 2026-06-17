@@ -30,7 +30,7 @@ public sealed class JsonSettingsStore : ISettingsStore
 
     private static AppSettingsDto DefaultSettings() => new(
         AiBackend.Claude,
-        WhisperModelSize.Medium,
+        WhisperModelSize.LargeTurbo,
         Domain.ValueObjects.AnswerSettings.Default,
         Domain.ValueObjects.CodeProfile.Empty,
         null,

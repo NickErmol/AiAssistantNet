@@ -200,8 +200,12 @@ capacity, so **onset pre-roll was deprioritized** (deferred, not implemented).
 - **Kept:** Component 1 timing instrumentation (`TranscriptionMetrics` + `WhisperTiming` logs).
 - **Reverted:** Component 2 (whole-window VAD restored) — the single biggest accuracy fix.
 - **Dropped:** Component 3 (build is 0ms).
-- **Model default = Medium** (balanced accuracy/latency; `settings.json whisperModel:3`, code
-  fallbacks aligned). LargeTurbo remains the per-session "max accuracy" choice.
+- **Model default = LargeTurbo** (`settings.json whisperModel:4`, code defaults/fallbacks
+  aligned). A clean A/B re-test on whole windows showed **Medium dropped an entire question**
+  (interface vs abstract class) and garbled "asynchronous code" → "Asset Horn of Scott", while
+  **LargeTurbo captured all 10 cleanly**. With whole-sentence windows both ran near RTF ~0.8–1.0
+  (LargeTurbo only ~0.8s slower per question), so for interview use — where a missed question is
+  costly — LargeTurbo's accuracy wins. Medium/Small remain per-session choices for more speed.
 - **Bug fixed:** `TranscriptHallucinationFilter` — the old exact-match filter missed
   dash-prefixed (`"- Thank you."`) and bracketed (`"(audio cuts out)"`) hallucinations.
 - **Deferred:** onset pre-roll (~150–250ms pre-trigger ring buffer) — revisit only if staying on
@@ -209,6 +213,6 @@ capacity, so **onset pre-roll was deprioritized** (deferred, not implemented).
 
 ### Net deliverables
 
-Timing instrumentation + the whole-window revert + the hallucination-filter fix + Medium
+Timing instrumentation + the whole-window revert + the hallucination-filter fix + LargeTurbo
 default. The effort's real value was **accuracy and a corrected mental model of the latency**,
 not the latency tuning originally planned.

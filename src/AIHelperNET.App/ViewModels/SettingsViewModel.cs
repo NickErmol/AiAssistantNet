@@ -36,7 +36,7 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private string? _selectedMicDeviceId;
     [ObservableProperty] private string? _selectedLoopbackDeviceId;
     [ObservableProperty] private string _whisperLanguage = "auto";
-    [ObservableProperty] private WhisperModelSize _whisperModel = WhisperModelSize.Medium;
+    [ObservableProperty] private WhisperModelSize _whisperModel = WhisperModelSize.LargeTurbo;
 
     // ── Code Profiles tab ─────────────────────────────────────────
     [ObservableProperty] private ProfilePreset? _selectedPreset;
