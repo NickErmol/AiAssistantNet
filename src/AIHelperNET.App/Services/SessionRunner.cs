@@ -14,7 +14,7 @@ public sealed class SessionRunner(
     IAudioCaptureService audioCapture,
     ITranscriptionService transcription,
     TranscriptPipelineService pipeline,
-    int segmentMergeWindowMs = 300)
+    int segmentMergeWindowMs = 150)
 {
     private CancellationTokenSource? _cts;
     private Task? _pipelineTask;

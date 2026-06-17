@@ -32,10 +32,10 @@ public sealed class SileroVadHysteresisTests
 
         // 2 confirm chunks (triggers speech start, chunkCount=2)
         // + 4 speech chunks (chunkCount=6, below MinChunks=8)
-        // + 12 silence chunks (SilenceFlushCount reached, discard)
+        // + 16 silence chunks (SilenceFlushCount reached, discard)
         for (int i = 0; i < 2; i++) Collect(acc, windows, 0.9f);  // confirm
         for (int i = 0; i < 4; i++) Collect(acc, windows, 0.9f);  // speech
-        for (int i = 0; i < 12; i++) Collect(acc, windows, 0.1f); // silence
+        for (int i = 0; i < 16; i++) Collect(acc, windows, 0.1f); // silence
 
         Assert.Empty(windows);
     }
@@ -46,10 +46,10 @@ public sealed class SileroVadHysteresisTests
         var acc = new VadWindowAccumulator();
         var windows = new List<SpeechWindow>();
 
-        // 2 confirm + 20 speech + 12 silence → one window
+        // 2 confirm + 20 speech + 16 silence → one window
         for (int i = 0; i < 2; i++) Collect(acc, windows, 0.9f);
         for (int i = 0; i < 20; i++) Collect(acc, windows, 0.9f);
-        for (int i = 0; i < 12; i++) Collect(acc, windows, 0.1f);
+        for (int i = 0; i < 16; i++) Collect(acc, windows, 0.1f);
 
         Assert.Single(windows);
         Assert.Equal(Speaker.Other, windows[0].Speaker);
