@@ -115,7 +115,7 @@ public sealed partial class GenerateAnswerHandler(
             cmd.ScreenContext,
             recentTranscript,
             recentQA,
-            maxTokens: effectiveMaxTokens);
+            maxTokens: effectiveMaxTokens) with { Model = settings.AnswerModel };
 
         var chunks = new System.Text.StringBuilder();
         try

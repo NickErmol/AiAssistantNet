@@ -17,6 +17,7 @@ namespace AIHelperNET.Application.Sessions.Dtos;
 /// <param name="LatestQuestionWindowSeconds">Look-back window (seconds) the Answer-latest-question
 /// hotkey scans for the most recent question, in range [30, 300].</param>
 /// <param name="OverlayMode">Overlay render mode (stealth vs see-through). Applied at app startup.</param>
+/// <param name="AnswerModel">Which Claude model generates answers (Claude backend only).</param>
 /// <param name="GlossaryEnabled">Whether the transcription glossary biases speech-to-text.</param>
 public sealed record AppSettingsDto(
     AiBackend ActiveBackend,
@@ -31,7 +32,8 @@ public sealed record AppSettingsDto(
     int MaxAnswerTokens = 800,
     int LatestQuestionWindowSeconds = 120,
     OverlayMode OverlayMode = OverlayMode.Stealth,
-    bool GlossaryEnabled = true)
+    bool GlossaryEnabled = true,
+    AnswerModel AnswerModel = AnswerModel.Haiku)
 {
     /// <summary>Default answer-token cap used when unset/legacy.</summary>
     public const int DefaultMaxAnswerTokens = 800;

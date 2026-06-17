@@ -47,4 +47,11 @@ public static class EnumValues
         new("Large Turbo", WhisperModelSize.LargeTurbo),
         new("Large",       WhisperModelSize.Large),
     ];
+
+    public static IReadOnlyList<EnumOption<AnswerModel>> AnswerModels { get; } =
+    [
+        new("Haiku (fastest)",   AnswerModel.Haiku),
+        new("Sonnet (balanced)", AnswerModel.Sonnet),
+        new("Opus (best)",       AnswerModel.Opus),
+    ];
 }
