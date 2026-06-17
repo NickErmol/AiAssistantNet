@@ -84,6 +84,22 @@ public sealed class SileroVadHysteresisTests
         Assert.Empty(windows);
     }
 
+    [Fact]
+    public void LongContinuousSpeech_ChopsIntoMultipleWindows()
+    {
+        var acc = new VadWindowAccumulator();
+        var windows = new List<SpeechWindow>();
+
+        // Feed well over two MaxChunks worth of continuous speech with no pause.
+        // Force-flush at MaxChunks means a long monologue yields multiple finals
+        // instead of one giant block.
+        for (int i = 0; i < VadWindowAccumulator.MaxChunks * 2 + 10; i++)
+            Collect(acc, windows, 0.9f);
+
+        Assert.True(windows.Count >= 2,
+            $"expected >= 2 chopped windows, got {windows.Count}");
+    }
+
     private static void Collect(VadWindowAccumulator acc, List<SpeechWindow> windows, float prob)
     {
         var w = acc.Feed(prob, Chunk, Speaker.Other);

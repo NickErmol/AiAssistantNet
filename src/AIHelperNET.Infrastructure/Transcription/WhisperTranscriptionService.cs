@@ -1,6 +1,7 @@
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Infrastructure.Audio;
+using Serilog;
 using Whisper.net;
 
 namespace AIHelperNET.Infrastructure.Transcription;
@@ -21,13 +22,6 @@ public sealed class WhisperTranscriptionService(
 
     private const string InitialPrompt =
         "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
-
-    private static readonly HashSet<string> HallucinationPhrases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "thank you", "thanks for watching", "thanks for listening",
-        "please subscribe", "like and subscribe", "see you next time",
-        "subtitles by", "transcribed by",
-    };
 
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
@@ -58,6 +52,7 @@ public sealed class WhisperTranscriptionService(
         {
             await _buildLock.WaitAsync(ct);
             WhisperProcessor processor;
+            var buildSw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 processor = factory.CreateBuilder()
@@ -70,15 +65,30 @@ public sealed class WhisperTranscriptionService(
                     .Build();
             }
             finally { _buildLock.Release(); }
+            buildSw.Stop();
 
             await using var _ = (IAsyncDisposable)processor;
 
+            var produced = new List<SegmentData>();
+            var inferSw = System.Diagnostics.Stopwatch.StartNew();
             await foreach (var seg in processor.ProcessAsync(window.Samples, ct))
+                produced.Add(seg);
+            inferSw.Stop();
+
+            var audioSec = TranscriptionMetrics.WindowAudioSeconds(window.Samples.Length);
+            Log.Information(
+                "WhisperTiming model={Model} speaker={Speaker} windowAudioSec={AudioSec:F2} " +
+                "buildMs={BuildMs} inferMs={InferMs} rtf={Rtf:F2}",
+                model, window.Speaker, audioSec,
+                buildSw.ElapsedMilliseconds, inferSw.ElapsedMilliseconds,
+                TranscriptionMetrics.RealtimeFactor(inferSw.ElapsedMilliseconds, audioSec));
+
+            foreach (var seg in produced)
             {
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
                 if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
                 if (WordCount(seg.Text) < MinWords) continue;
-                if (IsKnownHallucination(seg.Text)) continue;
+                if (TranscriptHallucinationFilter.IsHallucination(seg.Text)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
                 var text = seg.Text.Trim();
@@ -97,12 +107,6 @@ public sealed class WhisperTranscriptionService(
     {
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return words.Length <= maxWords ? text : string.Join(' ', words[^maxWords..]);
-    }
-
-    private static bool IsKnownHallucination(string text)
-    {
-        var trimmed = text.Trim('.', '!', '?', ' ');
-        return HallucinationPhrases.Contains(trimmed);
     }
 
     private static bool IsNearDuplicate(string current, string? previous)
