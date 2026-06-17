@@ -23,13 +23,6 @@ public sealed class WhisperTranscriptionService(
     private const string InitialPrompt =
         "Technical interview. Software engineering, system design, algorithms, data structures, coding.";
 
-    private static readonly HashSet<string> HallucinationPhrases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "thank you", "thanks for watching", "thanks for listening",
-        "please subscribe", "like and subscribe", "see you next time",
-        "subtitles by", "transcribed by",
-    };
-
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
         WhisperModelSize model,
@@ -95,7 +88,7 @@ public sealed class WhisperTranscriptionService(
                 if (string.IsNullOrWhiteSpace(seg.Text)) continue;
                 if (seg.Text.Contains("[BLANK_AUDIO]", StringComparison.OrdinalIgnoreCase)) continue;
                 if (WordCount(seg.Text) < MinWords) continue;
-                if (IsKnownHallucination(seg.Text)) continue;
+                if (TranscriptHallucinationFilter.IsHallucination(seg.Text)) continue;
                 if (IsNearDuplicate(seg.Text, lastEmitted)) continue;
 
                 var text = seg.Text.Trim();
@@ -114,12 +107,6 @@ public sealed class WhisperTranscriptionService(
     {
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return words.Length <= maxWords ? text : string.Join(' ', words[^maxWords..]);
-    }
-
-    private static bool IsKnownHallucination(string text)
-    {
-        var trimmed = text.Trim('.', '!', '?', ' ');
-        return HallucinationPhrases.Contains(trimmed);
     }
 
     private static bool IsNearDuplicate(string current, string? previous)
