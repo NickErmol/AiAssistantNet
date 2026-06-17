@@ -150,3 +150,65 @@ own processor; the static `_buildLock` still guards the now-rare builds.
 1. Component 1 (instrumentation) → run a live session → read RTF + build/infer split.
 2. Component 2 (VAD constants) → tune against the numbers + manual A/B.
 3. Component 3 **only if** `buildMs` proved significant in step 1.
+
+---
+
+## Measurement results & outcome (2026-06-17)
+
+Live A/B with a fixed 10-line technical script (read aloud into the mic; transcripts pulled
+from `sessions.db` `TranscriptItem`, timing from the new `WhisperTiming` logs). **The premise
+of this design — that latency was the problem — turned out to be wrong for the usable model.**
+
+### Timing (Component 1 paid off immediately)
+
+| Model | Fixed inference cost / window | RTF on whole 3–5s questions | RTF on short (<1.5s) clips |
+|---|---|---|---|
+| Small | ~1.0s | ~0.3 | ~1.0 |
+| Medium | ~2.7s | ~0.65 | ~2–3 |
+| LargeTurbo | ~3.5s | ~0.75 | ~1.5–3 |
+
+- **`buildMs` was 0–1ms** across the board → **Component 3 (processor reuse) dropped** as
+  pointless; we keep the rolling-context prompt and its accuracy benefit for free.
+- Inference cost is **fixed per window regardless of audio length** (Whisper pads to a 30s mel
+  before encoding). So RTF depends entirely on **window length**: long whole-sentence windows
+  amortize the fixed cost (RTF < 1); short fragmented windows multiply it (RTF ≫ 1).
+
+### The root cause was fragmentation, not hardware
+
+Component 2's chopping (`MaxChunks` 240→112, `SilenceFlushCount` 12→8) **made everything
+worse**: it split sentences into short windows, which (a) multiplied the fixed encoder cost into
+a growing backlog and (b) hard-cut audio mid-word, producing Whisper `"(audio cuts out)"`
+truncation artifacts and dropped words. **Component 2 was reverted** to the whole-window
+baseline (375ms flush, 7.5s window).
+
+This also **corrected an earlier wrong conclusion**: LargeTurbo's original "10–15s delay" was
+**not** a fixed hardware ceiling — it was the fragmentation backlog. With whole-sentence
+windows, LargeTurbo runs at **RTF ~0.75 and keeps up**, producing the transcript ~3.5s after a
+pause. It is viable (just not the fastest).
+
+### Accuracy A/B (clean, whole-window runs)
+
+Accuracy ranking: **LargeTurbo > Medium ≫ Small.** LargeTurbo was near word-perfect (incl.
+sentence-initial words). Medium captured all technical terms cleanly (gRPC, asynchronous code,
+Azure Key Vault). Small garbled technical terms ("JRPC", "Azure Nodes Code") and first words.
+The dominant residual error on Small/Medium is the **first word of each utterance**; LargeTurbo
+gets first words right, indicating the audio onset is *not* badly clipped — it is smaller-model
+capacity, so **onset pre-roll was deprioritized** (deferred, not implemented).
+
+### Decisions shipped on this branch
+
+- **Kept:** Component 1 timing instrumentation (`TranscriptionMetrics` + `WhisperTiming` logs).
+- **Reverted:** Component 2 (whole-window VAD restored) — the single biggest accuracy fix.
+- **Dropped:** Component 3 (build is 0ms).
+- **Model default = Medium** (balanced accuracy/latency; `settings.json whisperModel:3`, code
+  fallbacks aligned). LargeTurbo remains the per-session "max accuracy" choice.
+- **Bug fixed:** `TranscriptHallucinationFilter` — the old exact-match filter missed
+  dash-prefixed (`"- Thank you."`) and bracketed (`"(audio cuts out)"`) hallucinations.
+- **Deferred:** onset pre-roll (~150–250ms pre-trigger ring buffer) — revisit only if staying on
+  Small/Medium and wanting sharper sentence-initial words.
+
+### Net deliverables
+
+Timing instrumentation + the whole-window revert + the hallucination-filter fix + Medium
+default. The effort's real value was **accuracy and a corrected mental model of the latency**,
+not the latency tuning originally planned.
