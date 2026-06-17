@@ -148,6 +148,53 @@ public class GenerateAnswerHandlerTests
         captured!.User.Should().Contain("constructor injection specifically");
     }
 
+    /// <summary>
+    /// When the session is torn down (e.g. a pipeline restart) the shared cancellation token fires
+    /// and the final <see cref="IUnitOfWork.SaveChangesAsync"/> throws. The handler must swallow that
+    /// cancellation instead of letting it bubble up as an unhandled exception (logged as ERR).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenSaveChangesCancelled_DoesNotThrow()
+    {
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, T0).Value;
+        var q = DetectedQuestion.Create("Explain DI.", QuestionSource.Audio, T0);
+        session.AddDetectedQuestion(q);
+        session.AddTranscriptItem(TranscriptItem.Create(Speaker.Other, "Explain DI.", T0, 0.9f));
+        var turn = session.AddConversationTurn(q.Id, "Explain DI.", T0).Value;
+
+        var repo = Substitute.For<ISessionRepository>();
+        repo.GetAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result.Ok(session)));
+
+        var provider = Substitute.For<IAnswerProvider>();
+        provider.StreamAnswerAsync(Arg.Any<AnswerPrompt>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Stream("Dependency ", "injection."));
+        var resolver = Substitute.For<IAnswerProviderResolver>();
+        resolver.Resolve(Arg.Any<AiBackend>()).Returns(provider);
+
+        var settings = Substitute.For<ISettingsStore>();
+        settings.LoadAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AppSettingsDto(
+                AiBackend.Claude, WhisperModelSize.Base, AnswerSettings.Default, CodeProfile.Empty,
+                MicDeviceId: null, LoopbackDeviceId: null)));
+        var streamSink = Substitute.For<IAnswerStreamSink>();
+
+        // Simulate the token already being cancelled by the time we persist (session restart).
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<Result>>(_ => throw new OperationCanceledException());
+
+        var handler = new GenerateAnswerHandler(
+            repo, resolver, settings, streamSink, uow, TimeProvider.System, new TurnStatusFeedback(),
+            NullLogger<GenerateAnswerHandler>.Instance);
+
+        var act = async () => await handler.Handle(
+            new GenerateAnswerCommand(session.Id, turn.Id, AnswerVersionType.Preliminary),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
     [Fact]
     public async Task Handle_IncludesLastThreeAnsweredTurnsAsContext()
     {
