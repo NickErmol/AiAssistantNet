@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FlaUI.Core.Tools;
 using Xunit;
 
 namespace AIHelperNET.UITests.Tests;
@@ -15,6 +16,30 @@ public sealed class SessionLifecycleTests(AppFixture fixture) : IDisposable
             fixture.Main.BtnToggleSession.Click();
             Thread.Sleep(500);
         }
+    }
+
+    /// <summary>
+    /// Waits (up to <paramref name="timeout"/>) for the toggle button to show "Start", which
+    /// confirms that <c>ToggleSessionAsync</c>'s async stop path has fully settled
+    /// (IsSessionActive=false, IsMicActive=false, IsSystemAudioActive=false all written).
+    /// </summary>
+    private void WaitUntilStopped(TimeSpan timeout)
+        => Retry.WhileTrue(
+            () => fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault == "Stop",
+            timeout);
+
+    /// <summary>
+    /// Selects the "Both" audio-source radio button using the UIA SelectionItemPattern
+    /// rather than a simulated mouse click.  RadioButton.Click() in FlaUI sends a
+    /// coordinate-based mouse event, which is silently dropped when the overlay window
+    /// does not own the foreground focus — leaving the ViewModel's AudioSource unchanged.
+    /// SelectionItemPattern.Select() goes through the accessibility API and works
+    /// regardless of focus.
+    /// </summary>
+    private void SelectAudioSourceBoth()
+    {
+        fixture.Main.RadioAudioBoth.Patterns.SelectionItem.Pattern.Select();
+        Thread.Sleep(200); // let WPF two-way binding propagate to ViewModel
     }
 
     [Fact]
@@ -49,15 +74,25 @@ public sealed class SessionLifecycleTests(AppFixture fixture) : IDisposable
     public void Start_BothMode_MicAndSystemDotsActive()
     {
         StopIfRunning();
-        fixture.Main.RadioAudioBoth.Click();
+
+        // Wait for the async stop to fully settle before changing audio source.
+        // StopIfRunning() only sleeps 500 ms but ToggleSessionAsync (stop path) awaits
+        // runner.StopAsync(); IsSessionActive / IsMicActive / IsSystemAudioActive are only
+        // written AFTER that completes. Polling for "Start" guarantees we are in a clean
+        // stopped state before we restore AudioSource=Both.
+        WaitUntilStopped(TimeSpan.FromSeconds(5));
+
+        // Use UIA SelectionItemPattern.Select() instead of Click() — see SelectAudioSourceBoth()
+        // doc comment for why Click() is unreliable here.
+        SelectAudioSourceBoth();
 
         fixture.Main.BtnToggleSession.Click();
 
         // Both audio captures initialize concurrently — system audio can lag behind mic.
         // Poll up to 5 s for each dot rather than using a fixed sleep.
-        FlaUI.Core.Tools.Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotMic),
+        Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotMic),
             TimeSpan.FromSeconds(5));
-        FlaUI.Core.Tools.Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotSystem),
+        Retry.WhileTrue(() => !fixture.Main.IsDotActive(fixture.Main.DotSystem),
             TimeSpan.FromSeconds(5));
 
         fixture.Main.IsDotActive(fixture.Main.DotMic).Should().BeTrue("Mic dot should be green in Both mode");
@@ -79,7 +114,9 @@ public sealed class SessionLifecycleTests(AppFixture fixture) : IDisposable
         fixture.Main.IsDotActive(fixture.Main.DotSystem).Should().BeFalse("System dot should stay grey in Mic Only mode");
 
         StopIfRunning();
-        fixture.Main.RadioAudioBoth.Click();
+        // Restore AudioSource=Both via UIA SelectionItemPattern — Click() is unreliable when the
+        // overlay window does not hold foreground focus (see SelectAudioSourceBoth()).
+        SelectAudioSourceBoth();
     }
 
     [Fact]
@@ -95,7 +132,9 @@ public sealed class SessionLifecycleTests(AppFixture fixture) : IDisposable
         fixture.Main.IsDotActive(fixture.Main.DotMic).Should().BeFalse("Mic dot should stay grey in System Only mode");
 
         StopIfRunning();
-        fixture.Main.RadioAudioBoth.Click();
+        // Restore AudioSource=Both via UIA SelectionItemPattern — Click() is unreliable when the
+        // overlay window does not hold foreground focus (see SelectAudioSourceBoth()).
+        SelectAudioSourceBoth();
     }
 
     [Fact]

@@ -23,7 +23,8 @@ public sealed class ScreenCaptureTests(AppFixture fixture) : IDisposable
         // Stop session if running
         if (fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault == "Stop")
         {
-            fixture.Main.BtnToggleSession.Click();
+            // Use InvokePattern so the click works regardless of which window has OS focus.
+            fixture.Main.BtnToggleSession.Patterns.Invoke.Pattern.Invoke();
             Thread.Sleep(500);
         }
     }
@@ -56,8 +57,13 @@ public sealed class ScreenCaptureTests(AppFixture fixture) : IDisposable
     [Fact]
     public void Capture_WithTestImage_ProducesTurnCard()
     {
-        // Ensure Screen Only mode so capture triggers an answer
-        fixture.Main.RadioModeScreenOnly.Click();
+        // Ensure Screen Only mode so capture triggers an answer.
+        // Use SelectionItemPattern.Select() rather than Click() — after the test image is
+        // opened in the Photos viewer (below), the OS foreground focus shifts to Photos.
+        // FlaUI Click() uses mouse-coordinate simulation, which is silently dropped when
+        // the AIHelper overlay does not own the foreground focus.  SelectionItemPattern /
+        // InvokePattern work through the accessibility API and require no focus.
+        fixture.Main.RadioModeScreenOnly.Patterns.SelectionItem.Pattern.Select();
         Thread.Sleep(200);
 
         // Open the test image so there is something on screen to OCR
@@ -74,14 +80,20 @@ public sealed class ScreenCaptureTests(AppFixture fixture) : IDisposable
         });
         Thread.Sleep(1500); // allow image viewer to open
 
-        // Start a session
-        fixture.Main.BtnToggleSession.Click();
-        Thread.Sleep(600);
+        // Start a session.  Use InvokePattern — same reason as the radio button above.
+        fixture.Main.BtnToggleSession.Patterns.Invoke.Pattern.Invoke();
 
-        // Click the Capture button
-        fixture.Main.BtnCapture.Click();
+        // Wait deterministically for the session to start (button → "Stop").
+        Retry.WhileTrue(
+            () => fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault != "Stop",
+            TimeSpan.FromSeconds(5));
 
-        // Wait up to 30 s for a turn card to appear
+        // Click the Capture button (InvokePattern — window still may not have focus).
+        fixture.Main.BtnCapture.Patterns.Invoke.Pattern.Invoke();
+
+        // The card is created after CaptureScreenCommand (OCR) + CreateScreenTurnCommand, both of
+        // which run before answer streaming — so it appears within a few seconds even if the AI
+        // backend is slow or absent. 30 s covers OCR + turn creation comfortably.
         var turnCard = Retry.WhileNull(
             () => fixture.Main.FirstTurnCard,
             TimeSpan.FromSeconds(30),

@@ -343,7 +343,6 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,0,0,8"
-                                            AutomationProperties.AutomationId="TurnCard"
                                             Background="{DynamicResource Brush.Background.Card}"
                                             BorderBrush="{DynamicResource Brush.Border}"
                                             BorderThickness="1"
@@ -358,7 +357,14 @@
                                                     <TextBlock Text="&#10067; "
                                                                Foreground="{DynamicResource Brush.Semantic.Question}"
                                                                FontSize="{DynamicResource Font.XS}"/>
+                                                    <!-- AutomationId="TurnCard" lives on this TextBlock, not the
+                                                         card's Border: WPF layout elements (Border/Grid/StackPanel)
+                                                         and ContentControl produce no UI-automation peer, so an id on
+                                                         them is invisible to UIA tests. A TextBlock does expose a peer,
+                                                         and there is exactly one question line per card — so this is a
+                                                         reliable per-card automation anchor. -->
                                                     <TextBlock Text="{Binding InitialQuestion}"
+                                                               AutomationProperties.AutomationId="TurnCard"
                                                                AutomationProperties.Name="Question"
                                                                Foreground="{DynamicResource Brush.Semantic.Question}"
                                                                FontSize="{DynamicResource Font.SM}"
