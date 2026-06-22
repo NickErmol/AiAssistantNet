@@ -5,7 +5,7 @@ using Xunit;
 namespace AIHelperNET.UITests.Tests;
 
 [Collection("UITests")]
-public sealed class ScreenCaptureTests(AppFixture fixture, Xunit.Abstractions.ITestOutputHelper output) : IDisposable
+public sealed class ScreenCaptureTests(AppFixture fixture) : IDisposable
 {
     private System.Diagnostics.Process? _imageProcess;
 
@@ -88,24 +88,16 @@ public sealed class ScreenCaptureTests(AppFixture fixture, Xunit.Abstractions.IT
             () => fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault != "Stop",
             TimeSpan.FromSeconds(5));
 
-        output.WriteLine($"[DIAG] After start wait: SessionBtn={fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault}");
-
         // Click the Capture button (InvokePattern — window still may not have focus).
         fixture.Main.BtnCapture.Patterns.Invoke.Pattern.Invoke();
 
-        // Wait up to 30 s for a turn card to appear.
-        // A turn card is created synchronously (before streaming) by OnTurnCreated, so it
-        // should appear within a few seconds regardless of whether the AI backend succeeds.
-        FlaUI.Core.AutomationElements.AutomationElement? turnCard = null;
-        for (int i = 0; i < 60; i++)
-        {
-            Thread.Sleep(500);
-            turnCard = fixture.Main.FirstTurnCard;
-            var allCards = fixture.Window.FindAllDescendants(cf => cf.ByAutomationId("TurnCard"));
-            var allElements = fixture.Window.FindAllDescendants();
-            output.WriteLine($"[DIAG] Poll {i+1}/60: FirstTurnCard={turnCard is not null}, FindAll count={allCards.Length}, AllDescendants={allElements.Length}, SessionBtn={fixture.Main.BtnToggleSession.Properties.Name.ValueOrDefault}");
-            if (turnCard is not null) break;
-        }
+        // The card is created after CaptureScreenCommand (OCR) + CreateScreenTurnCommand, both of
+        // which run before answer streaming — so it appears within a few seconds even if the AI
+        // backend is slow or absent. 30 s covers OCR + turn creation comfortably.
+        var turnCard = Retry.WhileNull(
+            () => fixture.Main.FirstTurnCard,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMilliseconds(500)).Result;
 
         turnCard.Should().NotBeNull("a turn card should appear after screen capture");
     }
