@@ -31,7 +31,9 @@ public sealed class WhisperTranscriptionService(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         var factory = await whisperModels.GetFactoryAsync(model, ct);
-        var lang    = string.IsNullOrWhiteSpace(language) || language == "auto" ? null : language;
+        // "auto" makes Whisper detect the language per window; a concrete code (e.g. "en", "ru")
+        // forces it. Empty/whitespace falls back to auto rather than silently forcing English.
+        var lang    = string.IsNullOrWhiteSpace(language) ? "auto" : language;
 
         string? lastEmitted = null;
         var recent = new Queue<string>(RecentContextSegments);
@@ -56,7 +58,7 @@ public sealed class WhisperTranscriptionService(
             try
             {
                 processor = factory.CreateBuilder()
-                    .WithLanguage(lang ?? "en")
+                    .WithLanguage(lang)
                     .WithTemperature(0)            // greedy decoding — no random word substitutions
                     .WithNoContext()               // prevent stale KV-cache from previous windows
                     .WithPrompt(BuildPrompt())     // rolling context + glossary bias for every window
