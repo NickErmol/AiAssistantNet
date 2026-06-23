@@ -22,6 +22,11 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <!-- Override the native SQLite binary pulled transitively by EF Core's Microsoft.Data.Sqlite
+         (bundle_e_sqlite3 2.1.11 ships SQLite < 3.50.2, vulnerable to CVE-2025-6965 / GHSA-2m69-gcr7-jv3q).
+         3.50.3 bundles SQLite 3.50.3 (patched). Only the native lib is bumped — SQLitePCLRaw.core stays
+         2.1.11 so Microsoft.Data.Sqlite's managed API is unaffected; SQLite's C ABI is stable across this. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
