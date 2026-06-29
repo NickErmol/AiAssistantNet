@@ -49,8 +49,14 @@ public sealed partial class RegenerateAnswerWithScreenHandler(
 
         turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
 
+        // Answers follow the selected transcription language; "auto" keeps the configured Output Language.
+        var answerSettings = session.AnswerSettings with
+        {
+            OutputLanguage = AnswerLanguageResolver.Resolve(settings.WhisperLanguage, session.AnswerSettings.OutputLanguage),
+        };
+
         var prompt = PromptBuilderService.BuildWithScreenMode(
-            session.CodeProfile, session.AnswerSettings,
+            session.CodeProfile, answerSettings,
             request.ScreenContext, request.InterviewerLines, request.Mode);
 
         var chunks = new System.Text.StringBuilder();

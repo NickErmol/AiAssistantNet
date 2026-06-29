@@ -75,8 +75,14 @@ public sealed partial class GenerateScreenFollowUpHandler(
         var answer = start.Value;
         turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
 
+        // Answers follow the selected transcription language; "auto" keeps the configured Output Language.
+        var answerSettings = session.AnswerSettings with
+        {
+            OutputLanguage = AnswerLanguageResolver.Resolve(settings.WhisperLanguage, session.AnswerSettings.OutputLanguage),
+        };
+
         var prompt = PromptBuilderService.BuildScreenFollowUp(
-            session.CodeProfile, session.AnswerSettings,
+            session.CodeProfile, answerSettings,
             request.Ocr, request.Mode, request.Additions, request.RecentTranscript, priorAnswer);
 
         var chunks = new System.Text.StringBuilder();

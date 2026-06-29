@@ -52,8 +52,14 @@ public sealed partial class GenerateFollowUpHandler(
 
         turn.TransitionTo(ConversationTurnStatus.GeneratingRefined);
 
+        // Answers follow the selected transcription language; "auto" keeps the configured Output Language.
+        var answerSettings = session.AnswerSettings with
+        {
+            OutputLanguage = AnswerLanguageResolver.Resolve(settings.WhisperLanguage, session.AnswerSettings.OutputLanguage),
+        };
+
         var prompt = PromptBuilderService.BuildFollowUp(
-            session.CodeProfile, session.AnswerSettings,
+            session.CodeProfile, answerSettings,
             question.Text, priorText, request.FollowUpText);
 
         var chunks = new System.Text.StringBuilder();
