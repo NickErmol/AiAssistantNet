@@ -232,7 +232,10 @@
                                   SelectedValue="{Binding AnswerStyle}"
                                   Margin="0,0,0,4"/>
                         <TextBlock Text="Output Language" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Text="{Binding OutputLanguage}" Margin="0,0,0,12"/>
+                        <TextBox Text="{Binding OutputLanguage}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Answers follow the Audio tab's transcription Language; this applies only when that is Auto-detect."
+                                   TextWrapping="Wrap" FontSize="10" Opacity="0.7"
+                                   Foreground="{DynamicResource Brush.Foreground.Primary}" Margin="0,0,0,12"/>
                         <Separator Margin="0,0,0,8"/>
                         <DockPanel>
                             <Button Content="Update current" DockPanel.Dock="Right" Margin="4,0,0,0"

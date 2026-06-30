@@ -106,6 +106,11 @@ public sealed partial class GenerateAnswerHandler(
         var answerSettings = isPreliminary && session.AnswerSettings.Length > AnswerLength.ShortLength
             ? session.AnswerSettings with { Length = AnswerLength.ShortLength }
             : session.AnswerSettings;
+        // Answers follow the selected transcription language; "auto" keeps the configured Output Language.
+        answerSettings = answerSettings with
+        {
+            OutputLanguage = AnswerLanguageResolver.Resolve(settings.WhisperLanguage, answerSettings.OutputLanguage),
+        };
         var effectiveMaxTokens = isPreliminary
             ? Math.Min(settings.MaxAnswerTokens, PreliminaryTokenCap)
             : settings.MaxAnswerTokens;
