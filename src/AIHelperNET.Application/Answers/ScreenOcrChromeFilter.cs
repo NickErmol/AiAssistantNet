@@ -12,12 +12,15 @@ public static partial class ScreenOcrChromeFilter
     private const int MaxChromeWords = 40;
 
     // Meeting-UI vocabulary (Teams/Zoom/Meet controls and roster labels). Matched as whole words,
-    // letters only, case-insensitive. Individually these are ordinary words ("chat", "react"), so a
-    // single hit never rejects — see the combined rules in IsLikelyChrome.
+    // letters only, case-insensitive. Individually these are ordinary words ("chat", "mute"), and
+    // prose tasks about chat/WebRTC features legitimately stack several of them — so vocabulary
+    // alone never rejects; every rule in IsLikelyChrome also requires a chrome SHAPE signal.
+    // "react" is deliberately absent: React-the-framework saturates frontend tasks, and the Teams
+    // button is covered by the other words.
     private static readonly HashSet<string> MeetingWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "notetaker", "participants", "participant", "mute", "unmute", "reactions",
-        "raise", "chat", "people", "invite", "breakout", "leave", "react", "camera",
+        "raise", "chat", "people", "invite", "breakout", "leave", "camera",
     };
 
     // Any of these means the capture carries answerable content, never chrome.
@@ -52,12 +55,13 @@ public static partial class ScreenOcrChromeFilter
             .Count();
         var clockHits = ClockPattern().Count(ocr);
         var noiseRatio = tokens.Count(IsNoiseToken) / (double)tokens.Length;
+        var titleCaseRatio = tokens.Count(t => char.IsUpper(t[0])) / (double)tokens.Length;
 
-        // A rejection always needs at least two independent chrome signals so ordinary sentences
-        // that happen to contain "chat"/"react"/a clock time pass through.
-        return meetingHits >= 3
-            || (meetingHits >= 2 && (clockHits >= 1 || noiseRatio >= 0.2))
-            || (meetingHits >= 1 && clockHits >= 1 && noiseRatio >= 0.15);
+        // Meeting vocabulary alone never rejects — a prose task about a chat/WebRTC feature stacks
+        // the same words. Rejection requires a chrome SHAPE alongside it: a title bar's clock plus
+        // roster shrapnel (initials, lone digits, OCR garble), or a control strip's title-case run.
+        return (meetingHits >= 1 && clockHits >= 1 && noiseRatio >= 0.15)
+            || (meetingHits >= 3 && titleCaseRatio >= 0.75);
     }
 
     private static string LettersOnly(string token)

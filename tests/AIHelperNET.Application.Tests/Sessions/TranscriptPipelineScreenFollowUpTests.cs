@@ -122,7 +122,7 @@ public class TranscriptPipelineScreenFollowUpTests
             uow, CancellationToken.None);
 
         seen.Should().NotBeEmpty("the screen-task branch must classify the interviewer utterance");
-        seen.Should().Contain(ctx => ctx.Any(i => i.Text.Contains("LRU cache")),
-            "the classifier must see the captured on-screen task so it can recognise an addition to it");
+        seen[0].Should().Contain(i => i.Text.Contains("LRU cache"),
+            "the FIRST classification is the screen-follow-up decision and must carry the captured task");
     }
 }

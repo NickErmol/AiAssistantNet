@@ -7,12 +7,16 @@ namespace AIHelperNET.Application.Answers;
 /// not a reliable exit: when the captured task text is garbage (e.g. OCR'd meeting chrome), the
 /// follow-up classifier answers Noise forever and the focus never releases — in a live session this
 /// held for 19 minutes. Focus is released after too many consecutive Noise verdicts, or when no
-/// FollowUp has arrived within the idle window. Pure — the caller supplies the clock.
+/// FollowUp has arrived within the idle window. The idle default is deliberately generous (10 min):
+/// silent multi-minute working stretches are normal while a candidate codes, and the consecutive-
+/// Noise counter is the fast exit for garbage tasks. Pure — the caller supplies the clock.
 /// </summary>
 public sealed class ScreenFocusReleaseValve(int maxConsecutiveNoise = 5, TimeSpan? maxIdle = null)
 {
-    private readonly int _maxConsecutiveNoise = maxConsecutiveNoise;
-    private readonly TimeSpan _maxIdle = maxIdle ?? TimeSpan.FromMinutes(3);
+    private readonly int _maxConsecutiveNoise = maxConsecutiveNoise >= 1
+        ? maxConsecutiveNoise
+        : throw new ArgumentOutOfRangeException(nameof(maxConsecutiveNoise), "Must be at least 1.");
+    private readonly TimeSpan _maxIdle = maxIdle ?? TimeSpan.FromMinutes(10);
     private ConversationTurnId? _cardId;
     private int _consecutiveNoise;
     private DateTimeOffset _anchor;

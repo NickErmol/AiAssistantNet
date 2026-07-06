@@ -18,6 +18,10 @@ public sealed class CaptureScreenHandler(IScreenOcrService ocrService)
         var result = await ocrService.CaptureAndReadAsync(cancellationToken);
         if (result.IsFailed) return result;
 
+        // Distinct diagnoses: an empty OCR is a blank/unreadable screen, not chrome.
+        if (string.IsNullOrWhiteSpace(result.Value))
+            return Result.Fail<string>("Capture rejected: OCR returned no text (blank or unreadable screen).");
+
         // A capture of meeting/window UI chrome (title bar, participant list) carries no answerable
         // task; creating a screen turn from it would also make that garbage the "task in focus" and
         // misroute subsequent interviewer speech.

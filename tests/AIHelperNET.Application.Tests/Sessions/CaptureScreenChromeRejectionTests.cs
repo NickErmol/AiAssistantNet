@@ -43,4 +43,16 @@ public class CaptureScreenChromeRejectionTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Contain("LRU cache");
     }
+
+    [Fact]
+    public async Task BlankOcr_IsRejectedWithABlankScreenMessage_NotAChromeMessage()
+    {
+        var handler = Make("   ");
+
+        var result = await handler.Handle(new CaptureScreenCommand(), CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors[0].Message.Should().Contain("no text",
+            "a blank/unreadable screen is a different diagnosis than UI chrome");
+    }
 }

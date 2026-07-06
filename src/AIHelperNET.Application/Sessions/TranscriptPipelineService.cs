@@ -154,15 +154,14 @@ public sealed partial class TranscriptPipelineService(
 
             // Stale-focus release: a task that only ever yields Noise (e.g. a garbage capture) must
             // not hold focus until MOVED_ON — which never comes when the task text is meaningless.
+            // On release, skip the outcome switch entirely and continue to normal audio routing.
             if (_screenFocusValve.Track(screenCtx.ScreenCardId, followUpOutcome, _time.GetUtcNow()))
             {
                 _screenStore.Clear();
                 if (logger is not null)
                     Log.ScreenFocusReleased(logger, screenCtx.TopicLabel);
-                followUpOutcome = Answers.ScreenFollowUpOutcome.MovedOn; // treat as moved on: route below
             }
-
-            switch (followUpOutcome)
+            else switch (followUpOutcome)
             {
                 case Answers.ScreenFollowUpOutcome.FollowUp:
                     _screenStore.AddAddition(item.Text);
@@ -176,7 +175,9 @@ public sealed partial class TranscriptPipelineService(
                     // Noise means "not about the captured task" — NOT "not a question". Fall through
                     // to normal boundary routing (keeping the screen focus) so a spoken question is
                     // still detected. In the 2026-07-06 live session a garbage capture held focus and
-                    // Noise verdicts silently dropped 8 real questions over 19 minutes.
+                    // Noise verdicts silently dropped 8 real questions over 19 minutes. The second
+                    // classification this costs (screen classifier + boundary path) is intentional —
+                    // do not "optimize" the fall-through away.
                     break;
             }
         }

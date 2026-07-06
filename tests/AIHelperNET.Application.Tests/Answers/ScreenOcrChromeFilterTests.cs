@@ -65,6 +65,21 @@ public class ScreenOcrChromeFilterTests
                 "Build a React component that fetches and renders a paginated user list")
             .Should().BeFalse();
 
+    // Prose tasks stacked with meeting-adjacent vocabulary (React, mute, participants, camera) are
+    // canonical frontend/WebRTC interview subjects — the filter must key on chrome SHAPE
+    // (title-case control strips, roster shrapnel, clocks), not vocabulary alone.
+    [Fact]
+    public void ReactTaskMentioningMuteAndParticipants_IsNotChrome()
+        => ScreenOcrChromeFilter.IsLikelyChrome(
+                "Build a React component that allows users to mute audio and shows a list of participants")
+            .Should().BeFalse();
+
+    [Fact]
+    public void VideoChatFeatureTask_IsNotChrome()
+        => ScreenOcrChromeFilter.IsLikelyChrome(
+                "Implement a video chat feature that lets users toggle their camera on and off and mute their microphone. Include a participants list.")
+            .Should().BeFalse();
+
     [Fact]
     public void ProseMentioningAClockTime_IsNotChrome()
         => ScreenOcrChromeFilter.IsLikelyChrome(

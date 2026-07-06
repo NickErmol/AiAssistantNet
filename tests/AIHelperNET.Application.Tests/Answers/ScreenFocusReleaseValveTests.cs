@@ -83,4 +83,21 @@ public class ScreenFocusReleaseValveTests
         valve.Reset();
         valve.Track(CardA, ScreenFollowUpOutcome.Noise, T0.AddSeconds(1)).Should().BeFalse();
     }
+
+    [Fact]
+    public void DefaultIdleWindow_ToleratesNormalSilentCodingStretches()
+    {
+        var valve = new ScreenFocusReleaseValve(); // defaults
+
+        valve.Track(CardA, ScreenFollowUpOutcome.Noise, T0).Should().BeFalse();
+        valve.Track(CardA, ScreenFollowUpOutcome.Noise, T0.AddMinutes(5))
+            .Should().BeFalse("a 5-minute silent working period is normal in a coding interview");
+    }
+
+    [Fact]
+    public void DegenerateNoiseThreshold_IsRejected()
+    {
+        var act = () => new ScreenFocusReleaseValve(maxConsecutiveNoise: 0);
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }
