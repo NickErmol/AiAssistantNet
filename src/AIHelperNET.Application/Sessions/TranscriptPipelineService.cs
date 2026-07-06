@@ -35,6 +35,15 @@ public sealed partial class TranscriptPipelineService(
     private readonly ConcurrentDictionary<ConversationTurnId, DateTimeOffset> _lastActivityAt = new();
     private DateTimeOffset? _collectionStartedAt;
     private const int MaxCollectionSeconds = 8;
+    // Per-session (not per-turn): the fold check compares against the specific turn's LastActivity,
+    // so Me speech during an earlier turn correctly does not block a later turn's fold.
+    private DateTimeOffset? _lastMeUtteranceAt;
+    // A QuestionComplete this soon after the active turn's last activity — with no candidate speech
+    // in between — is a fragment of the same compound question, not a new one. Deliberately a
+    // SLIDING window: LastActivity is stamped on every Other item processed while the turn is
+    // active (including filler), because an interviewer still talking is still composing the
+    // question — only candidate speech ends the composition. Same 6 s recency as BoundarySplitGuard.
+    private static readonly TimeSpan QuestionFoldWindow = TimeSpan.FromSeconds(6);
     private readonly List<TranscriptItem> _recentItems = [];
     private const int MaxRecentItems = 5;
     private readonly Answers.ScreenTaskContextStore _screenStore = screenStore ?? new Answers.ScreenTaskContextStore();
@@ -143,8 +152,13 @@ public sealed partial class TranscriptPipelineService(
         Session session, TranscriptItem item, CancellationToken ct)
     {
         // Me utterances are routed deterministically: no AI, never open a turn, never generate.
+        // The early return intentionally bypasses StampActivity below — candidate speech must end
+        // the compound-question fold window, never renew it.
         if (item.Speaker == Speaker.Me)
+        {
+            _lastMeUtteranceAt = _time.GetUtcNow(); // candidate spoke — ends any compound-question fold window
             return HandleMeUtterance(session, item);
+        }
 
         // Screen-task follow-up: while a captured task is in focus, interviewer speech that adds to
         // or asks about it spawns a NEW context-aware card (the capture card is never mutated).
@@ -373,6 +387,24 @@ public sealed partial class TranscriptPipelineService(
             activeTurn.CompleteQuestion();
             turnSink.OnTurnStatusChanged(activeTurn.Id, ConversationTurnStatus.Detected);
             return new GenerateAnswerCommand(session.Id, activeTurn.Id, AnswerVersionType.Preliminary);
+        }
+
+        // Compound-question fold: interviewers build questions across pauses ("…the technical
+        // challenges you had" + 2 s + "How did you overcome that?"), and each half classifies as
+        // QuestionComplete — in the 2026-07-06 session 5 of 6 questions split into duplicate cards.
+        // Within the fold window, with no candidate speech since the turn's last activity (candidate
+        // speech means the question was answered — quick-fire rounds must still split) and no screen
+        // task in focus (a spoken question must never mutate a capture card), append to the live
+        // turn and regenerate instead of opening a second card.
+        if (activeTurn is not null && !IsTerminal(activeTurn.Status)
+            && _screenStore.Current is null
+            && _time.GetUtcNow() - LastActivity(activeTurn.Id) <= QuestionFoldWindow
+            && (_lastMeUtteranceAt is null || _lastMeUtteranceAt < LastActivity(activeTurn.Id)))
+        {
+            if (logger is not null)
+                Log.CompoundFoldApplied(logger, activeTurn.Id.Value,
+                    item.Text[..Math.Min(60, item.Text.Length)]);
+            return AppendContinuation(session, item, activeTurn);
         }
 
         // No collecting turn — create new
@@ -724,6 +756,7 @@ public sealed partial class TranscriptPipelineService(
         _turnCts.Clear();
         _lastActivityAt.Clear();
         _collectionStartedAt = null;
+        _lastMeUtteranceAt = null;
         _recentItems.Clear();
         _accumulator.Reset();
         _regenDebouncer.Reset();
@@ -800,5 +833,9 @@ public sealed partial class TranscriptPipelineService(
         [LoggerMessage(Level = LogLevel.Information,
             Message = "ScreenFollowUp: stale focus released for task='{Task}' (consecutive-noise/idle valve)")]
         internal static partial void ScreenFocusReleased(ILogger logger, string task);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "CompoundFold: appended to turn {TurnId} instead of opening a new card — text='{Text}'")]
+        internal static partial void CompoundFoldApplied(ILogger logger, Guid turnId, string text);
     }
 }
