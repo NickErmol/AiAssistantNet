@@ -73,6 +73,10 @@ public static class DependencyInjection
         services.AddHttpClient<LatestQuestionExtractor>();
         services.AddSingleton<ILatestQuestionExtractor, LatestQuestionExtractor>();
 
+        services.AddHttpClient<SessionReviewAnalyzer>(c =>
+            c.Timeout = TimeSpan.FromMinutes(5));
+        services.AddSingleton<ISessionReviewAnalyzer, SessionReviewAnalyzer>();
+
         services.AddSingleton<IBoundaryDecisionRecorder>(
             _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));
 
