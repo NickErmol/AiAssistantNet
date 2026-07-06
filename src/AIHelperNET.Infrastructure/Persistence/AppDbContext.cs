@@ -8,6 +8,7 @@ namespace AIHelperNET.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<SessionReview> SessionReviews => Set<SessionReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -142,5 +143,36 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             });
             ct.Navigation(x => x.AnswerVersions).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
+
+        // SessionReview — one review per session, navigation-less FK from Session side.
+        // Get-only and private-setter props must be configured explicitly (EF convention skips them).
+        var r = modelBuilder.Entity<SessionReview>();
+
+        r.HasKey(x => x.Id);
+        r.Property(x => x.Id)
+            .HasConversion(id => id.Value, v => new SessionReviewId(v));
+
+        r.Property(x => x.SessionId)
+            .HasConversion(id => id.Value, v => new SessionId(v));
+
+        // Markdown and ModelUsed have private setters — must be mapped explicitly.
+        r.Property(x => x.Markdown).HasMaxLength(64000);
+        r.Property(x => x.ModelUsed).HasMaxLength(100);
+
+        // SQLite stores DateTimeOffset as long (Unix ms) — same pattern as Session.StartedAt.
+        r.Property(x => x.GeneratedAt)
+            .HasConversion(
+                dto => dto.ToUnixTimeMilliseconds(),
+                ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
+
+        // One review per session — unique index enforces the constraint at the DB level.
+        r.HasIndex(x => x.SessionId).IsUnique();
+
+        // FK to Sessions with cascade delete. No navigation property on Session so the review
+        // blob is never eager-loaded via Session.GetAsync.
+        r.HasOne<Session>()
+            .WithOne()
+            .HasForeignKey<SessionReview>(x => x.SessionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

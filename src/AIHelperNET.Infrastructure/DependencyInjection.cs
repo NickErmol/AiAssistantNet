@@ -31,6 +31,7 @@ public static class DependencyInjection
                 b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
              .AddInterceptors(new SqlitePragmaInterceptor()));
         services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<ISessionReviewRepository, SessionReviewRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         // Settings & secrets
