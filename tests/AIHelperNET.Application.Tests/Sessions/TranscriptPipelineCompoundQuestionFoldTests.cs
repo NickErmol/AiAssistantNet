@@ -25,8 +25,8 @@ public class TranscriptPipelineCompoundQuestionFoldTests
 {
     private static readonly DateTimeOffset T0 = DateTimeOffset.UnixEpoch;
 
-    private static (TranscriptPipelineService svc, Session session, IUnitOfWork uow, FakeTimeProvider time)
-        Make()
+    private static (TranscriptPipelineService svc, Session session, IUnitOfWork uow, FakeTimeProvider time,
+        IMediator mediator) Make()
     {
         var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, T0).Value;
 
@@ -52,7 +52,7 @@ public class TranscriptPipelineCompoundQuestionFoldTests
             factory, Substitute.For<ITranscriptSink>(), Substitute.For<IConversationTurnSink>(),
             Substitute.For<IQuestionClassifier>(),
             boundaryClassifier: boundary, timeProvider: time);
-        return (svc, session, uow, time);
+        return (svc, session, uow, time, mediator);
     }
 
     private static TranscriptItem Other(string text, DateTimeOffset ts)
@@ -61,7 +61,7 @@ public class TranscriptPipelineCompoundQuestionFoldTests
     [Fact]
     public async Task RapidSecondQuestion_FoldsIntoTheActiveTurn()
     {
-        var (svc, session, uow, time) = Make();
+        var (svc, session, uow, time, _) = Make();
 
         await svc.ProcessAsync(session,
             Other("Could you talk through what are the major technical challenges you had?", T0), uow, default);
@@ -79,7 +79,7 @@ public class TranscriptPipelineCompoundQuestionFoldTests
     [Fact]
     public async Task SecondQuestionAfterCandidateSpoke_OpensANewTurn()
     {
-        var (svc, session, uow, time) = Make();
+        var (svc, session, uow, time, _) = Make();
 
         await svc.ProcessAsync(session, Other("What is a primary key?", T0), uow, default);
 
@@ -97,7 +97,7 @@ public class TranscriptPipelineCompoundQuestionFoldTests
     [Fact]
     public async Task SecondQuestionBeyondTheFoldWindow_OpensANewTurn()
     {
-        var (svc, session, uow, time) = Make();
+        var (svc, session, uow, time, _) = Make();
 
         await svc.ProcessAsync(session, Other("What is a primary key?", T0), uow, default);
 
@@ -105,5 +105,41 @@ public class TranscriptPipelineCompoundQuestionFoldTests
         await svc.ProcessAsync(session, Other("What is dependency injection?", T0.AddSeconds(10)), uow, default);
 
         session.ConversationTurns.Should().HaveCount(2, "10 s is well past the fold window");
+    }
+
+    [Fact]
+    public async Task FoldWindowBoundary_ExactlySixSecondsFolds_JustOverSplits()
+    {
+        // Pins the <= comparison: elapsed == window folds; one millisecond more splits.
+        var (svc, session, uow, time, _) = Make();
+        await svc.ProcessAsync(session, Other("What is a primary key?", T0), uow, default);
+        time.Advance(TimeSpan.FromSeconds(6));
+        await svc.ProcessAsync(session, Other("And how do you enforce it?", T0.AddSeconds(6)), uow, default);
+        session.ConversationTurns.Should().HaveCount(1, "exactly the window edge still folds");
+
+        var (svc2, session2, uow2, time2, _) = Make();
+        await svc2.ProcessAsync(session2, Other("What is a primary key?", T0), uow2, default);
+        time2.Advance(TimeSpan.FromSeconds(6) + TimeSpan.FromMilliseconds(1));
+        await svc2.ProcessAsync(session2, Other("What is dependency injection?", T0.AddSeconds(7)), uow2, default);
+        session2.ConversationTurns.Should().HaveCount(2, "past the window edge splits");
+    }
+
+    [Fact]
+    public async Task Fold_FiresADebouncedRegenerationForTheExistingTurn()
+    {
+        var (svc, session, uow, time, mediator) = Make();
+
+        await svc.ProcessAsync(session,
+            Other("Could you talk through the major technical challenges you had?", T0), uow, default);
+        time.Advance(TimeSpan.FromSeconds(2));
+        await svc.ProcessAsync(session, Other("How did you overcome that?", T0.AddSeconds(2)), uow, default);
+
+        time.Advance(TimeSpan.FromSeconds(2)); // past the 1 s regen debounce
+        await Task.Delay(200);                 // let the fire-and-forget Task.Run dispatch
+
+        await mediator.Received().Send(
+            Arg.Is<AIHelperNET.Application.Answers.Commands.GenerateAnswerCommand>(
+                c => c.TurnId == session.ConversationTurns[0].Id),
+            Arg.Any<CancellationToken>());
     }
 }
