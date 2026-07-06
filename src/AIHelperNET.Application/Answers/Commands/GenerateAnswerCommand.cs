@@ -133,7 +133,8 @@ public sealed partial class GenerateAnswerHandler(
             }
             answer.Complete(clock.GetUtcNow());
 
-            var version = AnswerVersion.Create(cmd.VersionType, chunks.ToString(), clock.GetUtcNow());
+            var version = AnswerVersion.Create(
+                cmd.VersionType, AnswerStreamMarkers.StripForStorage(chunks.ToString()), clock.GetUtcNow());
             turn.AddAnswerVersion(version);
 
             var readyStatus = cmd.VersionType == AnswerVersionType.Preliminary

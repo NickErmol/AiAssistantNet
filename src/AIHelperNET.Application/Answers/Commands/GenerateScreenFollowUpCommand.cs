@@ -95,7 +95,8 @@ public sealed partial class GenerateScreenFollowUpHandler(
                 await streamSink.OnChunkAsync(turn.Id, AnswerVersionType.ScreenFollowUp, chunk, cancellationToken);
             }
             answer.Complete(clock.GetUtcNow());
-            turn.AddAnswerVersion(AnswerVersion.Create(AnswerVersionType.ScreenFollowUp, chunks.ToString(), clock.GetUtcNow()));
+            turn.AddAnswerVersion(AnswerVersion.Create(
+                AnswerVersionType.ScreenFollowUp, AnswerStreamMarkers.StripForStorage(chunks.ToString()), clock.GetUtcNow()));
             turn.TransitionTo(ConversationTurnStatus.RefinedReady);
             await streamSink.OnCompleteAsync(turn.Id, AnswerVersionType.ScreenFollowUp, cancellationToken);
             screenStore.SetLatestCard(turn.Id);

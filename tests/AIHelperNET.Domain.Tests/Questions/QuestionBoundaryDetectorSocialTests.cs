@@ -42,9 +42,12 @@ public sealed class QuestionBoundaryDetectorSocialTests
     }
 
     // Technical questions must be completely unaffected — same label and confidence as before.
+    // "How was your experience with..." is a canonical experience-question phrasing and must NOT
+    // be caught by the greeting list (reviewer-flagged false positive).
     [Theory]
     [InlineData("Can you explain the N+1 query problem in Entity Framework Core?")]
     [InlineData("What kind of OAuth flows have you worked on?")]
+    [InlineData("How was your experience with Azure API Management?")]
     public void TechnicalQuestions_StillFireQuestionCompleteAtFullConfidence(string text)
     {
         var result = _sut.Evaluate(text, Speaker.Other, null, NoRecent);

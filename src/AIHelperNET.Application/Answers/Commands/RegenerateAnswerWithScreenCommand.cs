@@ -70,7 +70,8 @@ public sealed partial class RegenerateAnswerWithScreenHandler(
             }
             answer.Complete(clock.GetUtcNow());
 
-            var version = AnswerVersion.Create(AnswerVersionType.UpdatedWithScreen, chunks.ToString(), clock.GetUtcNow());
+            var version = AnswerVersion.Create(
+                AnswerVersionType.UpdatedWithScreen, AnswerStreamMarkers.StripForStorage(chunks.ToString()), clock.GetUtcNow());
             turn.AddAnswerVersion(version);
 
             turn.TransitionTo(ConversationTurnStatus.RefinedReady);

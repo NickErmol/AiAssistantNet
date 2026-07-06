@@ -139,6 +139,7 @@ public sealed class PromptBuilderService
             "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
         AppendCodeProfile(system, profile);
         system.AppendLine(SharedMarkdownRule);
+        system.AppendLine(GroundingRule);
 
         var user = new StringBuilder();
         user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");

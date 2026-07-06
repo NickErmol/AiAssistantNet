@@ -27,11 +27,15 @@ public sealed class QuestionBoundaryDetector
     ];
 
     // Greeting shapes matched as substrings — anywhere in the segment ("Hey Kumar, how are you?").
+    // "How was your ..." is NOT matched bare: "how was your experience with X" is a canonical
+    // experience question; only the unambiguous day/weekend/trip variants are listed (the
+    // weekend/vacation words are also covered by PersonalTopicWords).
     private static readonly string[] GreetingPhrases =
     [
         "how are you", "how's it going", "how is it going", "how have you been",
         "nice to meet you", "good morning", "good afternoon", "good evening",
-        "how was your", "how's your day", "how is your day"
+        "how was your day", "how was your weekend", "how was your trip",
+        "how's your day", "how is your day"
     ];
 
     // Personal-life vocabulary matched as whole words. Deliberately narrow: words like "hurt",

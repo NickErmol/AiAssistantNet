@@ -84,13 +84,16 @@ public sealed class ClaudeAnswerProvider(
                 if (json is "" or "[DONE]") continue;
                 var delta = ClaudeSse.ParseTextDelta(json);
                 if (!string.IsNullOrEmpty(delta)) yield return delta;
-                stopReason ??= ClaudeSse.ParseStopReason(json);
+                // Cheap substring gate keeps the second JSON parse off the per-token hot path.
+                if (stopReason is null && json.Contains("message_delta", StringComparison.Ordinal))
+                    stopReason = ClaudeSse.ParseStopReason(json);
             }
 
             // A max_tokens stop leaves the answer mid-sentence; surface that instead of letting the
-            // card end silently incomplete (observed in the 2026-07-06 live session).
+            // card end silently incomplete (observed in the 2026-07-06 live session). Display-only:
+            // command handlers strip it via AnswerStreamMarkers.StripForStorage before persisting.
             if (stopReason == "max_tokens")
-                yield return "\n\n*(answer cut off at the length limit)*";
+                yield return AnswerStreamMarkers.Truncated;
         }
         finally
         {

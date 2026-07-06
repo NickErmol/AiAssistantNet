@@ -51,6 +51,15 @@ public class PromptBuilderGroundingAndLengthTests
         prompt.System.Should().ContainEquivalentOf("never invent");
     }
 
+    [Fact]
+    public void BuildFollowUp_SystemForbidsInventingToolNames()
+    {
+        var prompt = PromptBuilderService.BuildFollowUp(
+            CodeProfile.Empty, Short, "original q", "previous a", "follow-up q");
+
+        prompt.System.Should().ContainEquivalentOf("never invent");
+    }
+
     // --- screen-mode token floors -----------------------------------------------------------------
 
     [Theory]
