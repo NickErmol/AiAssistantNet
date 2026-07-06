@@ -1,4 +1,5 @@
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Application.Answers;
 using FluentResults;
 using Mediator;
 
@@ -13,5 +14,15 @@ public sealed class CaptureScreenHandler(IScreenOcrService ocrService)
 {
     /// <inheritdoc/>
     public async ValueTask<Result<string>> Handle(CaptureScreenCommand command, CancellationToken cancellationToken)
-        => await ocrService.CaptureAndReadAsync(cancellationToken);
+    {
+        var result = await ocrService.CaptureAndReadAsync(cancellationToken);
+        if (result.IsFailed) return result;
+
+        // A capture of meeting/window UI chrome (title bar, participant list) carries no answerable
+        // task; creating a screen turn from it would also make that garbage the "task in focus" and
+        // misroute subsequent interviewer speech.
+        return ScreenOcrChromeFilter.IsLikelyChrome(result.Value)
+            ? Result.Fail<string>("Capture rejected: screen shows only window/meeting UI chrome, no task content.")
+            : result;
+    }
 }
