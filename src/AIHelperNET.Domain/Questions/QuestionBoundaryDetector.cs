@@ -26,6 +26,27 @@ public sealed class QuestionBoundaryDetector
         "i will share my screen", "i'll share my screen"
     ];
 
+    // Greeting shapes matched as substrings — anywhere in the segment ("Hey Kumar, how are you?").
+    // "How was your ..." is NOT matched bare: "how was your experience with X" is a canonical
+    // experience question; only the unambiguous day/weekend/trip variants are listed (the
+    // weekend/vacation words are also covered by PersonalTopicWords).
+    private static readonly string[] GreetingPhrases =
+    [
+        "how are you", "how's it going", "how is it going", "how have you been",
+        "nice to meet you", "good morning", "good afternoon", "good evening",
+        "how was your day", "how was your weekend", "how was your trip",
+        "how's your day", "how is your day"
+    ];
+
+    // Personal-life vocabulary matched as whole words. Deliberately narrow: words like "hurt",
+    // "health", or "recovery" are excluded because they occur in real technical questions
+    // ("does it hurt performance?", "disaster recovery").
+    private static readonly HashSet<string> PersonalTopicWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "injury", "injured", "sick", "illness", "weather", "weekend",
+        "vacation", "holiday", "holidays", "family", "hobbies", "hobby"
+    };
+
     private static readonly string[] ScenarioStarters =
     [
         "let's say", "let us say", "imagine that", "imagine we",
@@ -103,6 +124,16 @@ public sealed class QuestionBoundaryDetector
         if (matchedFiller is not null)
         {
             return Unrelated(normalized, 0.90, $"Starts with filler phrase '{matchedFiller}'");
+        }
+
+        // Rule 3.5: Social/personal question from the interviewer → defer to the AI classifier.
+        // Greetings and personal-life questions ("what injury do you have?") are grammatically
+        // complete questions, so the rules below would fire QuestionComplete at 0.85 and burn a
+        // generation on small talk. Low confidence routes them to the AI classifier (whose
+        // Unrelated label covers social questions) — this rule only defers, never hard-drops.
+        if (speaker == Speaker.Other && LooksSocial(normalizedLower))
+        {
+            return Unrelated(normalized, 0.50, "Social/personal question — deferring to AI classifier");
         }
 
         // Rule 4: Speaker == Me AND active turn → ClarificationOfCurrentQuestion
@@ -296,6 +327,26 @@ public sealed class QuestionBoundaryDetector
 
     private static string FirstWord(string text) =>
         text.Split(' ')[0].ToLowerInvariant().Trim('.', '?', '!');
+
+    /// <summary>Sniffs interviewer small talk: a greeting shape anywhere in the text, or a
+    /// personal-life word as a whole word. Used only to LOWER confidence so the AI classifier
+    /// decides — never to assert Unrelated on its own.</summary>
+    private static bool LooksSocial(string normalizedLower)
+    {
+        foreach (var greeting in GreetingPhrases)
+        {
+            if (normalizedLower.Contains(greeting, StringComparison.Ordinal))
+                return true;
+        }
+
+        foreach (var token in normalizedLower.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (PersonalTopicWords.Contains(token.Trim('.', ',', '?', '!', ';', ':')))
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Backchannel / acknowledgement / function words that carry no topic content. A short

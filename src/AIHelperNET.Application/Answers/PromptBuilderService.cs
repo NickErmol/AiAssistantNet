@@ -68,6 +68,7 @@ public sealed class PromptBuilderService
             "For conceptual, design, 'what is', 'why', 'how does it work' questions — verbal answer only.");
         system.AppendLine("5. Start directly with the answer. Never say 'Great question' or restate the question.");
         system.AppendLine("6. Give the answer only — no 'why this is a good answer' commentary or meta-notes.");
+        system.AppendLine("7. " + GroundingRule);
 
         AppendCodeProfile(system, profile);
 
@@ -138,6 +139,7 @@ public sealed class PromptBuilderService
             "Be concise — 2–4 sentences or bullets. No restating the prior answer.");
         AppendCodeProfile(system, profile);
         system.AppendLine(SharedMarkdownRule);
+        system.AppendLine(GroundingRule);
 
         var user = new StringBuilder();
         user.AppendLine(CultureInfo.InvariantCulture, $"Original question: {originalQuestion}");
@@ -163,6 +165,7 @@ public sealed class PromptBuilderService
         system.AppendLine(ModeSystemPrompt(mode));
         AppendCodeProfile(system, profile);
         system.AppendLine(SharedMarkdownRule);
+        system.AppendLine(GroundingRule);
         system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
             "concise; do not pad, repeat, or add filler to fill space.");
 
@@ -181,7 +184,7 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
+            MaxTokens: ScreenMaxTokens(settings, mode));
     }
 
     /// <summary>Builds a prompt for an interviewer follow-up on a captured screen task: the model
@@ -208,6 +211,7 @@ public sealed class PromptBuilderService
         system.AppendLine(ModeSystemPrompt(mode));
         AppendCodeProfile(system, profile);
         system.AppendLine(SharedMarkdownRule);
+        system.AppendLine(GroundingRule);
         system.AppendLine("Use only as many tokens as the answer genuinely needs — be complete but " +
             "concise; do not pad, repeat, or add filler to fill space.");
         system.AppendLine("The interviewer has added requirements to, or asked about, the task on " +
@@ -243,7 +247,21 @@ public sealed class PromptBuilderService
             System: system.ToString(),
             User: user.ToString(),
             OutputLanguage: settings.OutputLanguage,
-            MaxTokens: Math.Max(MapLengthToTokens(settings.Length), 2000));
+            MaxTokens: ScreenMaxTokens(settings, mode));
+    }
+
+    /// <summary>Output cap for screen-mode answers. Code and design modes keep the generous floor —
+    /// solutions must be complete and runnable, and rich design tasks legitimately fill 1000+
+    /// tokens (the live eval's no-truncation gate proved lower caps cut them off). Explain and
+    /// multiple-choice answers are short by construction ("3–5 sentences", "answer letter first"),
+    /// so they get a spoken-length cap. The configured answer length wins only when it asks for
+    /// more.</summary>
+    private static int ScreenMaxTokens(AnswerSettings settings, ScreenAnalysisMode mode)
+    {
+        var floor = mode is ScreenAnalysisMode.ExplainCode or ScreenAnalysisMode.MultipleChoice
+            ? 550
+            : 2000;
+        return Math.Max(MapLengthToTokens(settings.Length), floor);
     }
 
     private static string ModeSystemPrompt(ScreenAnalysisMode mode) => mode switch
@@ -310,6 +328,14 @@ public sealed class PromptBuilderService
     private const string SharedMarkdownRule =
         "Formatting: use \"- \" for bullets and **bold** for emphasis; " +
         "put any code in fenced ```language blocks; no headers (#).";
+
+    // Anti-hallucination guard: in a live session, garbled input produced a nonexistent CLI tool
+    // name and a fabricated APIM policy expression — spoken aloud, those are disqualifying.
+    private const string GroundingRule =
+        "GROUNDING: never invent tool names, CLI commands, API properties, or policy elements — " +
+        "when unsure something exists, describe the capability generically instead of naming it. " +
+        "If the question or on-screen text appears garbled or incomplete, open with a one-line " +
+        "interpretation of what is being asked before answering.";
 
     private static void AppendStructureGuidance(StringBuilder sb, AnswerLength length)
     {

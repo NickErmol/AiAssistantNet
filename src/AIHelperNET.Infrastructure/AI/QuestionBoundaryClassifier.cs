@@ -66,7 +66,10 @@ public sealed class QuestionBoundaryClassifier(
           usually flagged by an explicit shift marker ("moving on", "next question", "different topic",
           "let's switch gears").
         - Unrelated: social filler, acknowledgements, or logistics ("thanks for sharing", "can you hear me?",
-          "give me a second to share my screen", "take your time"). Use Unrelated for filler, NOT NoQuestion.
+          "give me a second to share my screen", "take your time") — AND personal/social questions about the
+          candidate's life, health, injuries, weather, weekend, or family ("what injury do you have?",
+          "how are you doing?", "did it snap?"). Small talk is Unrelated even when it is a grammatically
+          complete question directed at the candidate. Use Unrelated for filler, NOT NoQuestion.
         - NoQuestion: reserved for empty/meaningless audio; for human filler prefer Unrelated.
 
         Tie-breaker (avoids over-splitting one question into two cards):
@@ -89,6 +92,8 @@ public sealed class QuestionBoundaryClassifier(
         - recent:["how would you scale the database?"] latest(Me):"do you mean the read path or the write path?" status:CollectingQuestion -> ClarificationOfCurrentQuestion (candidate Me clarifies scope)
         - recent:["explain how dependency injection works"] latest(Other):"completely different topic, what's your experience with kubernetes?" status:PreliminaryReady -> NewQuestion (explicit shift + new topic)
         - latest:"give me a second to share my screen" status:null -> Unrelated (logistics filler)
+        - latest(Other):"Now what injury do you have?" status:null -> Unrelated (personal small talk, not an interview question)
+        - latest(Other):"Hey Kumar, how are you?" status:PreliminaryReady -> Unrelated (greeting, even though it is a question)
 
         JSON schema (return exactly this shape — keep reason to at most 5 words):
         {"classification":"<one label above>","confidence":<0.0-1.0>,"reason":"<≤5 words>"}

@@ -54,5 +54,8 @@
   { "id": "task-reverse-ll", "recentItems": [], "latestItem": { "speaker": "Other", "text": "write a function to reverse a linked list" }, "activeTurnStatus": null, "expectedLabel": "TaskComplete", "note": "imperative coding task" },
   { "id": "task-design-cache", "recentItems": [], "latestItem": { "speaker": "Other", "text": "design an lru cache with o of one operations" }, "activeTurnStatus": null, "expectedLabel": "TaskComplete", "note": "imperative design task" },
   { "id": "task-sql-topn", "recentItems": [], "latestItem": { "speaker": "Other", "text": "write a sql query for the top three earners per department" }, "activeTurnStatus": null, "expectedLabel": "TaskComplete", "note": "imperative task" },
-  { "id": "filler-takeyourtime", "recentItems": [], "latestItem": { "speaker": "Other", "text": "no rush take your time" }, "activeTurnStatus": null, "expectedLabel": "Unrelated", "note": "social filler" }
+  { "id": "filler-takeyourtime", "recentItems": [], "latestItem": { "speaker": "Other", "text": "no rush take your time" }, "activeTurnStatus": null, "expectedLabel": "Unrelated", "note": "social filler" },
+  { "id": "social-injury", "recentItems": [], "latestItem": { "speaker": "Other", "text": "Now what injury do you have?" }, "activeTurnStatus": null, "expectedLabel": "Unrelated", "note": "personal small-talk question (verbatim from 2026-07-06 session, burned a generation)" },
+  { "id": "social-greeting", "recentItems": [], "latestItem": { "speaker": "Other", "text": "Hey, hey, hey, hey, Kumar, how are you?" }, "activeTurnStatus": null, "expectedLabel": "Unrelated", "note": "greeting between participants (verbatim from 2026-07-06 session)" },
+  { "id": "social-weekend", "recentItems": [], "latestItem": { "speaker": "Other", "text": "did you have a good weekend?" }, "activeTurnStatus": "PreliminaryReady", "expectedLabel": "Unrelated", "note": "personal small talk mid-interview" }
 ]

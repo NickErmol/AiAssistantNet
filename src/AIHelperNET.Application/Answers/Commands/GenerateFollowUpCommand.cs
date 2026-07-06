@@ -73,7 +73,8 @@ public sealed partial class GenerateFollowUpHandler(
             }
             answer.Complete(clock.GetUtcNow());
 
-            var version = AnswerVersion.Create(AnswerVersionType.FollowUp, chunks.ToString(), clock.GetUtcNow());
+            var version = AnswerVersion.Create(
+                AnswerVersionType.FollowUp, AnswerStreamMarkers.StripForStorage(chunks.ToString()), clock.GetUtcNow());
             turn.AddAnswerVersion(version);
 
             turn.TransitionTo(ConversationTurnStatus.RefinedReady);
