@@ -677,6 +677,9 @@ public class TranscriptPipelineServiceTests
             .Do(ci => capturedTokens.Enqueue(ci.ArgAt<CancellationToken>(1)));
 
         await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is dependency injection?"), uow, CancellationToken.None);
+        // The candidate answers in between — without this, two Other questions inside the
+        // compound-question fold window would (by design) fold into one turn.
+        await svc.ProcessAsync(session, MakeItem(Speaker.Me, "It means injecting dependencies."), uow, CancellationToken.None);
         await svc.ProcessAsync(session, MakeItem(Speaker.Other, "What exactly is the repository pattern?"), uow, CancellationToken.None);
         await Task.Delay(200);
 
