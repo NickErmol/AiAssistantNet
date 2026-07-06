@@ -106,11 +106,14 @@ public class TranscriptPipelineScreenFollowUpTests
     {
         var (svc, session, store, uow, boundary) = Make(BoundaryLabel.NoQuestion);
 
-        IReadOnlyList<TranscriptItem>? seen = null;
+        // A Noise outcome now falls through to normal boundary routing, which classifies again with
+        // plain transcript context — so collect every call and assert the screen-task branch's call
+        // (the first) carried the captured task.
+        var seen = new List<IReadOnlyList<TranscriptItem>>();
         boundary.ClassifyAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(ci =>
             {
-                seen = ci.ArgAt<IReadOnlyList<TranscriptItem>>(1);
+                seen.Add(ci.ArgAt<IReadOnlyList<TranscriptItem>>(1));
                 return Task.FromResult(Label(BoundaryLabel.NoQuestion));
             });
 
@@ -118,8 +121,8 @@ public class TranscriptPipelineScreenFollowUpTests
             TranscriptItem.Create(Speaker.Other, "now make it thread-safe", T0.AddSeconds(2), 0.9f),
             uow, CancellationToken.None);
 
-        seen.Should().NotBeNull("the screen-task branch must classify the interviewer utterance");
-        seen!.Should().Contain(i => i.Text.Contains("LRU cache"),
-            "the classifier must see the captured on-screen task so it can recognise an addition to it");
+        seen.Should().NotBeEmpty("the screen-task branch must classify the interviewer utterance");
+        seen[0].Should().Contain(i => i.Text.Contains("LRU cache"),
+            "the FIRST classification is the screen-follow-up decision and must carry the captured task");
     }
 }

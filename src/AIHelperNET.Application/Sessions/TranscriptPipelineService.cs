@@ -39,6 +39,7 @@ public sealed partial class TranscriptPipelineService(
     private const int MaxRecentItems = 5;
     private readonly Answers.ScreenTaskContextStore _screenStore = screenStore ?? new Answers.ScreenTaskContextStore();
     private readonly IScreenFollowUpClassifier? _screenFollowUpClassifier = screenFollowUpClassifier;
+    private readonly Answers.ScreenFocusReleaseValve _screenFocusValve = new();
     private SessionId? _sessionId;
     private string[] _recentTranscriptSnapshot = [];
 
@@ -149,7 +150,18 @@ public sealed partial class TranscriptPipelineService(
         // or asks about it spawns a NEW context-aware card (the capture card is never mutated).
         if (_screenStore.Current is { } screenCtx)
         {
-            switch (await ClassifyScreenFollowUpAsync(screenCtx, item, ct))
+            var followUpOutcome = await ClassifyScreenFollowUpAsync(screenCtx, item, ct);
+
+            // Stale-focus release: a task that only ever yields Noise (e.g. a garbage capture) must
+            // not hold focus until MOVED_ON — which never comes when the task text is meaningless.
+            // On release, skip the outcome switch entirely and continue to normal audio routing.
+            if (_screenFocusValve.Track(screenCtx.ScreenCardId, followUpOutcome, _time.GetUtcNow()))
+            {
+                _screenStore.Clear();
+                if (logger is not null)
+                    Log.ScreenFocusReleased(logger, screenCtx.TopicLabel);
+            }
+            else switch (followUpOutcome)
             {
                 case Answers.ScreenFollowUpOutcome.FollowUp:
                     _screenStore.AddAddition(item.Text);
@@ -160,7 +172,13 @@ public sealed partial class TranscriptPipelineService(
                     _screenStore.Clear();   // fall through to normal audio routing below
                     break;
                 default:
-                    return null;            // Noise — ignore
+                    // Noise means "not about the captured task" — NOT "not a question". Fall through
+                    // to normal boundary routing (keeping the screen focus) so a spoken question is
+                    // still detected. In the 2026-07-06 live session a garbage capture held focus and
+                    // Noise verdicts silently dropped 8 real questions over 19 minutes. The second
+                    // classification this costs (screen classifier + boundary path) is intentional —
+                    // do not "optimize" the fall-through away.
+                    break;
             }
         }
 
@@ -710,6 +728,7 @@ public sealed partial class TranscriptPipelineService(
         _accumulator.Reset();
         _regenDebouncer.Reset();
         _screenStore.Clear();
+        _screenFocusValve.Reset();
         _sessionId = null;
         _recentTranscriptSnapshot = [];
     }
@@ -777,5 +796,9 @@ public sealed partial class TranscriptPipelineService(
             Message = "ScreenFollowUp: task='{Task}' classifier -> {Outcome} text='{Text}'")]
         internal static partial void ScreenFollowUpClassified(
             ILogger logger, string task, Answers.ScreenFollowUpOutcome outcome, string text);
+
+        [LoggerMessage(Level = LogLevel.Information,
+            Message = "ScreenFollowUp: stale focus released for task='{Task}' (consecutive-noise/idle valve)")]
+        internal static partial void ScreenFocusReleased(ILogger logger, string task);
     }
 }
