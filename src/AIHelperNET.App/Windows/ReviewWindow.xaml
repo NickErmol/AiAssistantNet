@@ -1,0 +1,73 @@
+<Window x:Class="AIHelperNET.App.Windows.ReviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:AIHelperNET.App.Controls"
+        Title="Session Review"
+        Width="800" Height="650"
+        MinWidth="480" MinHeight="320"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Brush.Background.Window}"
+        Loaded="Window_Loaded">
+
+    <DockPanel Margin="12">
+
+        <!-- Header row: generated-at label, spacer, Regenerate, Export -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right"
+                    Content="Export…"
+                    Style="{StaticResource ActionBtn}"
+                    Margin="4,0,0,0"
+                    Command="{Binding ExportCommand}"/>
+            <Button DockPanel.Dock="Right"
+                    Content="Regenerate"
+                    Style="{StaticResource ActionBtn}"
+                    Command="{Binding RegenerateCommand}"/>
+            <TextBlock Text="{Binding GeneratedAtLabel}"
+                       VerticalAlignment="Center"
+                       FontSize="{DynamicResource Font.SM}"
+                       Foreground="{DynamicResource Brush.Foreground.Muted}"/>
+        </DockPanel>
+
+        <!-- Error banner — visible only when ErrorMessage is non-empty -->
+        <Border DockPanel.Dock="Top"
+                Margin="0,0,0,6"
+                Padding="8,4"
+                CornerRadius="3"
+                Background="#33CC4444"
+                BorderBrush="{DynamicResource Brush.Semantic.Error}"
+                BorderThickness="1"
+                Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       TextWrapping="Wrap"
+                       FontSize="{DynamicResource Font.SM}"
+                       Foreground="{DynamicResource Brush.Semantic.Error}"/>
+        </Border>
+
+        <!-- Loading overlay — centered ProgressBar + label, visible when IsLoading -->
+        <Grid DockPanel.Dock="Top"
+              Margin="0,0,0,6"
+              Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                <ProgressBar IsIndeterminate="True"
+                             Width="120" Height="4"
+                             VerticalAlignment="Center"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{DynamicResource Brush.Semantic.Busy}"/>
+                <TextBlock Text="  Analyzing session…"
+                           FontSize="{DynamicResource Font.SM}"
+                           Foreground="{DynamicResource Brush.Foreground.Muted}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Body: scrollable markdown content -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <controls:MarkdownPresenter Markdown="{Binding Markdown}"
+                                        Margin="0,4"/>
+        </ScrollViewer>
+
+    </DockPanel>
+</Window>

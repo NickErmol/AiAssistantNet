@@ -37,28 +37,55 @@
                                 BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="1" CornerRadius="4">
                             <StackPanel>
-                                <!-- Summary row button -->
-                                <Button Background="Transparent" BorderThickness="0"
-                                        Command="{Binding DataContext.ToggleExpandCommand,
-                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}">
-                                    <Grid Margin="8,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding DateLabel}"
-                                                   Foreground="{DynamicResource Brush.Foreground.Primary}"
-                                                   FontSize="{DynamicResource Font.SM}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Mode}"
-                                                   Foreground="{DynamicResource Brush.Foreground.Muted}"
-                                                   FontSize="{DynamicResource Font.XS}" Margin="8,0"/>
-                                        <TextBlock Grid.Column="2" Text="&#9654;"
-                                                   Foreground="{DynamicResource Brush.Foreground.Muted}"
-                                                   FontSize="{DynamicResource Font.XS}"/>
-                                    </Grid>
-                                </Button>
+                                <!-- Summary row: expand toggle + per-card actions -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Expand/collapse toggle -->
+                                    <Button Grid.Column="0" Background="Transparent" BorderThickness="0"
+                                            Command="{Binding DataContext.ToggleExpandCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Grid Margin="8,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding DateLabel}"
+                                                       Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                                       FontSize="{DynamicResource Font.SM}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Mode}"
+                                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                                       FontSize="{DynamicResource Font.XS}" Margin="8,0"/>
+                                            <TextBlock Grid.Column="2" Text="&#9654;"
+                                                       Foreground="{DynamicResource Brush.Foreground.Muted}"
+                                                       FontSize="{DynamicResource Font.XS}"/>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Review button -->
+                                    <Button Grid.Column="1"
+                                            Content="Review"
+                                            Style="{StaticResource ActionBtn}"
+                                            Margin="0,2,2,2"
+                                            Command="{Binding DataContext.ReviewCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+
+                                    <!-- Export button -->
+                                    <Button Grid.Column="2"
+                                            Content="Export…"
+                                            Style="{StaticResource ActionBtn}"
+                                            Margin="0,2,4,2"
+                                            Command="{Binding DataContext.ExportCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
 
                                 <!-- Expanded detail -->
                                 <Border Visibility="{Binding IsExpanded,
