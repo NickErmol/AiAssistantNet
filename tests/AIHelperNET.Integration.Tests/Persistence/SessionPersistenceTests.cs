@@ -56,6 +56,29 @@ public class SessionPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TranscriptItem_SpeakerAndConfidence_SurviveTheRoundTrip()
+    {
+        // Speaker attribution was silently dropped on save (get-only properties are not mapped by
+        // convention) — the 2026-07-06 session analysis had to reconstruct who-said-what from logs.
+        var t0 = DateTimeOffset.UtcNow;
+        var session = Session.Create(AnswerSettings.Default, CodeProfile.Empty, t0).Value;
+        session.AddTranscriptItem(TranscriptItem.Create(Speaker.Other, "What is CQRS?", t0.AddSeconds(1), 0.87f));
+        session.AddTranscriptItem(TranscriptItem.Create(Speaker.Me, "CQRS separates reads from writes.", t0.AddSeconds(2), 0.62f));
+
+        await _repo.AddAsync(session, default);
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var loaded = (await _repo.GetAsync(session.Id, default)).Value;
+        var items = loaded.Transcript.OrderBy(i => i.Timestamp).ToList();
+
+        items[0].Speaker.Should().Be(Speaker.Other);
+        items[0].Confidence.Should().BeApproximately(0.87f, 0.001f);
+        items[1].Speaker.Should().Be(Speaker.Me);
+        items[1].Confidence.Should().BeApproximately(0.62f, 0.001f);
+    }
+
+    [Fact]
     public async Task GetHistory_ReturnsOrderedSummaries()
     {
         for (int i = 0; i < 3; i++)
