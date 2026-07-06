@@ -35,11 +35,13 @@ public static class DependencyInjection
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<HistoryViewModel>();
         services.AddSingleton<AudioLevelViewModel>();
+        services.AddScoped<SessionReviewViewModel>();
 
         // Window context + windows
         services.AddSingleton<MainOverlayWindowContext>();
         services.AddSingleton<MainOverlayWindow>();
         services.AddSingleton<SettingsWindow>();
+        // ReviewWindow is constructed manually (transient, new instance per session)
 
         return services;
     }

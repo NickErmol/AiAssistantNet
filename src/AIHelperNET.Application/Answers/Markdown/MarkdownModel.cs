@@ -23,3 +23,6 @@ public sealed record ListBlock(IReadOnlyList<IReadOnlyList<MarkdownInline>> Item
 
 /// <summary>A fenced code block.</summary>
 public sealed record CodeBlock(string? Language, string Code) : MarkdownBlock;
+
+/// <summary>An ATX heading (1–4 # characters). Level is clamped to 1–4.</summary>
+public sealed record HeadingBlock(int Level, IReadOnlyList<MarkdownInline> Inlines) : MarkdownBlock;

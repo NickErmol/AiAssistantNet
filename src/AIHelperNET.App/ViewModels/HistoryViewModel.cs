@@ -39,6 +39,10 @@ public sealed partial class HistoryViewModel(IMediator mediator) : ObservableObj
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
+    /// <summary>Raised when the user requests to open the post-session review for a session.
+    /// The window layer subscribes and creates a <see cref="SessionReviewViewModel"/>.</summary>
+    public event Action<SessionId>? ReviewRequested;
+
     public ObservableCollection<SessionSummaryVm> Sessions { get; } = [];
 
     [RelayCommand]
@@ -68,6 +72,13 @@ public sealed partial class HistoryViewModel(IMediator mediator) : ObservableObj
         {
             vm.IsExpanded = false;
         }
+    }
+
+    [RelayCommand]
+    private void Review(SessionSummaryVm? vm)
+    {
+        if (vm is null) return;
+        ReviewRequested?.Invoke(vm.Id);
     }
 
     [RelayCommand]

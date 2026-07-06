@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.Application.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace AIHelperNET.App.Windows;
@@ -48,9 +49,11 @@ public partial class MainOverlayWindow : Window
         "Brush.Background.Sidebar", "Brush.Background.Panel", "Brush.Background.Card",
     };
 
-    private readonly SettingsWindow    _settingsWindow;
-    private readonly SettingsViewModel _settingsVm;
-    private readonly HistoryViewModel  _historyVm;
+    private readonly SettingsWindow              _settingsWindow;
+    private readonly SettingsViewModel           _settingsVm;
+    private readonly HistoryViewModel            _historyVm;
+    private readonly IServiceScopeFactory        _reviewScopeFactory;
+    private readonly List<ReviewWindow>          _reviewWindows = [];
     private bool _stealthActive;
     private bool _seeThrough;
     private bool _showingHistory;
@@ -60,15 +63,18 @@ public partial class MainOverlayWindow : Window
         MainOverlayWindowContext context,
         SettingsWindow settingsWindow,
         SettingsViewModel settingsVm,
-        HistoryViewModel historyVm)
+        HistoryViewModel historyVm,
+        IServiceScopeFactory reviewScopeFactory)
     {
         InitializeComponent();
-        DataContext     = context;
-        _settingsWindow = settingsWindow;
-        _settingsVm     = settingsVm;
-        _historyVm      = historyVm;
+        DataContext          = context;
+        _settingsWindow      = settingsWindow;
+        _settingsVm          = settingsVm;
+        _historyVm           = historyVm;
+        _reviewScopeFactory  = reviewScopeFactory;
         _settingsVm.OpacityChanged += OnOverlayOpacityChanged;
         HistoryPanelControl.DataContext = _historyVm;
+        _historyVm.ReviewRequested += OnReviewRequested;
     }
 
     /// <summary>
@@ -146,13 +152,31 @@ public partial class MainOverlayWindow : Window
         _stealthActive = enable && SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
         if (!_stealthActive) SetWindowDisplayAffinity(hwnd, WDA_NONE);
 
-        // Keep the settings window in lockstep with the overlay's stealth state.
+        // Keep the settings window and all open review windows in lockstep.
         _settingsWindow.SetStealth(_stealthActive);
+        foreach (var rw in _reviewWindows)
+            rw.SetStealth(_stealthActive);
 
         if (StealthBtn is not null)
             StealthBtn.Content = _stealthActive ? "👁" : "🎥";
 
         Log.Information("Overlay: stealth={S}", _stealthActive);
+    }
+
+    private void OnReviewRequested(AIHelperNET.Domain.Ids.SessionId sessionId)
+    {
+        var scope = _reviewScopeFactory.CreateScope();
+        var vm = scope.ServiceProvider.GetRequiredService<SessionReviewViewModel>();
+        vm.Initialize(sessionId);
+        var window = new ReviewWindow(vm);
+        _reviewWindows.Add(window);
+        window.SetStealth(_stealthActive);
+        window.Closed += (_, _) =>
+        {
+            _reviewWindows.Remove(window);
+            scope.Dispose();
+        };
+        window.Show();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -208,9 +232,13 @@ public partial class MainOverlayWindow : Window
     // The settings window isn't Owner-tied to the overlay (it lives independently in the desktop's
     // top-level window list), and it hides instead of closing — so it would linger and keep the app
     // alive after the overlay closes. Force it shut when the overlay closes.
+    // Review windows are also non-owner, so close them all too.
     protected override void OnClosed(EventArgs e)
     {
+        _historyVm.ReviewRequested -= OnReviewRequested;
         _settingsWindow.ForceClose();
+        foreach (var rw in _reviewWindows.ToList())
+            rw.Close();
         base.OnClosed(e);
     }
 }

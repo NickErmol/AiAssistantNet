@@ -31,6 +31,7 @@ public static class DependencyInjection
                 b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
              .AddInterceptors(new SqlitePragmaInterceptor()));
         services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<ISessionReviewRepository, SessionReviewRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         // Settings & secrets
@@ -71,6 +72,10 @@ public static class DependencyInjection
 
         services.AddHttpClient<LatestQuestionExtractor>();
         services.AddSingleton<ILatestQuestionExtractor, LatestQuestionExtractor>();
+
+        services.AddHttpClient<SessionReviewAnalyzer>(c =>
+            c.Timeout = TimeSpan.FromMinutes(5));
+        services.AddSingleton<ISessionReviewAnalyzer, SessionReviewAnalyzer>();
 
         services.AddSingleton<IBoundaryDecisionRecorder>(
             _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));
