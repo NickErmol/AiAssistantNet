@@ -185,8 +185,12 @@ public class InterviewScenarioTests
         // Interviewer instruction is carried into the prompt.
         prompt.User.Should().Contain(s.InterviewerSpeech);
 
-        // Screen analysis floors output at 2000 tokens regardless of length setting.
-        prompt.MaxTokens.Should().BeGreaterThanOrEqualTo(2000);
+        // Code and design modes keep the generous 2000-token floor; explain/MCQ answers are short
+        // by construction and get a spoken-length cap.
+        var expectedFloor = mode is ScreenAnalysisMode.ExplainCode or ScreenAnalysisMode.MultipleChoice
+            ? 550
+            : 2000;
+        prompt.MaxTokens.Should().BeGreaterThanOrEqualTo(expectedFloor);
 
         // A populated candidate stack surfaces in the system prompt (the .NET / Angular scenarios).
         if (s.Profile != CodeProfile.Empty)

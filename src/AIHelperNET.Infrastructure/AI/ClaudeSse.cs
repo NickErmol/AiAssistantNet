@@ -26,6 +26,27 @@ public static class ClaudeSse
         }
     }
 
+    /// <summary>Extracts <c>delta.stop_reason</c> from a <c>message_delta</c> SSE event, or
+    /// <see langword="null"/> for any other event or malformed JSON.</summary>
+    public static string? ParseStopReason(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("type", out var typeEl)) return null;
+            if (typeEl.GetString() != "message_delta") return null;
+
+            if (!root.TryGetProperty("delta", out var delta)) return null;
+            return delta.TryGetProperty("stop_reason", out var reason) ? reason.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     public static string BuildRequestJson(
         string model, string systemPrompt, string userPrompt, int maxTokens)
     {
