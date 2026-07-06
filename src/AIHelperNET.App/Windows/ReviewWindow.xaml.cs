@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Interop;
 using AIHelperNET.App.ViewModels;
+using Serilog;
 
 namespace AIHelperNET.App.Windows;
 
@@ -50,7 +51,16 @@ public sealed partial class ReviewWindow : Window
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
-        => await _vm.LoadAsync();
+    {
+        try
+        {
+            await _vm.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ReviewWindow: unexpected error in Window_Loaded");
+        }
+    }
 
     /// <inheritdoc/>
     protected override void OnClosed(EventArgs e)

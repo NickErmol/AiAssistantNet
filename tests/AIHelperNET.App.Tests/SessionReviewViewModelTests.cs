@@ -199,6 +199,88 @@ public class SessionReviewViewModelTests
 
         vm.IsLoading.Should().BeFalse();
     }
+
+    // ── Finding 2: exception safety ───────────────────────────────────────────
+
+    [Fact]
+    public async Task LoadAsync_WhenMediatorThrows_SetsErrorMessage_DoesNotRethrow()
+    {
+        var (vm, mediator) = Build();
+        mediator.When(m => m.Send(Arg.Any<GetSessionReviewQuery>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("DB exploded"));
+
+        var act = () => vm.LoadAsync();
+        await act.Should().NotThrowAsync();
+        vm.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task RegenerateAsync_WhenMediatorThrows_SetsErrorMessage_DoesNotRethrow()
+    {
+        var (vm, mediator) = Build();
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GetSessionReviewQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result<SessionReviewDto?>>(Result.Ok<SessionReviewDto?>(SomeReview)));
+#pragma warning restore CA2012
+        mediator.When(m => m.Send(Arg.Any<GenerateSessionReviewCommand>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("Network exploded"));
+
+        await vm.LoadAsync();
+        var act = () => vm.RegenerateAsync();
+        await act.Should().NotThrowAsync();
+        vm.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    // ── Finding 4: concurrent regenerate guard ────────────────────────────────
+
+    [Fact]
+    public async Task RegenerateAsync_WhileLoading_DoesNotSendSecondGenerateCommand()
+    {
+        var (vm, mediator) = Build();
+        var tcs = new TaskCompletionSource<Result<SessionReviewDto>>();
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GetSessionReviewQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Result<SessionReviewDto?>>(Result.Ok<SessionReviewDto?>(null)));
+        mediator.Send(Arg.Any<GenerateSessionReviewCommand>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => new ValueTask<Result<SessionReviewDto>>(tcs.Task));
+#pragma warning restore CA2012
+
+        var loadTask = vm.LoadAsync(); // starts, IsLoading = true, waiting on tcs
+        // IsLoading should be true now
+        vm.IsLoading.Should().BeTrue();
+        // Attempt to regenerate while loading — should return immediately without sending
+        await vm.RegenerateAsync();
+        // Complete the first load
+        tcs.SetResult(Result.Ok(SomeReview));
+        await loadTask;
+        // Only 1 Send for GenerateSessionReviewCommand
+        await mediator.Received(1).Send(Arg.Any<GenerateSessionReviewCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── Finding 5: IsLoading true during DB query ────────────────────────────
+
+    [Fact]
+    public async Task LoadAsync_IsLoading_TrueDuringQueryRoundTrip()
+    {
+        var (vm, mediator) = Build();
+        var tcs = new TaskCompletionSource<Result<SessionReviewDto?>>();
+        bool? loadingDuringQuery = null;
+#pragma warning disable CA2012
+        mediator.Send(Arg.Any<GetSessionReviewQuery>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                loadingDuringQuery = vm.IsLoading;
+                return new ValueTask<Result<SessionReviewDto?>>(tcs.Task);
+            });
+#pragma warning restore CA2012
+
+        var loadTask = vm.LoadAsync();
+        tcs.SetResult(Result.Ok<SessionReviewDto?>(SomeReview));
+        await loadTask;
+
+        loadingDuringQuery.Should().BeTrue();
+        vm.IsLoading.Should().BeFalse();
+    }
 }
 
 public class HistoryViewModelReviewRequestedTests

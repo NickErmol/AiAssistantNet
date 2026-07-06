@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mediator;
 using Microsoft.Win32;
+using Serilog;
 
 namespace AIHelperNET.App.ViewModels;
 
@@ -16,7 +17,10 @@ public sealed partial class SessionReviewViewModel(IMediator mediator) : Observa
     private SessionId _sessionId;
     private CancellationTokenSource _cts = new();
 
+    [NotifyCanExecuteChangedFor(nameof(RegenerateCommand))]
     [ObservableProperty] private bool   _isLoading;
+
+    [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
     [ObservableProperty] private string _markdown        = string.Empty;
     [ObservableProperty] private string _generatedAtLabel = string.Empty;
     [ObservableProperty] private string _errorMessage    = string.Empty;
@@ -34,6 +38,8 @@ public sealed partial class SessionReviewViewModel(IMediator mediator) : Observa
     /// <summary>Loads an existing review if available; otherwise generates one.</summary>
     public async Task LoadAsync()
     {
+        IsLoading = true;
+        ErrorMessage = string.Empty;
         var token = _cts.Token;
         try
         {
@@ -52,12 +58,26 @@ public sealed partial class SessionReviewViewModel(IMediator mediator) : Observa
         {
             // Silently swallow; user closed the window
         }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "SessionReviewViewModel: unexpected error in LoadAsync");
+            ErrorMessage = "Failed to load review: " + ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
+    private bool CanRegenerate() => !IsLoading;
+
     /// <summary>Re-generates the review, replacing the current one.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRegenerate))]
     public async Task RegenerateAsync()
     {
+        if (IsLoading) return; // belt for programmatic calls
+        IsLoading = true;
+        ErrorMessage = string.Empty;
         var token = _cts.Token;
         try
         {
@@ -67,24 +87,25 @@ public sealed partial class SessionReviewViewModel(IMediator mediator) : Observa
         {
             // Silently swallow
         }
-    }
-
-    private async Task GenerateCoreAsync(CancellationToken token)
-    {
-        IsLoading = true;
-        ErrorMessage = string.Empty;
-        try
+        catch (Exception ex)
         {
-            var result = await mediator.Send(new GenerateSessionReviewCommand(_sessionId), token);
-            if (result.IsSuccess)
-                ApplyReview(result.Value);
-            else
-                ErrorMessage = string.Join(", ", result.Errors.Select(e => e.Message));
+            Log.Error(ex, "SessionReviewViewModel: unexpected error in RegenerateAsync");
+            ErrorMessage = "Failed to regenerate review: " + ex.Message;
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    private async Task GenerateCoreAsync(CancellationToken token)
+    {
+        // IsLoading is owned by the caller (LoadAsync / RegenerateAsync)
+        var result = await mediator.Send(new GenerateSessionReviewCommand(_sessionId), token);
+        if (result.IsSuccess)
+            ApplyReview(result.Value);
+        else
+            ErrorMessage = string.Join(", ", result.Errors.Select(e => e.Message));
     }
 
     private void ApplyReview(SessionReviewDto dto)
@@ -100,8 +121,10 @@ public sealed partial class SessionReviewViewModel(IMediator mediator) : Observa
         _cts.Cancel();
     }
 
+    private bool CanExport() => !string.IsNullOrEmpty(Markdown);
+
     /// <summary>Exports the current markdown to a user-chosen file.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanExport))]
     public async Task ExportAsync()
     {
         if (string.IsNullOrEmpty(Markdown)) return;

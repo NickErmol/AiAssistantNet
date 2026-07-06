@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.Application.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace AIHelperNET.App.Windows;
@@ -51,7 +52,7 @@ public partial class MainOverlayWindow : Window
     private readonly SettingsWindow              _settingsWindow;
     private readonly SettingsViewModel           _settingsVm;
     private readonly HistoryViewModel            _historyVm;
-    private readonly Func<SessionReviewViewModel> _reviewVmFactory;
+    private readonly IServiceScopeFactory        _reviewScopeFactory;
     private readonly List<ReviewWindow>          _reviewWindows = [];
     private bool _stealthActive;
     private bool _seeThrough;
@@ -63,14 +64,14 @@ public partial class MainOverlayWindow : Window
         SettingsWindow settingsWindow,
         SettingsViewModel settingsVm,
         HistoryViewModel historyVm,
-        Func<SessionReviewViewModel> reviewVmFactory)
+        IServiceScopeFactory reviewScopeFactory)
     {
         InitializeComponent();
-        DataContext       = context;
-        _settingsWindow   = settingsWindow;
-        _settingsVm       = settingsVm;
-        _historyVm        = historyVm;
-        _reviewVmFactory  = reviewVmFactory;
+        DataContext          = context;
+        _settingsWindow      = settingsWindow;
+        _settingsVm          = settingsVm;
+        _historyVm           = historyVm;
+        _reviewScopeFactory  = reviewScopeFactory;
         _settingsVm.OpacityChanged += OnOverlayOpacityChanged;
         HistoryPanelControl.DataContext = _historyVm;
         _historyVm.ReviewRequested += OnReviewRequested;
@@ -164,12 +165,17 @@ public partial class MainOverlayWindow : Window
 
     private void OnReviewRequested(AIHelperNET.Domain.Ids.SessionId sessionId)
     {
-        var vm = _reviewVmFactory();
+        var scope = _reviewScopeFactory.CreateScope();
+        var vm = scope.ServiceProvider.GetRequiredService<SessionReviewViewModel>();
         vm.Initialize(sessionId);
         var window = new ReviewWindow(vm);
         _reviewWindows.Add(window);
         window.SetStealth(_stealthActive);
-        window.Closed += (_, _) => _reviewWindows.Remove(window);
+        window.Closed += (_, _) =>
+        {
+            _reviewWindows.Remove(window);
+            scope.Dispose();
+        };
         window.Show();
     }
 
