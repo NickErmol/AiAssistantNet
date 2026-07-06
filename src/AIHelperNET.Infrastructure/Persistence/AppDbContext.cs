@@ -48,6 +48,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                     dto => dto.ToUnixTimeMilliseconds(),
                     ms  => DateTimeOffset.FromUnixTimeMilliseconds(ms));
             t.Property(x => x.BoundaryRole).HasConversion<int>().HasDefaultValue(BoundaryRole.None);
+            // Get-only properties are not mapped by convention — without explicit config, speaker
+            // attribution and ASR confidence were silently dropped on save (rows predating this
+            // mapping read back as the column defaults: Speaker.Me / 0.0).
+            t.Property(x => x.Speaker).HasConversion<int>().HasDefaultValue(Speaker.Me);
+            t.Property(x => x.Confidence).HasDefaultValue(0f);
         });
 
         s.OwnsMany(x => x.Questions, q =>
