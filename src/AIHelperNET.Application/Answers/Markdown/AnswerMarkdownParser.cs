@@ -90,6 +90,15 @@ public static class AnswerMarkdownParser
                 continue;
             }
 
+            // ATX heading: 1–4 '#' characters followed by a space
+            if (TryStripHeading(trimmed, out var headingLevel, out var headingContent))
+            {
+                FlushParagraph();
+                blocks.Add(new HeadingBlock(headingLevel, ParseInlines(headingContent)));
+                i++;
+                continue;
+            }
+
             // Otherwise accumulate into the current paragraph
             paragraph.Add(line.Trim());
             i++;
@@ -97,6 +106,21 @@ public static class AnswerMarkdownParser
 
         FlushParagraph();
         return blocks;
+    }
+
+    private static bool TryStripHeading(string trimmed, out int level, out string content)
+    {
+        level = 0;
+        content = string.Empty;
+        if (trimmed.Length == 0 || trimmed[0] != '#') return false;
+        var count = 0;
+        while (count < trimmed.Length && trimmed[count] == '#')
+            count++;
+        if (count < 1 || count > 4) return false;
+        if (count >= trimmed.Length || trimmed[count] != ' ') return false;
+        level = count;
+        content = trimmed[(count + 1)..];
+        return true;
     }
 
     private static bool IsUnorderedBullet(string trimmed)

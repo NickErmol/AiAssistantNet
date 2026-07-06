@@ -105,13 +105,77 @@ public class AnswerMarkdownParserTests
         code.Code.Should().Be("line one\nline two");
     }
 
+    // --- Heading block tests ---
+
     [Fact]
-    public void Parse_HeaderLine_DegradesToPlainParagraph()
+    public void Parse_H2_YieldsHeadingBlockLevel2()
     {
-        var blocks = AnswerMarkdownParser.Parse("# Not a header");
+        var blocks = AnswerMarkdownParser.Parse("## Section Title");
+        blocks.Should().ContainSingle();
+        var h = blocks[0].Should().BeOfType<HeadingBlock>().Subject;
+        h.Level.Should().Be(2);
+        h.Inlines.Should().ContainSingle()
+            .Which.Should().BeOfType<TextRun>()
+            .Which.Text.Should().Be("Section Title");
+    }
+
+    [Fact]
+    public void Parse_H1_YieldsHeadingBlockLevel1()
+    {
+        var blocks = AnswerMarkdownParser.Parse("# H1");
+        var h = blocks[0].Should().BeOfType<HeadingBlock>().Subject;
+        h.Level.Should().Be(1);
+        ((TextRun)h.Inlines[0]).Text.Should().Be("H1");
+    }
+
+    [Fact]
+    public void Parse_H4_YieldsHeadingBlockLevel4()
+    {
+        var blocks = AnswerMarkdownParser.Parse("#### H4");
+        var h = blocks[0].Should().BeOfType<HeadingBlock>().Subject;
+        h.Level.Should().Be(4);
+        ((TextRun)h.Inlines[0]).Text.Should().Be("H4");
+    }
+
+    [Fact]
+    public void Parse_HashNoSpace_DegradesToParagraph()
+    {
+        var blocks = AnswerMarkdownParser.Parse("##NoSpace");
         blocks[0].Should().BeOfType<ParagraphBlock>()
             .Which.Inlines[0].Should().BeOfType<TextRun>()
-            .Which.Text.Should().Be("# Not a header");
+            .Which.Text.Should().Be("##NoSpace");
+    }
+
+    [Fact]
+    public void Parse_FiveHashes_DegradesToParagraph()
+    {
+        var blocks = AnswerMarkdownParser.Parse("##### five");
+        blocks[0].Should().BeOfType<ParagraphBlock>()
+            .Which.Inlines[0].Should().BeOfType<TextRun>()
+            .Which.Text.Should().Be("##### five");
+    }
+
+    [Fact]
+    public void Parse_HeadingWithBoldInline_YieldsMixedInlines()
+    {
+        var blocks = AnswerMarkdownParser.Parse("## Use **bold** here");
+        var h = blocks[0].Should().BeOfType<HeadingBlock>().Subject;
+        h.Level.Should().Be(2);
+        h.Inlines.Should().HaveCount(3);
+        h.Inlines[0].Should().BeOfType<TextRun>().Which.Text.Should().Be("Use ");
+        h.Inlines[1].Should().BeOfType<BoldRun>().Which.Text.Should().Be("bold");
+        h.Inlines[2].Should().BeOfType<TextRun>().Which.Text.Should().Be(" here");
+    }
+
+    [Fact]
+    public void Parse_HeadingBetweenParagraphs_ParsesAllBlocks()
+    {
+        var md = "Intro text.\n\n## Section\n\nBody text.";
+        var blocks = AnswerMarkdownParser.Parse(md);
+        blocks.Should().HaveCount(3);
+        blocks[0].Should().BeOfType<ParagraphBlock>();
+        blocks[1].Should().BeOfType<HeadingBlock>().Which.Level.Should().Be(2);
+        blocks[2].Should().BeOfType<ParagraphBlock>();
     }
 
     [Fact]

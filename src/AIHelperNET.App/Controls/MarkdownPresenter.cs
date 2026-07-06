@@ -51,6 +51,7 @@ public sealed class MarkdownPresenter : ContentControl
         ParagraphBlock p => Paragraph(p),
         ListBlock l      => List(l),
         CodeBlock c      => Code(c),
+        HeadingBlock h   => Heading(h),
         _                => new TextBlock()
     };
 
@@ -64,6 +65,28 @@ public sealed class MarkdownPresenter : ContentControl
         };
         tb.SetResourceReference(TextBlock.ForegroundProperty, "Brush.Foreground.Primary");
         foreach (var inline in p.Inlines)
+            tb.Inlines.Add(ToInline(inline));
+        return tb;
+    }
+
+    private TextBlock Heading(HeadingBlock h)
+    {
+        var scale = h.Level switch
+        {
+            1 => 1.50,
+            2 => 1.30,
+            3 => 1.15,
+            _ => 1.05   // level 4
+        };
+        var tb = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = BaseFontSize * scale,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 4)
+        };
+        tb.SetResourceReference(TextBlock.ForegroundProperty, "Brush.Foreground.Primary");
+        foreach (var inline in h.Inlines)
             tb.Inlines.Add(ToInline(inline));
         return tb;
     }
