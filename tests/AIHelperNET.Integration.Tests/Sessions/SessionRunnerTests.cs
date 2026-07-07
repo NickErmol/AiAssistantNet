@@ -5,6 +5,7 @@ using AIHelperNET.Application.Sessions;
 using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
+using AIHelperNET.Integration.Tests.E2E;
 using FluentAssertions;
 using FluentResults;
 using Mediator;
@@ -55,7 +56,7 @@ public class SessionRunnerTests
         var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink, classifier);
         var capture        = new FakeAudioCaptureService(captureFrames);
         var transcription  = new FakeTranscriptionService();
-        return new SessionRunner(scopeFactory, capture, transcription, pipeline);
+        return new SessionRunner(scopeFactory, capture, new FakeSttResolver(transcription), pipeline);
     }
 
     [Fact]

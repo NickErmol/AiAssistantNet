@@ -69,9 +69,6 @@ public static class DependencyInjection
             sp.GetRequiredService<ISecretStore>(),
             sp.GetService<IOverlayStatusNotifier>()));   // registered by the App layer; null in bare-Infra hosts
 
-        // TEMP bridge until SessionRunner resolves per-session (next commit removes this):
-        services.AddSingleton<ITranscriptionService>(sp => sp.GetRequiredService<WhisperTranscriptionService>());
-
         // OCR
         services.AddSingleton<IScreenOcrService, WindowsOcrService>();
 

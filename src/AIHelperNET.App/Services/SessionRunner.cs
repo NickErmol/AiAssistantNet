@@ -12,7 +12,7 @@ namespace AIHelperNET.App.Services;
 public sealed class SessionRunner(
     IServiceScopeFactory scopeFactory,
     IAudioCaptureService audioCapture,
-    ITranscriptionService transcription,
+    ISttResolver sttResolver,
     TranscriptPipelineService pipeline,
     int segmentMergeWindowMs = 150)
 {
@@ -25,7 +25,8 @@ public sealed class SessionRunner(
         SessionId sessionId,
         AudioDeviceSelection devices,
         TranscriptionOptions options,
-        AudioSourceMode audioSource)
+        AudioSourceMode audioSource,
+        SttProvider sttProvider = SttProvider.Whisper)
     {
         _sessionScope = scopeFactory.CreateScope();
         var repo = _sessionScope.ServiceProvider.GetRequiredService<ISessionRepository>();
@@ -46,7 +47,7 @@ public sealed class SessionRunner(
         // the handshake. Fire-and-forget; best-effort.
         _ = WarmUpAnswerProviderAsync(_cts.Token);
 
-        _pipelineTask = RunAsync(result.Value, devices, options, audioSource, _cts.Token);
+        _pipelineTask = RunAsync(result.Value, devices, options, audioSource, sttProvider, _cts.Token);
     }
 
     private async Task WarmUpAnswerProviderAsync(CancellationToken ct)
@@ -100,11 +101,13 @@ public sealed class SessionRunner(
         AudioDeviceSelection devices,
         TranscriptionOptions options,
         AudioSourceMode audioSource,
+        SttProvider sttProvider,
         CancellationToken ct)
     {
         Log.Information("SessionRunner: pipeline starting (mode={AudioSource})", audioSource);
 
         var uow = _sessionScope!.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var transcription = sttResolver.Resolve(sttProvider);
 
         bool runMic      = audioSource != AudioSourceMode.SystemAudioOnly;
         bool runLoopback = audioSource != AudioSourceMode.MicrophoneOnly;

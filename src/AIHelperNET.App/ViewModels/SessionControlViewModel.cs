@@ -100,7 +100,8 @@ public sealed partial class SessionControlViewModel(
                         settings?.WhisperModel ?? WhisperModelSize.LargeTurbo,
                         settings?.WhisperLanguage ?? "auto",
                         glossaryDomains),
-                    AudioSource);
+                    AudioSource,
+                    settings?.SttProvider ?? SttProvider.Whisper);
             }
         }
         else if (ActiveSessionId is { } id)

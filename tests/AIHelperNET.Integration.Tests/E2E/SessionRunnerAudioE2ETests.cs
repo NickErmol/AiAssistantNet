@@ -54,7 +54,7 @@ public class SessionRunnerAudioE2ETests : IAsyncLifetime
     private SessionRunner NewRunner(IReadOnlyList<ScriptedUtterance> script) =>
         new(_host.Services.GetRequiredService<IServiceScopeFactory>(),
             new ScriptedAudioCaptureService(script),
-            new ScriptedTranscriptionService(script),
+            new FakeSttResolver(new ScriptedTranscriptionService(script)),
             _host.Services.GetRequiredService<TranscriptPipelineService>(),
             segmentMergeWindowMs: MergeWindowMs);
 

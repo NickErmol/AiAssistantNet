@@ -45,3 +45,10 @@ public sealed class ScriptedTranscriptionService(IReadOnlyList<ScriptedUtterance
         }
     }
 }
+
+/// <summary>Test resolver: always returns the supplied service regardless of provider.</summary>
+public sealed class FakeSttResolver(ITranscriptionService service) : ISttResolver
+{
+    /// <inheritdoc/>
+    public ITranscriptionService Resolve(SttProvider provider) => service;
+}

@@ -5,6 +5,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
+using AIHelperNET.Infrastructure.Transcription;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -67,7 +68,7 @@ public class RealAudioE2ETests : IAsyncLifetime
     private SessionRunner NewRunner(IReadOnlyList<WavUtterance> script) =>
         new(_host.Services.GetRequiredService<IServiceScopeFactory>(),
             new WavFileAudioCaptureService(script),
-            _host.Services.GetRequiredService<ITranscriptionService>(), // REAL Whisper
+            new FakeSttResolver(_host.Services.GetRequiredService<WhisperTranscriptionService>()), // REAL Whisper
             _host.Services.GetRequiredService<TranscriptPipelineService>(),
             segmentMergeWindowMs: MergeWindowMs);
 
