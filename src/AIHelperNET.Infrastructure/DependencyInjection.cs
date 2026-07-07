@@ -81,6 +81,10 @@ public static class DependencyInjection
             c.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton<ISessionReviewAnalyzer, SessionReviewAnalyzer>();
 
+        services.AddHttpClient<ProfileCondenser>(c =>
+            c.Timeout = TimeSpan.FromMinutes(2));
+        services.AddSingleton<IProfileCondenser, ProfileCondenser>();
+
         services.AddSingleton<IBoundaryDecisionRecorder>(
             _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));
 
