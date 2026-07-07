@@ -83,7 +83,8 @@ public sealed partial class GenerateScreenFollowUpHandler(
 
         var prompt = PromptBuilderService.BuildScreenFollowUp(
             session.CodeProfile, answerSettings,
-            request.Ocr, request.Mode, request.Additions, request.RecentTranscript, priorAnswer);
+            request.Ocr, request.Mode, request.Additions, request.RecentTranscript, priorAnswer,
+            candidateProfileCard: settings.CandidateProfileCard);
 
         var chunks = new System.Text.StringBuilder();
         try

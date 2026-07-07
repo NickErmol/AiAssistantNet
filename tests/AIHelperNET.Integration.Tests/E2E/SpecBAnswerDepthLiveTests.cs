@@ -16,7 +16,7 @@ namespace AIHelperNET.Integration.Tests.E2E;
 
 /// <summary>
 /// Spec B manual-verification harness (live Claude). Builds the PRODUCTION audio prompt via
-/// <see cref="PromptBuilderService.Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{Domain.Sessions.TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?, int?)"/>
+/// <see cref="PromptBuilderService.Build(CodeProfile, AnswerSettings, string, string?, IReadOnlyList{Domain.Sessions.TranscriptItem}?, IReadOnlyList{ValueTuple{string,string}}?, int?, string?)"/>
 /// at the Spec B default 800-token cap, then sends it to the real Anthropic API using the key from
 /// Windows Credential Manager (same store production uses). Gated/self-skips when no key is present,
 /// so CI and offline runs stay green. Uses a non-streaming request so it can read back

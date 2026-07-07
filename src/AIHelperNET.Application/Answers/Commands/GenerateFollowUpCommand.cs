@@ -60,7 +60,8 @@ public sealed partial class GenerateFollowUpHandler(
 
         var prompt = PromptBuilderService.BuildFollowUp(
             session.CodeProfile, answerSettings,
-            question.Text, priorText, request.FollowUpText);
+            question.Text, priorText, request.FollowUpText,
+            candidateProfileCard: settings.CandidateProfileCard);
 
         var chunks = new System.Text.StringBuilder();
         try
