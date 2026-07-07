@@ -54,3 +54,12 @@ public enum AiBackend
     /// <summary>Ollama local model.</summary>
     Ollama
 }
+
+/// <summary>Selects which speech-to-text provider transcribes session audio.</summary>
+public enum SttProvider
+{
+    /// <summary>Local Whisper — offline, private. The default.</summary>
+    Whisper,
+    /// <summary>Deepgram cloud streaming — sub-second finals, requires API key.</summary>
+    Deepgram
+}

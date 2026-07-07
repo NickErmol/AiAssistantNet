@@ -67,6 +67,9 @@ public sealed record AppSettingsDto(
     /// <summary>Glossary domain keys whose terms bias transcription. Empty ⇒ none.</summary>
     public IReadOnlyList<string> EnabledGlossaryDomains { get; init; } = [];
 
+    /// <summary>Speech-to-text provider; Whisper is the offline default.</summary>
+    public SttProvider SttProvider { get; init; } = SttProvider.Whisper;
+
     /// <summary>Returns a copy with <see cref="MaxAnswerTokens"/> and <see cref="LatestQuestionWindowSeconds"/>
     /// coerced into their valid ranges: missing/non-positive → defaults; otherwise clamped.
     /// Also strips invalid or duplicate-id entries from <see cref="HotkeyOverrides"/>.</summary>
