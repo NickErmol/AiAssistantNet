@@ -125,6 +125,54 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
+
+                    <TextBlock Text="Transcription provider" FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.SM}"
+                               Foreground="{DynamicResource Brush.Foreground.Primary}"
+                               Margin="0,16,0,6"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Local Whisper (offline, private)" GroupName="Stt"
+                                 AutomationProperties.AutomationId="Stt_Whisper"
+                                 IsChecked="{Binding SttProvider,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Whisper}"/>
+                    <RadioButton Style="{StaticResource RadioBtn}" Content="Deepgram streaming (cloud, sub-second)" GroupName="Stt"
+                                 AutomationProperties.AutomationId="Stt_Deepgram"
+                                 IsChecked="{Binding SttProvider,
+                                     Converter={StaticResource EnumToBoolConverter},
+                                     ConverterParameter=Deepgram}"/>
+
+                    <StackPanel Visibility="{Binding IsDeepgramSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="Deepgram API Key" FontWeight="SemiBold"
+                                   FontSize="{DynamicResource Font.SM}"
+                                   Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                   Margin="0,12,0,6"/>
+                        <DockPanel>
+                            <Button Content="Delete" DockPanel.Dock="Right" Width="60"
+                                    Foreground="#CC4444"
+                                    Command="{Binding DeleteDeepgramKeyCommand}"/>
+                            <Button Content="Save" DockPanel.Dock="Right" Width="60" Margin="0,0,6,0"
+                                    Command="{Binding SaveDeepgramKeyCommand}"/>
+                            <Border Background="{DynamicResource Brush.Background.Panel}"
+                                    BorderBrush="{DynamicResource Brush.Border}"
+                                    BorderThickness="1" CornerRadius="3" Padding="1">
+                                <PasswordBox x:Name="DeepgramKeyBox"
+                                             AutomationProperties.AutomationId="DeepgramKeyBox"
+                                             Background="Transparent"
+                                             Foreground="{DynamicResource Brush.Foreground.Primary}"
+                                             CaretBrush="{DynamicResource Brush.Foreground.Primary}"
+                                             BorderThickness="0" Padding="5,3"
+                                             PasswordChanged="DeepgramKeyBox_PasswordChanged"/>
+                            </Border>
+                        </DockPanel>
+                        <TextBlock Text="{Binding DeepgramStatusMessage}"
+                                   Foreground="{DynamicResource Brush.Semantic.Active}"
+                                   Margin="0,8,0,0"
+                                   FontSize="{DynamicResource Font.SM}"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,8,0,0"
+                                   FontSize="{DynamicResource Font.XS}"
+                                   Foreground="{DynamicResource Brush.Foreground.Secondary}"
+                                   Text="Cloud transcription streams both microphone and interviewer audio to Deepgram for the whole session (≈$0.90/hour across both channels). If the connection drops, the session falls back to local Whisper automatically. Whisper runs fully offline."/>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
 

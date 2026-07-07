@@ -42,6 +42,23 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private string _whisperLanguage = "auto";
     [ObservableProperty] private WhisperModelSize _whisperModel = WhisperModelSize.LargeTurbo;
 
+    // ── Transcription provider (Audio tab) ────────────────────────
+    /// <summary>Selected speech-to-text provider (local Whisper vs Deepgram streaming).</summary>
+    [ObservableProperty] private SttProvider _sttProvider = SttProvider.Whisper;
+
+    /// <summary>Whether the Deepgram key-entry panel should be visible; true when
+    /// <see cref="SttProvider"/> is <see cref="SttProvider.Deepgram"/>.</summary>
+    [ObservableProperty] private bool _isDeepgramSelected;
+
+    /// <summary>Deepgram API key text as typed by the user, mirrored from the PasswordBox code-behind.</summary>
+    [ObservableProperty] private string _deepgramKeyInput = string.Empty;
+
+    /// <summary>Status text shown under the Deepgram key controls.</summary>
+    [ObservableProperty] private string _deepgramStatusMessage = string.Empty;
+
+    partial void OnSttProviderChanged(SttProvider value)
+        => IsDeepgramSelected = value == SttProvider.Deepgram;
+
     // ── Code Profiles tab ─────────────────────────────────────────
     [ObservableProperty] private ProfilePreset? _selectedPreset;
     [ObservableProperty] private string _presetName = string.Empty;
@@ -222,6 +239,7 @@ public sealed partial class SettingsViewModel(
         SelectedLoopbackDeviceId = s.LoopbackDeviceId;
         WhisperLanguage          = s.WhisperLanguage;
         WhisperModel             = s.WhisperModel;
+        SttProvider              = s.SttProvider;
         OverlayOpacity           = s.OverlayOpacity;
         OverlayMode              = s.OverlayMode;
         _loadedOverlayMode       = s.OverlayMode;
@@ -266,6 +284,10 @@ public sealed partial class SettingsViewModel(
             GlossaryDomains.Add(new GlossaryDomainToggle(d.Key, d.DisplayName, enabledDomains.Contains(d.Key)));
 
         await RefreshKeyStatusAsync();
+
+        var hasDeepgramKey = await mediator.Send(new HasApiKeyQuery(SecretKind.Deepgram));
+        DeepgramStatusMessage = hasDeepgramKey.IsSuccess && hasDeepgramKey.Value
+            ? "Deepgram key is stored ✓" : "No Deepgram key stored.";
     }
 
     // ── API Key commands ──────────────────────────────────────────
@@ -286,6 +308,28 @@ public sealed partial class SettingsViewModel(
     {
         var result = await mediator.Send(new DeleteApiKeyCommand(SecretKind.Anthropic));
         StatusMessage = result.IsSuccess ? "API key deleted." : $"Error: {string.Join(", ", result.Errors)}";
+    }
+
+    // ── Deepgram key commands (Audio tab) ───────────────────────────
+    [RelayCommand]
+    private async Task SaveDeepgramKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(DeepgramKeyInput)) return;
+        using var secure = new System.Security.SecureString();
+        foreach (var c in DeepgramKeyInput) secure.AppendChar(c);
+        secure.MakeReadOnly();
+        var result = await mediator.Send(new SaveApiKeyCommand(SecretKind.Deepgram, secure));
+        DeepgramStatusMessage = result.IsSuccess
+            ? "Deepgram key saved ✓" : $"Error: {string.Join(", ", result.Errors)}";
+        DeepgramKeyInput = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task DeleteDeepgramKeyAsync()
+    {
+        var result = await mediator.Send(new DeleteApiKeyCommand(SecretKind.Deepgram));
+        DeepgramStatusMessage = result.IsSuccess
+            ? "Deepgram key deleted." : $"Error: {string.Join(", ", result.Errors)}";
     }
 
     // ── Save all settings ─────────────────────────────────────────
@@ -362,7 +406,8 @@ public sealed partial class SettingsViewModel(
             EnabledGlossaryDomains = GlossaryDomains.Where(d => d.IsEnabled).Select(d => d.Key).ToList(),
             ResumeRawText       = NullIfEmpty(ResumeRawText),
             JobDescriptionRawText = NullIfEmpty(JobDescriptionRawText),
-            CandidateProfileCard  = NullIfEmpty(CandidateProfileCard)
+            CandidateProfileCard  = NullIfEmpty(CandidateProfileCard),
+            SttProvider = SttProvider
         };
 
         await mediator.Send(new SaveSettingsCommand(dto));

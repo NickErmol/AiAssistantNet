@@ -88,6 +88,9 @@ public sealed partial class SettingsWindow : Window
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
         => _vm.ApiKeyInput = ApiKeyBox.Password;
 
+    private void DeepgramKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
+        => _vm.DeepgramKeyInput = DeepgramKeyBox.Password;
+
     /// <summary>Closes the window for real (bypassing the hide-on-close guard), used when the
     /// overlay/app is shutting down so the settings window doesn't linger.</summary>
     public void ForceClose()
