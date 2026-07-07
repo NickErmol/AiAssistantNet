@@ -48,7 +48,12 @@ public sealed class DeepgramClientWebSocket : IDeepgramSocket
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                 await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", cts.Token);
             }
-            catch (Exception) { /* best-effort close; disposal must not throw */ }
+            catch (Exception ex)
+            {
+                // Best-effort close; disposal must not throw. Logged so a misbehaving
+                // close handshake is at least visible when debugging session teardown.
+                Serilog.Log.Debug(ex, "Deepgram socket close failed during disposal");
+            }
         }
         _socket.Dispose();
     }

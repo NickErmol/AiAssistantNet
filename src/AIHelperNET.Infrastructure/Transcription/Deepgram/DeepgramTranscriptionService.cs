@@ -67,9 +67,12 @@ public sealed class DeepgramTranscriptionService(
             {
                 json = await socket.ReceiveTextAsync(linked.Token);
             }
-            catch (OperationCanceledException) when (sendTask.IsFaulted && !ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (sendTask.IsFaulted)
             {
-                break;   // surface the send fault below instead of a bare cancellation
+                // A send fault always wins classification — even if the caller cancelled in the
+                // same instant. Otherwise the real WebSocket/auth exception is swallowed as a
+                // bare cancellation and the resilient wrapper never sees a fault to retry.
+                break;   // surface the send fault below
             }
             if (json is null) break;
 
@@ -98,12 +101,21 @@ public sealed class DeepgramTranscriptionService(
         {
             await socket.SendAudioAsync(PcmConverter.ToLinear16(frames.Current.Samples), ct);
 
-            // Await the next frame, keeping the socket alive during capture gaps.
+            // Await the next frame, keeping the socket alive during capture gaps. The idle
+            // delay gets its own token: frames normally arrive every ~30-100ms, and without
+            // an explicit cancel each round would orphan a live 5s timer (timer-queue churn
+            // that scales with session length).
             var next = frames.MoveNextAsync().AsTask();
             while (true)
             {
-                var completed = await Task.WhenAny(next, Task.Delay(_keepAlive, ct));
-                if (completed == next) { hasCurrent = await next; break; }
+                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var completed = await Task.WhenAny(next, Task.Delay(_keepAlive, idleCts.Token));
+                if (completed == next)
+                {
+                    idleCts.Cancel();   // release the losing delay's timer immediately
+                    hasCurrent = await next;
+                    break;
+                }
                 await socket.SendTextAsync(KeepAliveJson, ct);
             }
         }
