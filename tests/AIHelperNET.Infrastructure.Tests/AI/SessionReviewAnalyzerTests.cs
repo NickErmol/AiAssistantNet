@@ -193,10 +193,9 @@ public sealed class SessionReviewAnalyzerTests
 
         await sut.AnalyzeAsync(SonnetReviewPrompt(), CancellationToken.None);
 
-        handler.LastRequest.Should().NotBeNull();
-        handler.LastRequest!.Headers.Should().ContainKey("x-api-key");
-        handler.LastRequest.Headers.GetValues("x-api-key").Should()
-            .ContainSingle().Which.Should().Be("fake-review-key");
+        // CapturedApiKey is a snapshot taken inside SendAsync, before ZeroString runs
+        // in the caller's finally block and zeroes the original string buffer in-place.
+        handler.CapturedApiKey.Should().Be("fake-review-key");
     }
 
     [Fact]
@@ -291,11 +290,25 @@ internal sealed class ReviewMockHandler(
     public HttpRequestMessage? LastRequest { get; private set; }
     public string? LastRequestBody { get; private set; }
 
+    /// <summary>
+    /// Snapshot of the x-api-key header value captured during SendAsync, before
+    /// SecureStringHelpers.ZeroString runs in the caller's finally block.
+    /// </summary>
+    public string? CapturedApiKey { get; private set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken ct)
     {
         LastRequest = request;
         LastRequestBody = await request.Content!.ReadAsStringAsync(ct);
+        // Snapshot the API key as an independent copy before the caller's finally
+        // block calls ZeroString, which zeroes the char buffer of the original string in-place.
+        if (request.Headers.TryGetValues("x-api-key", out var vals) &&
+            vals.FirstOrDefault() is { } rawKey)
+        {
+            // new string(span) always allocates; the original string object will be zeroed later.
+            CapturedApiKey = new string(rawKey.AsSpan());
+        }
         return new HttpResponseMessage(status)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")

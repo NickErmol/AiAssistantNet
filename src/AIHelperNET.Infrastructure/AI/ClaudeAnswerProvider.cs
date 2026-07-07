@@ -1,10 +1,9 @@
 using System.IO;
 using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Security;
 using System.Text;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
+using AIHelperNET.Infrastructure.Security;
 using Microsoft.Extensions.Options;
 
 namespace AIHelperNET.Infrastructure.AI;
@@ -51,7 +50,7 @@ public sealed class ClaudeAnswerProvider(
         using var request = new HttpRequestMessage(
             HttpMethod.Post, $"{opts.BaseUrl}/v1/messages");
 
-        var apiKey = SecureStringToString(keyResult.Value);
+        var apiKey = SecureStringHelpers.ConvertToString(keyResult.Value);
         try
         {
             request.Headers.Add("x-api-key", apiKey);
@@ -97,21 +96,8 @@ public sealed class ClaudeAnswerProvider(
         }
         finally
         {
-            if (apiKey.Length > 0)
-            {
-                unsafe
-                {
-                    fixed (char* p = apiKey)
-                        for (int i = 0; i < apiKey.Length; i++) p[i] = '\0';
-                }
-            }
+            SecureStringHelpers.ZeroString(apiKey);
         }
     }
 
-    private static string SecureStringToString(SecureString ss)
-    {
-        var ptr = Marshal.SecureStringToBSTR(ss);
-        try { return Marshal.PtrToStringBSTR(ptr) ?? string.Empty; }
-        finally { Marshal.ZeroFreeBSTR(ptr); }
-    }
 }

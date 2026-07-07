@@ -1,9 +1,8 @@
 using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Security;
 using System.Text;
 using System.Text.Json;
 using AIHelperNET.Application.Abstractions;
+using AIHelperNET.Infrastructure.Security;
 using Microsoft.Extensions.Options;
 using Serilog;
 
@@ -57,7 +56,7 @@ public sealed class HaikuQuestionClassifier(
         using var request = new HttpRequestMessage(
             HttpMethod.Post, $"{opts.BaseUrl}/v1/messages");
 
-        var apiKey = SecureStringToString(keyResult.Value);
+        var apiKey = SecureStringHelpers.ConvertToString(keyResult.Value);
         try
         {
             request.Headers.Add("x-api-key", apiKey);
@@ -78,9 +77,7 @@ public sealed class HaikuQuestionClassifier(
         }
         finally
         {
-            // SecureStringToString already zeroes via ZeroFreeBSTR;
-            // the managed string copy is GC-collected naturally.
-            _ = apiKey.Length; // suppress unused-variable warning
+            SecureStringHelpers.ZeroString(apiKey);
         }
     }
 
@@ -111,10 +108,4 @@ public sealed class HaikuQuestionClassifier(
         }
     }
 
-    private static string SecureStringToString(SecureString ss)
-    {
-        var ptr = Marshal.SecureStringToBSTR(ss);
-        try { return Marshal.PtrToStringBSTR(ptr) ?? string.Empty; }
-        finally { Marshal.ZeroFreeBSTR(ptr); }
-    }
 }

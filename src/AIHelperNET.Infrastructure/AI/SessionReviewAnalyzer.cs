@@ -1,11 +1,10 @@
 using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Security;
 using System.Text;
 using System.Text.Json;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
 using AIHelperNET.Application.Reviews;
+using AIHelperNET.Infrastructure.Security;
 using FluentResults;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -49,7 +48,7 @@ public sealed class SessionReviewAnalyzer(
         });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{opts.BaseUrl}/v1/messages");
-        var apiKey = SecureStringToString(keyResult.Value);
+        var apiKey = SecureStringHelpers.ConvertToString(keyResult.Value);
         try
         {
             request.Headers.Add("x-api-key", apiKey);
@@ -73,7 +72,7 @@ public sealed class SessionReviewAnalyzer(
         }
         finally
         {
-            _ = apiKey.Length; // managed copy GC-collected; BSTR already zeroed by SecureStringToString
+            SecureStringHelpers.ZeroString(apiKey);
         }
     }
 
@@ -110,10 +109,4 @@ public sealed class SessionReviewAnalyzer(
         }
     }
 
-    private static string SecureStringToString(SecureString ss)
-    {
-        var ptr = Marshal.SecureStringToBSTR(ss);
-        try { return Marshal.PtrToStringBSTR(ptr) ?? string.Empty; }
-        finally { Marshal.ZeroFreeBSTR(ptr); }
-    }
 }

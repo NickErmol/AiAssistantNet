@@ -86,6 +86,11 @@ public sealed partial class SettingsViewModel(
     /// Injectable file-picker delegate used by the Load-from-file commands.
     /// Default shows a WPF OpenFileDialog; override in tests to inject a path directly.
     /// </summary>
+    /// <remarks>
+    /// The default implementation shows a WPF <see cref="Microsoft.Win32.OpenFileDialog"/>
+    /// and must run on the WPF UI thread (STA). Commands call <see cref="PickFile"/> before
+    /// any <see langword="await"/> to ensure this contract is met.
+    /// </remarks>
     internal Func<string?> PickFile { get; set; } = () =>
     {
         var dlg = new OpenFileDialog

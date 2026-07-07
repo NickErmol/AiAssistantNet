@@ -129,6 +129,41 @@ public sealed class DocumentTextExtractorTests : IDisposable
             .Contain("No text could be extracted");
     }
 
+    // ─── oversize file → fail ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExtractAsync_OversizeFile_ReturnsFail()
+    {
+        var path = Path.Combine(_tempDir, "huge.txt");
+        // Write an 11 MB file (beyond 10 MB guard)
+        await using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
+        fs.SetLength(11L * 1024 * 1024);
+        // Write some bytes so it's a real file, not sparse (sparse may not work on all FS)
+        fs.Seek(0, SeekOrigin.Begin);
+        await fs.WriteAsync(new byte[1024]);
+        await fs.FlushAsync();
+
+        var result = await _sut.ExtractAsync(path, CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Should().ContainSingle().Which.Message.Should().Contain("too large");
+    }
+
+    // ─── pre-cancelled token → OperationCanceledException ────────────────────
+
+    [Fact]
+    public async Task ExtractAsync_CancelledToken_ThrowsOperationCanceledException()
+    {
+        const string pdfText = "cancellation test content";
+        var path = Path.Combine(_tempDir, "cancel_test.pdf");
+        CreatePdf(path, pdfText);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _sut.ExtractAsync(path, cts.Token));
+    }
+
     // ─── Fixture helpers ──────────────────────────────────────────────────────
 
     private static void CreateDocx(string path, string text)

@@ -26,6 +26,9 @@ public sealed class DocumentTextExtractor : IDocumentTextExtractor
         if (!File.Exists(filePath))
             return Result.Fail($"File not found: {filePath}");
 
+        if (new FileInfo(filePath).Length > 10 * 1024 * 1024)
+            return Result.Fail("File is too large (max 10 MB).");
+
         try
         {
             string text;
@@ -36,11 +39,11 @@ public sealed class DocumentTextExtractor : IDocumentTextExtractor
             }
             else if (extLower == ".pdf")
             {
-                text = ExtractPdf(filePath);
+                text = await Task.Run(() => ExtractPdf(filePath, ct), ct);
             }
             else
             {
-                text = ExtractDocx(filePath);
+                text = await Task.Run(() => ExtractDocx(filePath), ct);
             }
 
             if (string.IsNullOrWhiteSpace(text))
@@ -58,13 +61,17 @@ public sealed class DocumentTextExtractor : IDocumentTextExtractor
         }
     }
 
-    private static string ExtractPdf(string filePath)
+    private static string ExtractPdf(string filePath, CancellationToken ct)
     {
         using var document = PdfDocument.Open(filePath);
-        var pages = document.GetPages()
-            .Select(p => p.Text)
-            .Where(t => !string.IsNullOrEmpty(t));
-        return string.Join("\n", pages);
+        var sb = new System.Text.StringBuilder();
+        foreach (var page in document.GetPages())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!string.IsNullOrEmpty(page.Text))
+                sb.AppendLine(page.Text);
+        }
+        return sb.ToString().TrimEnd();
     }
 
     private static string ExtractDocx(string filePath)
