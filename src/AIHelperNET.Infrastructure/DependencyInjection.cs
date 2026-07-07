@@ -11,6 +11,7 @@ using AIHelperNET.Infrastructure.Ocr;
 using AIHelperNET.Infrastructure.Persistence;
 using AIHelperNET.Infrastructure.Security;
 using AIHelperNET.Infrastructure.Transcription;
+using AIHelperNET.Infrastructure.Transcription.Deepgram;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,7 +57,20 @@ public static class DependencyInjection
         services.AddHttpClient(nameof(SileroModelProvider));
         services.AddSingleton<SileroModelProvider>();
         services.AddSingleton<ITranscriptionGlossaryProvider, JsonTranscriptionGlossaryProvider>();
-        services.AddSingleton<ITranscriptionService, WhisperTranscriptionService>();
+        services.AddSingleton<WhisperTranscriptionService>();
+        services.AddSingleton<IDeepgramSocketFactory, DeepgramClientWebSocketFactory>();
+        services.AddSingleton(sp => new DeepgramTranscriptionService(
+            sp.GetRequiredService<IDeepgramSocketFactory>(),
+            sp.GetRequiredService<ISecretStore>(),
+            sp.GetRequiredService<ITranscriptionGlossaryProvider>()));
+        services.AddSingleton<ISttResolver>(sp => new SttResolver(
+            sp.GetRequiredService<WhisperTranscriptionService>(),
+            sp.GetRequiredService<DeepgramTranscriptionService>(),
+            sp.GetRequiredService<ISecretStore>(),
+            sp.GetService<IOverlayStatusNotifier>()));   // registered by the App layer; null in bare-Infra hosts
+
+        // TEMP bridge until SessionRunner resolves per-session (next commit removes this):
+        services.AddSingleton<ITranscriptionService>(sp => sp.GetRequiredService<WhisperTranscriptionService>());
 
         // OCR
         services.AddSingleton<IScreenOcrService, WindowsOcrService>();
