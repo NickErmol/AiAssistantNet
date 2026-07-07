@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using AIHelperNET.App.Services;
 using AIHelperNET.App.ViewModels;
 using AIHelperNET.Application.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,8 @@ public sealed class MainOverlayWindowContext(
     SessionControlViewModel sessionControl,
     TranscriptViewModel transcript,
     ConversationTurnViewModel conversationTurn,
-    AudioLevelViewModel audioLevel)
+    AudioLevelViewModel audioLevel,
+    OverlayStatusNotifier statusNotice)
 {
     /// <summary>Gets the session control view model.</summary>
     public SessionControlViewModel SessionControl    => sessionControl;
@@ -29,6 +31,9 @@ public sealed class MainOverlayWindowContext(
 
     /// <summary>Gets the audio level view model.</summary>
     public AudioLevelViewModel AudioLevel             => audioLevel;
+
+    /// <summary>Gets the transient overlay status notifier.</summary>
+    public OverlayStatusNotifier StatusNotice         => statusNotice;
 }
 
 /// <summary>The stealth overlay window excluded from screen capture.</summary>

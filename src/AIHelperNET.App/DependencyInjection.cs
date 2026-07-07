@@ -21,6 +21,8 @@ public static class DependencyInjection
         services.AddSingleton<ITranscriptSink>(sp => sp.GetRequiredService<TranscriptSink>());
         services.AddSingleton<ConversationTurnSinkAdapter>();
         services.AddSingleton<IConversationTurnSink>(sp => sp.GetRequiredService<ConversationTurnSinkAdapter>());
+        services.AddSingleton<OverlayStatusNotifier>();
+        services.AddSingleton<IOverlayStatusNotifier>(sp => sp.GetRequiredService<OverlayStatusNotifier>());
 
         // Session pipeline runner
         services.AddSingleton<SessionRunner>();

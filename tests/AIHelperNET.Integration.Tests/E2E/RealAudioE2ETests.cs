@@ -5,6 +5,7 @@ using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Questions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
+using AIHelperNET.Infrastructure.Transcription;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -67,7 +68,7 @@ public class RealAudioE2ETests : IAsyncLifetime
     private SessionRunner NewRunner(IReadOnlyList<WavUtterance> script) =>
         new(_host.Services.GetRequiredService<IServiceScopeFactory>(),
             new WavFileAudioCaptureService(script),
-            _host.Services.GetRequiredService<ITranscriptionService>(), // REAL Whisper
+            new FakeSttResolver(_host.Services.GetRequiredService<WhisperTranscriptionService>()), // REAL Whisper
             _host.Services.GetRequiredService<TranscriptPipelineService>(),
             segmentMergeWindowMs: MergeWindowMs);
 
@@ -105,7 +106,7 @@ public class RealAudioE2ETests : IAsyncLifetime
     {
         var session = await PersistNewSessionAsync();
         var runner = NewRunner(new[] { new WavUtterance(Speaker.Me, "me_chitchat.wav", GapMsBefore: 0) });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
         await runner.WaitForCompletionAsync();
         await runner.StopAsync();
         var reloaded = await ReloadAsync(session.Id);
@@ -133,7 +134,7 @@ public class RealAudioE2ETests : IAsyncLifetime
             new WavUtterance(Speaker.Other, "other_di.wav",   GapMsBefore: 0),
             new WavUtterance(Speaker.Me,    "me_clarify.wav", GapMsBefore: 3000),
         });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
         await runner.WaitForCompletionAsync();
         // Wait for the initial answer (first Other utterance) to land before stopping.
         await PollUntilAsync(session.Id,
@@ -163,7 +164,7 @@ public class RealAudioE2ETests : IAsyncLifetime
             new WavUtterance(Speaker.Other, "other_di.wav",      GapMsBefore: 0),
             new WavUtterance(Speaker.Other, "other_shorter.wav", GapMsBefore: 3000),
         });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id,
             s => s.ConversationTurns.Count == 1 && s.ConversationTurns[0].AnswerVersions.Count >= 2,
@@ -186,7 +187,7 @@ public class RealAudioE2ETests : IAsyncLifetime
             new WavUtterance(Speaker.Other, "other_di.wav",   GapMsBefore: 0),
             new WavUtterance(Speaker.Other, "other_cqrs.wav", GapMsBefore: 3000),
         });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 2, AnswerTimeout);
         await runner.StopAsync();
@@ -215,7 +216,7 @@ public class RealAudioE2ETests : IAsyncLifetime
             new WavUtterance(Speaker.Other, "other_di_part1.wav", GapMsBefore: 0),
             new WavUtterance(Speaker.Other, "other_di_part2.wav", GapMsBefore: 200),
         });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 1, AnswerTimeout);
         await runner.StopAsync();
@@ -235,7 +236,7 @@ public class RealAudioE2ETests : IAsyncLifetime
         {
             new WavUtterance(Speaker.Other, "other_di.wav", GapMsBefore: 0),
         });
-        await runner.StartAsync(session.Id, Devices, Model, "en", AudioSourceMode.Both, new HashSet<string>());
+        await runner.StartAsync(session.Id, Devices, new TranscriptionOptions(Model, "en", new HashSet<string>()), AudioSourceMode.Both);
 
         await runner.WaitForCompletionAsync();
         await PollUntilAsync(session.Id, s => s.ConversationTurns.Count >= 1, AnswerTimeout);

@@ -106,7 +106,7 @@ public sealed class QuestionBoundaryClassifier(
         Speaker speaker,
         CancellationToken ct)
     {
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("QuestionBoundaryClassifier: no API key configured, returning Ambiguous");

@@ -58,7 +58,7 @@ public sealed class LatestQuestionExtractor(
     public async Task<LatestQuestionResult> ExtractAsync(
         IReadOnlyList<TranscriptLine> window, string? screenContext, CancellationToken ct)
     {
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("LatestQuestionExtractor: no API key configured, returning None");

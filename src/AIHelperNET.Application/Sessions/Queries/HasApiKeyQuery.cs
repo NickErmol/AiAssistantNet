@@ -5,7 +5,8 @@ using Mediator;
 namespace AIHelperNET.Application.Sessions.Queries;
 
 /// <summary>Query that returns whether an API key is currently stored.</summary>
-public sealed record HasApiKeyQuery : IRequest<Result<bool>>;
+/// <param name="Kind">Which secret to check.</param>
+public sealed record HasApiKeyQuery(SecretKind Kind) : IRequest<Result<bool>>;
 
 /// <summary>Handles <see cref="HasApiKeyQuery"/>.</summary>
 public sealed class HasApiKeyHandler(ISecretStore secretStore)
@@ -13,5 +14,5 @@ public sealed class HasApiKeyHandler(ISecretStore secretStore)
 {
     /// <inheritdoc/>
     public ValueTask<Result<bool>> Handle(HasApiKeyQuery query, CancellationToken cancellationToken)
-        => ValueTask.FromResult(Result.Ok(secretStore.HasApiKey()));
+        => ValueTask.FromResult(Result.Ok(secretStore.HasApiKey(query.Kind)));
 }

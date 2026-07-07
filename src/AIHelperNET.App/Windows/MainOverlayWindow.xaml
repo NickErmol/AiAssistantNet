@@ -49,6 +49,8 @@
                     <Run Text="{Binding SessionControl.IsSessionActive,
                         Converter={StaticResource BoolToStringConverter},
                         ConverterParameter='Listening|Stopped'}"/>
+                    <Run Text=" "/>
+                    <Run Text="{Binding StatusNotice.Message, Mode=OneWay}"/>
                 </TextBlock>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

@@ -35,8 +35,7 @@ public sealed class ScriptedTranscriptionService(IReadOnlyList<ScriptedUtterance
 {
     /// <inheritdoc/>
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
-        IAsyncEnumerable<AudioFrame> frames, WhisperModelSize model, string language,
-        IReadOnlySet<string> glossaryDomains,
+        IAsyncEnumerable<AudioFrame> frames, TranscriptionOptions options,
         [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var frame in frames.WithCancellation(ct))
@@ -45,4 +44,11 @@ public sealed class ScriptedTranscriptionService(IReadOnlyList<ScriptedUtterance
             yield return new TranscriptSegment(utt.Text, frame.Speaker, frame.CapturedAt, 0.95f);
         }
     }
+}
+
+/// <summary>Test resolver: always returns the supplied service regardless of provider.</summary>
+public sealed class FakeSttResolver(ITranscriptionService service) : ISttResolver
+{
+    /// <inheritdoc/>
+    public ITranscriptionService Resolve(SttProvider provider) => service;
 }

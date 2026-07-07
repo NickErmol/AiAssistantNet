@@ -116,7 +116,7 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
     /// <summary>Minimal <see cref="ISecretStore"/> that yields a fixed key from the environment.</summary>
     private sealed class EnvSecretStore(string key) : ISecretStore
     {
-        public Result<SecureString> GetApiKey()
+        public Result<SecureString> GetApiKey(SecretKind kind)
         {
             var ss = new SecureString();
             foreach (var c in key) ss.AppendChar(c);
@@ -124,8 +124,8 @@ public class BoundaryClassifierAiEvalTests(ITestOutputHelper output)
             return Result.Ok(ss);
         }
 
-        public Result SaveApiKey(SecureString key) => Result.Ok();
-        public Result DeleteApiKey() => Result.Ok();
-        public bool HasApiKey() => true;
+        public Result SaveApiKey(SecretKind kind, SecureString key) => Result.Ok();
+        public Result DeleteApiKey(SecretKind kind) => Result.Ok();
+        public bool HasApiKey(SecretKind kind) => true;
     }
 }

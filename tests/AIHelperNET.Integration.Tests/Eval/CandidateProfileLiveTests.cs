@@ -1,4 +1,5 @@
 using System.Net.Http;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Security;
 using FluentAssertions;
@@ -100,7 +101,7 @@ public class CandidateProfileLiveTests(ITestOutputHelper output)
     {
         // ── Guard: skip if no API key ─────────────────────────────────────────
         var secrets = new WindowsCredentialSecretStore();
-        if (!secrets.HasApiKey())
+        if (!secrets.HasApiKey(SecretKind.Anthropic))
         {
             output.WriteLine("Skipped: no Claude API key in Windows Credential Manager " +
                 "(target 'AIHelperNET:ClaudeApiKey').");

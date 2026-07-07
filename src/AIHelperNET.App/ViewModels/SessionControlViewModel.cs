@@ -96,10 +96,12 @@ public sealed partial class SessionControlViewModel(
                 await runner.StartAsync(
                     result.Value.Id,
                     new AudioDeviceSelection(settings?.MicDeviceId, settings?.LoopbackDeviceId),
-                    settings?.WhisperModel ?? WhisperModelSize.LargeTurbo,
-                    settings?.WhisperLanguage ?? "auto",
+                    new TranscriptionOptions(
+                        settings?.WhisperModel ?? WhisperModelSize.LargeTurbo,
+                        settings?.WhisperLanguage ?? "auto",
+                        glossaryDomains),
                     AudioSource,
-                    glossaryDomains);
+                    settings?.SttProvider ?? SttProvider.Whisper);
             }
         }
         else if (ActiveSessionId is { } id)

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
+using AIHelperNET.Infrastructure.Transcription;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -31,12 +32,12 @@ public sealed class RussianLanguageDetectionTests(ITestOutputHelper output) : IA
 
     private async Task<string> TranscribeAsync(string language)
     {
-        var svc = _host.Services.GetRequiredService<ITranscriptionService>();
+        var svc = _host.Services.GetRequiredService<WhisperTranscriptionService>();
         var sb = new StringBuilder();
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await foreach (var seg in svc.TranscribeAsync(
-                           RussianFrames(cts.Token), Model, language,
-                           new HashSet<string>(), cts.Token))
+                           RussianFrames(cts.Token),
+                           new TranscriptionOptions(Model, language, new HashSet<string>()), cts.Token))
             sb.Append(seg.Text).Append(' ');
         return sb.ToString().Trim();
     }

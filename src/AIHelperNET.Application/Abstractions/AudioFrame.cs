@@ -20,6 +20,15 @@ public sealed record AudioDeviceSelection(string? MicDeviceId, string? LoopbackD
 /// <param name="Confidence">Transcription confidence in [0, 1].</param>
 public sealed record TranscriptSegment(string Text, Speaker Speaker, DateTimeOffset CapturedAt, float Confidence);
 
+/// <summary>Per-session transcription parameters shared by all STT providers.</summary>
+/// <param name="Model">Whisper model size (ignored by cloud providers).</param>
+/// <param name="Language">BCP-47 language code (e.g. "en") or "auto" for auto-detection.</param>
+/// <param name="GlossaryDomains">Enabled glossary domain keys to bias decoding; empty ⇒ no bias.</param>
+public sealed record TranscriptionOptions(
+    WhisperModelSize Model,
+    string Language,
+    IReadOnlySet<string> GlossaryDomains);
+
 /// <summary>Whisper model size to use for transcription.</summary>
 public enum WhisperModelSize
 {
@@ -44,4 +53,13 @@ public enum AiBackend
     Claude,
     /// <summary>Ollama local model.</summary>
     Ollama
+}
+
+/// <summary>Selects which speech-to-text provider transcribes session audio.</summary>
+public enum SttProvider
+{
+    /// <summary>Local Whisper — offline, private. The default.</summary>
+    Whisper,
+    /// <summary>Deepgram cloud streaming — sub-second finals, requires API key.</summary>
+    Deepgram
 }

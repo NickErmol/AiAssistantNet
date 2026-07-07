@@ -5,6 +5,7 @@ using AIHelperNET.Application.Sessions;
 using AIHelperNET.Domain.Ids;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
+using AIHelperNET.Integration.Tests.E2E;
 using FluentAssertions;
 using FluentResults;
 using Mediator;
@@ -55,7 +56,7 @@ public class SessionRunnerTests
         var pipeline       = new TranscriptPipelineService(scopeFactory, transcriptSink, turnSink, classifier);
         var capture        = new FakeAudioCaptureService(captureFrames);
         var transcription  = new FakeTranscriptionService();
-        return new SessionRunner(scopeFactory, capture, transcription, pipeline);
+        return new SessionRunner(scopeFactory, capture, new FakeSttResolver(transcription), pipeline);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.Both, new HashSet<string>());
+            new TranscriptionOptions(WhisperModelSize.Base, "auto", new HashSet<string>()), AudioSourceMode.Both);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -90,7 +91,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.MicrophoneOnly, new HashSet<string>());
+            new TranscriptionOptions(WhisperModelSize.Base, "auto", new HashSet<string>()), AudioSourceMode.MicrophoneOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -110,7 +111,7 @@ public class SessionRunnerTests
         var runner = MakeRunner(session, frames);
 
         await runner.StartAsync(session.Id, new AudioDeviceSelection(null, null),
-            WhisperModelSize.Base, "auto", AudioSourceMode.SystemAudioOnly, new HashSet<string>());
+            new TranscriptionOptions(WhisperModelSize.Base, "auto", new HashSet<string>()), AudioSourceMode.SystemAudioOnly);
         await Task.Delay(500);
         await runner.StopAsync();
 
@@ -144,9 +145,7 @@ public class SessionRunnerTests
     {
         public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
             IAsyncEnumerable<AudioFrame> frames,
-            WhisperModelSize model,
-            string language,
-            IReadOnlySet<string> glossaryDomains,
+            TranscriptionOptions options,
             [EnumeratorCancellation] CancellationToken ct)
         {
             await foreach (var frame in frames.WithCancellation(ct))
