@@ -42,7 +42,7 @@ public sealed class ClaudeAnswerProvider(
         AnswerPrompt prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
             throw new InvalidOperationException("No Claude API key configured.");
 

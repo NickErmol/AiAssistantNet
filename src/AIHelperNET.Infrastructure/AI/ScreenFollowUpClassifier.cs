@@ -43,7 +43,7 @@ public sealed class ScreenFollowUpClassifier(
     public async Task<ScreenFollowUpOutcome> ClassifyAsync(
         string taskSummary, IReadOnlyList<string> additions, string utterance, CancellationToken ct)
     {
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("ScreenFollowUpClassifier: no API key configured, returning Noise");

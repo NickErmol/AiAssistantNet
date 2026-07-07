@@ -21,7 +21,7 @@ public class HaikuQuestionClassifierTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
 
         var options = Options.Create(new ClaudeOptions());
         return new HaikuQuestionClassifier(http, secrets, options);
@@ -68,7 +68,7 @@ public class HaikuQuestionClassifierTests
         var ss = new SecureString();
         foreach (var c in "k") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         var sut = new HaikuQuestionClassifier(http, secrets, Options.Create(new ClaudeOptions()));
 
         await sut.ClassifyAsync("new question", ["Q1?", "Q2?"], CancellationToken.None);

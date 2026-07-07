@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Reviews;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
@@ -46,7 +47,7 @@ public class SessionReviewLiveTests(ITestOutputHelper output)
     {
         // ── Guard: skip if no API key ──────────────────────────────────────────────
         var secrets = new WindowsCredentialSecretStore();
-        if (!secrets.HasApiKey())
+        if (!secrets.HasApiKey(SecretKind.Anthropic))
         {
             output.WriteLine("Skipped: no Claude API key in Windows Credential Manager " +
                 "(target 'AIHelperNET:ClaudeApiKey').");

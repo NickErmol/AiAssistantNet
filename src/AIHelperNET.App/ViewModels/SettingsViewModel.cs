@@ -276,7 +276,7 @@ public sealed partial class SettingsViewModel(
         using var secure = new System.Security.SecureString();
         foreach (var c in ApiKeyInput) secure.AppendChar(c);
         secure.MakeReadOnly();
-        var result = await mediator.Send(new SaveApiKeyCommand(secure));
+        var result = await mediator.Send(new SaveApiKeyCommand(SecretKind.Anthropic, secure));
         StatusMessage = result.IsSuccess ? "API key saved ✓" : $"Error: {string.Join(", ", result.Errors)}";
         ApiKeyInput   = string.Empty;
     }
@@ -284,7 +284,7 @@ public sealed partial class SettingsViewModel(
     [RelayCommand]
     private async Task DeleteApiKeyAsync()
     {
-        var result = await mediator.Send(new DeleteApiKeyCommand());
+        var result = await mediator.Send(new DeleteApiKeyCommand(SecretKind.Anthropic));
         StatusMessage = result.IsSuccess ? "API key deleted." : $"Error: {string.Join(", ", result.Errors)}";
     }
 
@@ -438,7 +438,7 @@ public sealed partial class SettingsViewModel(
 
     private async Task RefreshKeyStatusAsync()
     {
-        var hasKey = await mediator.Send(new HasApiKeyQuery());
+        var hasKey = await mediator.Send(new HasApiKeyQuery(SecretKind.Anthropic));
         if (StatusMessage == string.Empty || StatusMessage.StartsWith("API key is", StringComparison.Ordinal))
             StatusMessage = (hasKey.IsSuccess && hasKey.Value)
                 ? "API key is stored ✓" : "No API key stored — enter one above.";

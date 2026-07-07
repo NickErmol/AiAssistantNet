@@ -34,11 +34,11 @@ public sealed class ProfileCondenserTests
             var ss = new SecureString();
             foreach (var c in "fake-condenser-key") ss.AppendChar(c);
             ss.MakeReadOnly();
-            secrets.GetApiKey().Returns(Result.Ok(ss));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         }
         else
         {
-            secrets.GetApiKey().Returns(Result.Fail<SecureString>("no key"));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Fail<SecureString>("no key"));
         }
 
         return new ProfileCondenser(http, secrets, Options.Create(new ClaudeOptions()));
@@ -144,7 +144,7 @@ public sealed class ProfileCondenserTests
         });
         var http = new HttpClient(countingHandler) { BaseAddress = new Uri("https://api.anthropic.com") };
         var secrets = Substitute.For<ISecretStore>();
-        secrets.GetApiKey().Returns(Result.Fail<SecureString>("no key"));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Fail<SecureString>("no key"));
         var sut = new ProfileCondenser(http, secrets, Options.Create(new ClaudeOptions()));
 
         await sut.CondenseAsync(SampleResume, SampleJd, CancellationToken.None);
@@ -185,7 +185,7 @@ public sealed class ProfileCondenserTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         var sut = new ProfileCondenser(http, secrets, Options.Create(new ClaudeOptions()));
 
         using var cts = new CancellationTokenSource();

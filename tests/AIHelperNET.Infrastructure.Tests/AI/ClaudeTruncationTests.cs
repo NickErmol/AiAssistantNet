@@ -50,7 +50,7 @@ public sealed class ClaudeTruncationTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         return new ClaudeAnswerProvider(http, secrets, Options.Create(new ClaudeOptions()));
     }
 

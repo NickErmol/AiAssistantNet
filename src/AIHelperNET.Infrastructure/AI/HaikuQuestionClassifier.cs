@@ -32,7 +32,7 @@ public sealed class HaikuQuestionClassifier(
         IReadOnlyList<string> recentQuestions,
         CancellationToken ct)
     {
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("HaikuClassifier: no API key configured, returning NotAQuestion");

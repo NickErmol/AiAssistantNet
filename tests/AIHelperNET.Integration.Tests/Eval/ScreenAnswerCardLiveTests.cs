@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
 using AIHelperNET.Domain.ValueObjects;
 using AIHelperNET.Infrastructure.AI;
@@ -37,7 +38,7 @@ public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
     public async Task GeneratesCards_GatesPass_AndJudgeMeanMeetsFloor()
     {
         var secrets = new WindowsCredentialSecretStore();
-        if (!secrets.HasApiKey())
+        if (!secrets.HasApiKey(SecretKind.Anthropic))
         {
             output.WriteLine("Skipped: no Claude API key in Windows Credential Manager " +
                 "(target 'AIHelperNET:ClaudeApiKey').");
@@ -46,7 +47,7 @@ public class ScreenAnswerCardLiveTests(ITestOutputHelper output)
 
         var opts = new ClaudeOptions();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        var apiKey = SecureToString(secrets.GetApiKey().Value);
+        var apiKey = SecureToString(secrets.GetApiKey(SecretKind.Anthropic).Value);
 
         var report = new StringBuilder();
         report.AppendLine("=== Screen-answer-card live eval ===");

@@ -30,7 +30,7 @@ public sealed class ClaudeAnswerModelTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         var sut = new ClaudeAnswerProvider(http, secrets, Options.Create(new ClaudeOptions()));
 
         var prompt = new AnswerPrompt("sys", "user", "English", 300, AnswerModel.Sonnet);
@@ -48,7 +48,7 @@ public sealed class ClaudeAnswerModelTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         var sut = new ClaudeAnswerProvider(
             http, secrets, Options.Create(new ClaudeOptions { Model = "configured-default" }));
 

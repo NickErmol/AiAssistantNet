@@ -29,7 +29,7 @@ public sealed class ProfileCondenser(
         CancellationToken ct)
     {
         // 1. Resolve API key — fail fast without touching the network.
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("ProfileCondenser: no API key configured");

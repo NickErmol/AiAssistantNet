@@ -36,11 +36,11 @@ public sealed class SessionReviewAnalyzerTests
             var ss = new SecureString();
             foreach (var c in "fake-review-key") ss.AppendChar(c);
             ss.MakeReadOnly();
-            secrets.GetApiKey().Returns(Result.Ok(ss));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         }
         else
         {
-            secrets.GetApiKey().Returns(Result.Fail<SecureString>("no key"));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Fail<SecureString>("no key"));
         }
 
         return new SessionReviewAnalyzer(http, secrets, Options.Create(new ClaudeOptions()));
@@ -133,7 +133,7 @@ public sealed class SessionReviewAnalyzerTests
         });
         var http = new HttpClient(countingHandler) { BaseAddress = new Uri("https://api.anthropic.com") };
         var secrets = Substitute.For<ISecretStore>();
-        secrets.GetApiKey().Returns(Result.Fail<SecureString>("no key"));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Fail<SecureString>("no key"));
         var sut = new SessionReviewAnalyzer(http, secrets, Options.Create(new ClaudeOptions()));
 
         await sut.AnalyzeAsync(SonnetReviewPrompt(), CancellationToken.None);
@@ -270,7 +270,7 @@ public sealed class SessionReviewAnalyzerTests
         var ss = new SecureString();
         foreach (var c in "fake-key") ss.AppendChar(c);
         ss.MakeReadOnly();
-        secrets.GetApiKey().Returns(Result.Ok(ss));
+        secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         var sut = new SessionReviewAnalyzer(http, secrets, Options.Create(new ClaudeOptions()));
 
         using var cts = new CancellationTokenSource();

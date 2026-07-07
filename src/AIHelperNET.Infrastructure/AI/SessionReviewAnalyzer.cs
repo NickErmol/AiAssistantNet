@@ -27,7 +27,7 @@ public sealed class SessionReviewAnalyzer(
         AnswerPrompt prompt, CancellationToken ct)
     {
         // 1. Resolve API key — fail fast without touching the network.
-        var keyResult = secrets.GetApiKey();
+        var keyResult = secrets.GetApiKey(SecretKind.Anthropic);
         if (keyResult.IsFailed)
         {
             Log.Warning("SessionReviewAnalyzer: no API key configured");

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
 using AIHelperNET.Domain.Sessions;
 using AIHelperNET.Domain.ValueObjects;
@@ -29,7 +30,7 @@ public class AnswerLanguageLiveTests(ITestOutputHelper output)
     public async Task RussianTranscriptionLanguage_ProducesCyrillicAnswer_AutoStaysEnglish()
     {
         var secrets = new WindowsCredentialSecretStore();
-        if (!secrets.HasApiKey())
+        if (!secrets.HasApiKey(SecretKind.Anthropic))
         {
             output.WriteLine("Skipped: no Claude API key in Windows Credential Manager " +
                 "(target 'AIHelperNET:ClaudeApiKey').");
@@ -38,7 +39,7 @@ public class AnswerLanguageLiveTests(ITestOutputHelper output)
 
         var opts = new ClaudeOptions();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        var apiKey = SecureToString(secrets.GetApiKey().Value);
+        var apiKey = SecureToString(secrets.GetApiKey(SecretKind.Anthropic).Value);
 
         var profile = CodeProfile.Empty with { ProgrammingLanguage = "C#" };
         var question = DetectedQuestion.Create(

@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
 using AIHelperNET.Domain.ValueObjects;
 using AIHelperNET.Infrastructure.AI;
@@ -32,7 +33,7 @@ public class SpecBAnswerDepthLiveTests(ITestOutputHelper output)
     public async Task TrivialAndHard_AtEightHundredCap_DepthScalesAndNoTruncation()
     {
         var secrets = new WindowsCredentialSecretStore();
-        if (!secrets.HasApiKey())
+        if (!secrets.HasApiKey(SecretKind.Anthropic))
         {
             output.WriteLine("Skipped: no Claude API key in Windows Credential Manager " +
                 "(target 'AIHelperNET:ClaudeApiKey').");
@@ -41,7 +42,7 @@ public class SpecBAnswerDepthLiveTests(ITestOutputHelper output)
 
         var opts = new ClaudeOptions();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        var apiKey = SecureToString(secrets.GetApiKey().Value);
+        var apiKey = SecureToString(secrets.GetApiKey(SecretKind.Anthropic).Value);
 
         // (a) Trivial/factual question — difficulty instruction should keep it to 1–2 sentences.
         var trivial = PromptBuilderService.Build(

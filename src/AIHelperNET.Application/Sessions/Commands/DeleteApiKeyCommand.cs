@@ -5,7 +5,8 @@ using Mediator;
 namespace AIHelperNET.Application.Sessions.Commands;
 
 /// <summary>Command to remove the stored AI API key from the secret store.</summary>
-public sealed record DeleteApiKeyCommand : IRequest<Result>;
+/// <param name="Kind">Which secret to delete.</param>
+public sealed record DeleteApiKeyCommand(SecretKind Kind) : IRequest<Result>;
 
 /// <summary>Handles <see cref="DeleteApiKeyCommand"/>.</summary>
 public sealed class DeleteApiKeyHandler(ISecretStore secretStore)
@@ -13,5 +14,5 @@ public sealed class DeleteApiKeyHandler(ISecretStore secretStore)
 {
     /// <inheritdoc/>
     public ValueTask<Result> Handle(DeleteApiKeyCommand command, CancellationToken cancellationToken)
-        => ValueTask.FromResult(secretStore.DeleteApiKey());
+        => ValueTask.FromResult(secretStore.DeleteApiKey(command.Kind));
 }

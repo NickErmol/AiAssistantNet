@@ -25,11 +25,11 @@ public sealed class ScreenFollowUpClassifierTests
             var ss = new SecureString();
             foreach (var c in "fake-key") ss.AppendChar(c);
             ss.MakeReadOnly();
-            secrets.GetApiKey().Returns(Result.Ok(ss));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Ok(ss));
         }
         else
         {
-            secrets.GetApiKey().Returns(Result.Fail<SecureString>("no key"));
+            secrets.GetApiKey(SecretKind.Anthropic).Returns(Result.Fail<SecureString>("no key"));
         }
 
         return new ScreenFollowUpClassifier(http, secrets, Options.Create(new ClaudeOptions()));
