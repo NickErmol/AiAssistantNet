@@ -9,6 +9,7 @@ using AIHelperNET.Domain.ValueObjects;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mediator;
+using Microsoft.Win32;
 
 namespace AIHelperNET.App.ViewModels;
 
@@ -16,7 +17,9 @@ namespace AIHelperNET.App.ViewModels;
 public sealed partial class SettingsViewModel(
     IMediator mediator,
     IHotkeyApplier hotkeyApplier,
-    ITranscriptionGlossaryProvider glossary) : ObservableObject
+    ITranscriptionGlossaryProvider glossary,
+    IDocumentTextExtractor documentTextExtractor,
+    IProfileCondenser profileCondenser) : ObservableObject
 {
     // ── Shortcuts tab ─────────────────────────────────────────────
     /// <summary>Editable shortcut rows, one per action, shown in the Shortcuts tab.</summary>
@@ -64,6 +67,105 @@ public sealed partial class SettingsViewModel(
 
     /// <summary>All saved presets.</summary>
     public ObservableCollection<ProfilePreset> Presets { get; } = [];
+
+    // ── Profile tab ───────────────────────────────────────────────
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CondenseCommand))]
+    private string _resumeRawText = string.Empty;
+
+    [ObservableProperty] private string _jobDescriptionRawText = string.Empty;
+    [ObservableProperty] private string _candidateProfileCard = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CondenseCommand))]
+    private bool _isCondensing;
+
+    [ObservableProperty] private string _profileErrorMessage = string.Empty;
+
+    /// <summary>
+    /// Injectable file-picker delegate used by the Load-from-file commands.
+    /// Default shows a WPF OpenFileDialog; override in tests to inject a path directly.
+    /// </summary>
+    internal Func<string?> PickFile { get; set; } = () =>
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Documents|*.pdf;*.docx;*.txt;*.md|All files|*.*",
+            Title  = "Select a document"
+        };
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
+    };
+
+    private bool CanCondense => !IsCondensing && !string.IsNullOrWhiteSpace(ResumeRawText);
+
+    [RelayCommand]
+    private async Task LoadResumeFromFileAsync(CancellationToken ct)
+    {
+        var path = PickFile();
+        if (path is null) return;
+
+        var result = await documentTextExtractor.ExtractAsync(path, ct);
+        if (result.IsSuccess)
+        {
+            ResumeRawText = result.Value;
+            ProfileErrorMessage = string.Empty;
+        }
+        else
+        {
+            ProfileErrorMessage = string.Join("; ", result.Errors.Select(e => e.Message));
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadJobDescriptionFromFileAsync(CancellationToken ct)
+    {
+        var path = PickFile();
+        if (path is null) return;
+
+        var result = await documentTextExtractor.ExtractAsync(path, ct);
+        if (result.IsSuccess)
+        {
+            JobDescriptionRawText = result.Value;
+            ProfileErrorMessage = string.Empty;
+        }
+        else
+        {
+            ProfileErrorMessage = string.Join("; ", result.Errors.Select(e => e.Message));
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCondense))]
+    private async Task CondenseAsync(CancellationToken ct)
+    {
+        if (IsCondensing) return;
+        IsCondensing = true;
+        try
+        {
+            var jd = string.IsNullOrWhiteSpace(JobDescriptionRawText) ? null : JobDescriptionRawText;
+            var result = await profileCondenser.CondenseAsync(ResumeRawText, jd, ct);
+            if (result.IsSuccess)
+            {
+                CandidateProfileCard = result.Value;
+                ProfileErrorMessage  = string.Empty;
+            }
+            else
+            {
+                ProfileErrorMessage = string.Join("; ", result.Errors.Select(e => e.Message));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Silent — user cancelled or app is shutting down.
+        }
+        catch (Exception ex)
+        {
+            ProfileErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsCondensing = false;
+        }
+    }
 
     // ── Appearance tab ────────────────────────────────────────────
     [ObservableProperty] private double _overlayOpacity = 0.75;
@@ -139,6 +241,10 @@ public sealed partial class SettingsViewModel(
         AnswerTone       = s.AnswerSettings.Tone;
         AnswerFormat     = s.AnswerSettings.Format;
         OutputLanguage   = s.AnswerSettings.OutputLanguage;
+
+        ResumeRawText       = s.ResumeRawText       ?? string.Empty;
+        JobDescriptionRawText = s.JobDescriptionRawText ?? string.Empty;
+        CandidateProfileCard  = s.CandidateProfileCard  ?? string.Empty;
 
         Presets.Clear();
         foreach (var p in s.Presets) Presets.Add(p);
@@ -248,7 +354,10 @@ public sealed partial class SettingsViewModel(
         {
             Presets = [.. Presets],
             HotkeyOverrides = [.. hotkeyOverridesToSave],
-            EnabledGlossaryDomains = GlossaryDomains.Where(d => d.IsEnabled).Select(d => d.Key).ToList()
+            EnabledGlossaryDomains = GlossaryDomains.Where(d => d.IsEnabled).Select(d => d.Key).ToList(),
+            ResumeRawText       = NullIfEmpty(ResumeRawText),
+            JobDescriptionRawText = NullIfEmpty(JobDescriptionRawText),
+            CandidateProfileCard  = NullIfEmpty(CandidateProfileCard)
         };
 
         await mediator.Send(new SaveSettingsCommand(dto));

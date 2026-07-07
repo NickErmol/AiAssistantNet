@@ -14,7 +14,9 @@ namespace AIHelperNET.App.Tests;
 public class SettingsViewModelTransparencyTests
 {
     private static SettingsViewModel CreateVm()
-        => new(Substitute.For<IMediator>(), new StubHotkeyApplier(), Substitute.For<ITranscriptionGlossaryProvider>());
+        => new(Substitute.For<IMediator>(), new StubHotkeyApplier(), Substitute.For<ITranscriptionGlossaryProvider>(),
+               Substitute.For<AIHelperNET.Application.Abstractions.IDocumentTextExtractor>(),
+               Substitute.For<AIHelperNET.Application.Abstractions.IProfileCondenser>());
 
     [Fact]
     public void OverlayTransparency_is_inverse_of_opacity()

@@ -31,7 +31,9 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty());
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IDocumentTextExtractor>(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IProfileCondenser>());
 
         await vm.LoadAsync();
 
@@ -48,7 +50,9 @@ public class SettingsViewModelTokenTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty()) { MaxAnswerTokens = 1500 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IDocumentTextExtractor>(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IProfileCondenser>()) { MaxAnswerTokens = 1500 };
 
         await vm.SaveSettingsAsync();
 
@@ -76,7 +80,9 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<HasApiKeyQuery>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result<bool>>(Result.Ok(false)));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty());
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IDocumentTextExtractor>(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IProfileCondenser>());
 
         await vm.LoadAsync();
 
@@ -93,7 +99,9 @@ public class SettingsViewModelWindowTests
         mediator.Send(Arg.Any<SaveSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<Result>(Result.Ok()));
 #pragma warning restore CA2012
-        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty()) { LatestQuestionWindowSeconds = 200 };
+        var vm = new SettingsViewModel(mediator, new StubHotkeyApplier(), GlossaryStubs.Empty(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IDocumentTextExtractor>(),
+            Substitute.For<AIHelperNET.Application.Abstractions.IProfileCondenser>()) { LatestQuestionWindowSeconds = 200 };
 
         await vm.SaveSettingsAsync();
 
