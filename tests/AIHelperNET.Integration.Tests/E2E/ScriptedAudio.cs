@@ -35,8 +35,7 @@ public sealed class ScriptedTranscriptionService(IReadOnlyList<ScriptedUtterance
 {
     /// <inheritdoc/>
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
-        IAsyncEnumerable<AudioFrame> frames, WhisperModelSize model, string language,
-        IReadOnlySet<string> glossaryDomains,
+        IAsyncEnumerable<AudioFrame> frames, TranscriptionOptions options,
         [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var frame in frames.WithCancellation(ct))

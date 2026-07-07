@@ -24,10 +24,8 @@ public sealed class SessionRunner(
     public async Task StartAsync(
         SessionId sessionId,
         AudioDeviceSelection devices,
-        WhisperModelSize model,
-        string language,
-        AudioSourceMode audioSource,
-        IReadOnlySet<string> glossaryDomains)
+        TranscriptionOptions options,
+        AudioSourceMode audioSource)
     {
         _sessionScope = scopeFactory.CreateScope();
         var repo = _sessionScope.ServiceProvider.GetRequiredService<ISessionRepository>();
@@ -48,7 +46,7 @@ public sealed class SessionRunner(
         // the handshake. Fire-and-forget; best-effort.
         _ = WarmUpAnswerProviderAsync(_cts.Token);
 
-        _pipelineTask = RunAsync(result.Value, devices, model, language, audioSource, glossaryDomains, _cts.Token);
+        _pipelineTask = RunAsync(result.Value, devices, options, audioSource, _cts.Token);
     }
 
     private async Task WarmUpAnswerProviderAsync(CancellationToken ct)
@@ -100,10 +98,8 @@ public sealed class SessionRunner(
     private async Task RunAsync(
         Session session,
         AudioDeviceSelection devices,
-        WhisperModelSize model,
-        string language,
+        TranscriptionOptions options,
         AudioSourceMode audioSource,
-        IReadOnlySet<string> glossaryDomains,
         CancellationToken ct)
     {
         Log.Information("SessionRunner: pipeline starting (mode={AudioSource})", audioSource);
@@ -152,7 +148,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), model, language, glossaryDomains, ct)
+                        .TranscribeAsync(micChannel.Reader.ReadAllAsync(ct), options, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);
@@ -169,7 +165,7 @@ public sealed class SessionRunner(
                 try
                 {
                     await foreach (var seg in transcription
-                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), model, language, glossaryDomains, ct)
+                        .TranscribeAsync(loopbackChannel.Reader.ReadAllAsync(ct), options, ct)
                         .WithCancellation(ct))
                     {
                         await mergeChannel.Writer.WriteAsync(seg, ct);

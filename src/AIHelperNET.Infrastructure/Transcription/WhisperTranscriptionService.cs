@@ -25,15 +25,13 @@ public sealed class WhisperTranscriptionService(
 
     public async IAsyncEnumerable<TranscriptSegment> TranscribeAsync(
         IAsyncEnumerable<AudioFrame> frames,
-        WhisperModelSize model,
-        string language,
-        IReadOnlySet<string> glossaryDomains,
+        TranscriptionOptions options,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var factory = await whisperModels.GetFactoryAsync(model, ct);
+        var factory = await whisperModels.GetFactoryAsync(options.Model, ct);
         // "auto" makes Whisper detect the language per window; a concrete code (e.g. "en", "ru")
         // forces it. Empty/whitespace falls back to auto rather than silently forcing English.
-        var lang    = string.IsNullOrWhiteSpace(language) ? "auto" : language;
+        var lang    = string.IsNullOrWhiteSpace(options.Language) ? "auto" : options.Language;
 
         string? lastEmitted = null;
         var recent = new Queue<string>(RecentContextSegments);
@@ -41,9 +39,9 @@ public sealed class WhisperTranscriptionService(
         string BuildPrompt()
         {
             var recentContext = LastWords(string.Join(' ', recent), RecentContextWordCap);
-            var suffix = glossaryDomains.Count == 0
+            var suffix = options.GlossaryDomains.Count == 0
                 ? string.Empty
-                : glossary.BuildPromptSuffix(glossaryDomains, recentContext, GlossaryWordBudget);
+                : glossary.BuildPromptSuffix(options.GlossaryDomains, recentContext, GlossaryWordBudget);
             var basePart = recentContext.Length == 0 ? InitialPrompt : recentContext;
             // Glossary goes LAST so it sits closest to the audio and survives Whisper's
             // tail-truncation of an over-long prompt.
@@ -81,7 +79,7 @@ public sealed class WhisperTranscriptionService(
             Log.Information(
                 "WhisperTiming model={Model} speaker={Speaker} windowAudioSec={AudioSec:F2} " +
                 "buildMs={BuildMs} inferMs={InferMs} rtf={Rtf:F2}",
-                model, window.Speaker, audioSec,
+                options.Model, window.Speaker, audioSec,
                 buildSw.ElapsedMilliseconds, inferSw.ElapsedMilliseconds,
                 TranscriptionMetrics.RealtimeFactor(inferSw.ElapsedMilliseconds, audioSec));
 

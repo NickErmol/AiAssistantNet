@@ -35,8 +35,8 @@ public sealed class RussianLanguageDetectionTests(ITestOutputHelper output) : IA
         var sb = new StringBuilder();
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await foreach (var seg in svc.TranscribeAsync(
-                           RussianFrames(cts.Token), Model, language,
-                           new HashSet<string>(), cts.Token))
+                           RussianFrames(cts.Token),
+                           new TranscriptionOptions(Model, language, new HashSet<string>()), cts.Token))
             sb.Append(seg.Text).Append(' ');
         return sb.ToString().Trim();
     }
