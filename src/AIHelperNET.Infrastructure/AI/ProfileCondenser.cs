@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using AIHelperNET.Application.Abstractions;
 using AIHelperNET.Application.Answers;
-using AIHelperNET.Application.Reviews;
+using AIHelperNET.Application.Profile;
 using AIHelperNET.Infrastructure.Security;
 using FluentResults;
 using Microsoft.Extensions.Options;
@@ -12,30 +12,33 @@ using Serilog;
 namespace AIHelperNET.Infrastructure.AI;
 
 /// <summary>
-/// Sends the assembled review <see cref="AnswerPrompt"/> to the Claude Messages API (non-streaming)
-/// and returns the generated markdown report as a <see cref="SessionReviewResult"/>.
-/// Uses Sonnet (resolved via <see cref="ClaudeModels.Resolve"/>) and a 5-minute HTTP timeout
-/// to accommodate 8 k-token generation.
+/// Sends the assembled condensation <see cref="AnswerPrompt"/> to the Claude Messages API
+/// (non-streaming) and returns the generated profile card text.
+/// Uses Sonnet (resolved via <see cref="ClaudeModels.Resolve"/>) and a 2-minute HTTP timeout
+/// to accommodate condensation.
 /// </summary>
-public sealed class SessionReviewAnalyzer(
+public sealed class ProfileCondenser(
     HttpClient http,
     ISecretStore secrets,
-    IOptions<ClaudeOptions> options) : ISessionReviewAnalyzer
+    IOptions<ClaudeOptions> options) : IProfileCondenser
 {
     /// <inheritdoc/>
-    public async Task<Result<SessionReviewResult>> AnalyzeAsync(
-        AnswerPrompt prompt, CancellationToken ct)
+    public async Task<Result<string>> CondenseAsync(
+        string resumeText,
+        string? jobDescriptionText,
+        CancellationToken ct)
     {
         // 1. Resolve API key — fail fast without touching the network.
         var keyResult = secrets.GetApiKey();
         if (keyResult.IsFailed)
         {
-            Log.Warning("SessionReviewAnalyzer: no API key configured");
+            Log.Warning("ProfileCondenser: no API key configured");
             return Result.Fail(
                 "No Claude API key configured — add one in Settings.");
         }
 
         var opts = options.Value;
+        var prompt = CandidateProfilePromptBuilder.Build(resumeText, jobDescriptionText);
         var resolvedModel = ClaudeModels.Resolve(prompt.Model ?? AnswerModel.Sonnet);
 
         var body = JsonSerializer.Serialize(new
@@ -62,13 +65,13 @@ public sealed class SessionReviewAnalyzer(
 
             if (!response.IsSuccessStatusCode)
             {
-                Log.Warning("SessionReviewAnalyzer: API error {Status} — {Body}",
+                Log.Warning("ProfileCondenser: API error {Status} — {Body}",
                     (int)response.StatusCode, json[..Math.Min(200, json.Length)]);
                 return Result.Fail(
-                    $"Claude API returned {(int)response.StatusCode} — review generation failed.");
+                    $"Claude API returned {(int)response.StatusCode} — profile condensation failed.");
             }
 
-            return ParseResult(json, resolvedModel);
+            return ParseResult(json);
         }
         finally
         {
@@ -78,7 +81,7 @@ public sealed class SessionReviewAnalyzer(
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
-    private static Result<SessionReviewResult> ParseResult(string json, string modelUsed)
+    private static Result<string> ParseResult(string json)
     {
         try
         {
@@ -87,25 +90,25 @@ public sealed class SessionReviewAnalyzer(
 
             if (contentArray.GetArrayLength() == 0)
             {
-                Log.Warning("SessionReviewAnalyzer: response content array is empty");
-                return Result.Fail("Claude returned an empty response — review generation failed.");
+                Log.Warning("ProfileCondenser: response content array is empty");
+                return Result.Fail("Claude returned an empty response — profile condensation failed.");
             }
 
             var text = contentArray[0].GetProperty("text").GetString()?.Trim() ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                Log.Warning("SessionReviewAnalyzer: response text is empty");
-                return Result.Fail("Claude returned empty text — review generation failed.");
+                Log.Warning("ProfileCondenser: response text is empty");
+                return Result.Fail("Claude returned empty text — profile condensation failed.");
             }
 
-            Log.Debug("SessionReviewAnalyzer: review generated ({Chars} chars)", text.Length);
-            return Result.Ok(new SessionReviewResult(text, modelUsed));
+            Log.Debug("ProfileCondenser: condensed profile generated ({Chars} chars)", text.Length);
+            return Result.Ok(text);
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "SessionReviewAnalyzer: failed to parse Claude response");
-            return Result.Fail("Could not parse Claude response — review generation failed.");
+            Log.Warning(ex, "ProfileCondenser: failed to parse Claude response");
+            return Result.Fail("Could not parse Claude response — profile condensation failed.");
         }
     }
 

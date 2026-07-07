@@ -4,6 +4,7 @@ using AIHelperNET.Infrastructure.AI;
 using AIHelperNET.Infrastructure.Audio;
 using AIHelperNET.Infrastructure.Common;
 using AIHelperNET.Infrastructure.Diagnostics;
+using AIHelperNET.Infrastructure.Documents;
 using AIHelperNET.Infrastructure.Export;
 using AIHelperNET.Infrastructure.Hotkeys;
 using AIHelperNET.Infrastructure.Ocr;
@@ -37,6 +38,9 @@ public static class DependencyInjection
         // Settings & secrets
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<ISecretStore, WindowsCredentialSecretStore>();
+
+        // Document text extraction
+        services.AddSingleton<IDocumentTextExtractor, DocumentTextExtractor>();
 
         // Export
         services.AddSingleton<IExportService, ExportService>();
@@ -76,6 +80,10 @@ public static class DependencyInjection
         services.AddHttpClient<SessionReviewAnalyzer>(c =>
             c.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton<ISessionReviewAnalyzer, SessionReviewAnalyzer>();
+
+        services.AddHttpClient<ProfileCondenser>(c =>
+            c.Timeout = TimeSpan.FromMinutes(2));
+        services.AddSingleton<IProfileCondenser, ProfileCondenser>();
 
         services.AddSingleton<IBoundaryDecisionRecorder>(
             _ => new JsonlBoundaryDecisionRecorder(AppPaths.DiagnosticsDir));

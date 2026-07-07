@@ -57,7 +57,8 @@ public sealed partial class RegenerateAnswerWithScreenHandler(
 
         var prompt = PromptBuilderService.BuildWithScreenMode(
             session.CodeProfile, answerSettings,
-            request.ScreenContext, request.InterviewerLines, request.Mode);
+            request.ScreenContext, request.InterviewerLines, request.Mode,
+            candidateProfileCard: settings.CandidateProfileCard);
 
         var chunks = new System.Text.StringBuilder();
         try

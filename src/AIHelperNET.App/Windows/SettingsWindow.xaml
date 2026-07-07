@@ -249,6 +249,71 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ═══ Profile ═══ -->
+            <TabItem Header="Profile">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <TextBlock Text="RESUME" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Paste or load your CV / resume" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding ResumeRawText, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="100"
+                                 Margin="0,0,0,4"/>
+                        <Button Content="Load from file…"
+                                Command="{Binding LoadResumeFromFileCommand}"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12"/>
+
+                        <TextBlock Text="JOB DESCRIPTION" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Paste or load the target job description (optional)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding JobDescriptionRawText, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="100"
+                                 Margin="0,0,0,4"/>
+                        <Button Content="Load from file…"
+                                Command="{Binding LoadJobDescriptionFromFileCommand}"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12"/>
+
+                        <Button Content="Condense with Claude"
+                                Command="{Binding CondenseCommand}"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,6"/>
+                        <ProgressBar IsIndeterminate="True"
+                                     Height="4"
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding IsCondensing,
+                                         Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <TextBlock Text="{Binding ProfileErrorMessage}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Brush.Semantic.Error}"
+                                   Margin="0,0,0,6">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ProfileErrorMessage}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="Condensed card (editable)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding CandidateProfileCard, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="140"
+                                 Margin="0,0,0,4"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ═══ Appearance ═══ -->
             <TabItem Header="Appearance">
                 <StackPanel Margin="8">

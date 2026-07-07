@@ -49,6 +49,15 @@ public sealed record AppSettingsDto(
     /// <summary>Maximum Answer-latest-question look-back window, in seconds.</summary>
     public const int MaxLatestQuestionWindowSeconds = 300;
 
+    /// <summary>Raw resume text pasted or extracted from a file by the user.</summary>
+    public string? ResumeRawText { get; init; }
+
+    /// <summary>Raw job description text pasted or extracted from a file by the user.</summary>
+    public string? JobDescriptionRawText { get; init; }
+
+    /// <summary>Condensed candidate profile card produced by <c>IProfileCondenser</c>; injected into answer prompts.</summary>
+    public string? CandidateProfileCard { get; init; }
+
     /// <summary>Named setting presets for quick profile switching.</summary>
     public IReadOnlyList<ProfilePreset> Presets { get; init; } = [];
 
